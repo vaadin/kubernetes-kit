@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: azure-kit-demo
-  namespace: default
 spec:
   replicas: 2
   selector:
