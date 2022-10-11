@@ -9,7 +9,7 @@ To deploy the demo application into your cluster, follow these steps:
 
 1. Build the application JAR:
 ```
-# mvn clean package -Pproduction -Dmaven.javadoc.skip=true -Dmaven.source.skip=true
+# mvn clean package -Pproduction
 ```
 2. Create or update the Docker image:
 ```
@@ -38,7 +38,7 @@ At this point the demo should be reachable at http://localhost:8000/
 At http://localhost:8000/counter you find a counter which value is held in the UI.
 Pushing the "Increment" button increments the counter and keeps a log of the operation, tracking the hostname and address of the node currently serving the request.
 
-Now try to scale down your deploymen to a single pod:
+Now try to scale down your deployment to a single pod:
 
 ```
 # kubectl scale deployments/azure-kit-demo --replicas=1
