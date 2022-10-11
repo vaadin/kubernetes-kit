@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: azure-kit-demo
 spec:
-  replicas: 2
+  replicas: 4
   selector:
     matchLabels:
       app: azure-kit-demo
