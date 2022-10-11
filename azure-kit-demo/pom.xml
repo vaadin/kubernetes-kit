@@ -10,6 +10,11 @@
 
     <artifactId>azure-kit-demo</artifactId>
 
+    <properties>
+        <maven.source.skip>true</maven.source.skip>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
+    </properties>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
