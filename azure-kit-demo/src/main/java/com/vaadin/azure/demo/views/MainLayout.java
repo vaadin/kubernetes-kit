@@ -3,8 +3,7 @@ package com.vaadin.azure.demo.views;
 
 import com.vaadin.azure.demo.components.appnav.AppNav;
 import com.vaadin.azure.demo.components.appnav.AppNavItem;
-import com.vaadin.azure.demo.views.about.AboutView;
-import com.vaadin.azure.demo.views.helloworld.HelloWorldView;
+import com.vaadin.azure.demo.views.counter.CounterView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.html.Footer;
@@ -53,8 +52,8 @@ public class MainLayout extends AppLayout {
         // For documentation, visit https://github.com/vaadin/vcf-nav#readme
         AppNav nav = new AppNav();
 
-        nav.addItem(new AppNavItem("Hello World", HelloWorldView.class, "la la-globe"));
-        nav.addItem(new AppNavItem("About", AboutView.class, "la la-file"));
+        nav.addItem(new AppNavItem("Counter", CounterView.class,
+                "la la-plus-circle"));
 
         return nav;
     }
