@@ -14,6 +14,7 @@
 
     <modules>
         <module>azure-kit-demo</module>
+        <module>azure-kit-starter</module>
     </modules>
 
     <properties>
@@ -45,6 +46,13 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
+            </dependency>
             <dependency>
                 <groupId>com.vaadin</groupId>
                 <artifactId>license-checker</artifactId>
