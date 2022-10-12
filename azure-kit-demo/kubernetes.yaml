@@ -22,7 +22,26 @@ spec:
             limits:
               memory: 512Mi
               cpu: '1'
-
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-kit-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-kit-redis
+  template:
+    metadata:
+      labels:
+        app: azure-kit-redis
+    spec:
+      containers:
+        - name: azure-kit-redis
+          image: redis:latest
+          ports:
+            - containerPort: 6379
 ---
 apiVersion: v1
 kind: Service
@@ -33,7 +52,18 @@ spec:
     app: azure-kit-demo
   ports:
     - protocol: TCP
-      port: 8000 # The port to expose to the outside
-      targetPort: 8080 # The port the application is running on in the pods
+      port: 8000
+      targetPort: 8080
   type: LoadBalancer
   sessionAffinity: ClientIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-kit-redis-service
+spec:
+  selector:
+    app: azure-kit-redis
+  ports:
+  - protocol: TCP
+    port: 6379

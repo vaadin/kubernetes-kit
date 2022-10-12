@@ -1,20 +1,18 @@
 package com.vaadin.azure.demo.views.counter;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.vaadin.azure.demo.services.HostInfo;
 import com.vaadin.azure.demo.views.MainLayout;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.ListItem;
+import com.vaadin.flow.component.html.UnorderedList;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.data.provider.DataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
@@ -30,9 +28,7 @@ public class CounterView extends VerticalLayout {
 
     private final H3 ipAddressHeading = new H3();
 
-    private final Grid<CountEntry> grid = new Grid<>();
-
-    private final List<CountEntry> log = new ArrayList<>();
+    private final UnorderedList log = new UnorderedList();
 
     private final Button button = new Button("Increment");
 
@@ -52,14 +48,10 @@ public class CounterView extends VerticalLayout {
                 ButtonVariant.LUMO_LARGE);
         button.addClickListener(event -> count());
 
-        grid.addColumn(CountEntry::getCount);
-        grid.addColumn(CountEntry::getHostname);
-        grid.addColumn(CountEntry::getIpAddress);
-        grid.setItems(DataProvider.ofCollection(log));
-
         count();
 
-        add(counterHeading, hostnameHeading, ipAddressHeading, button, grid);
+        add(counterHeading, hostnameHeading, ipAddressHeading, button);
+        addAndExpand(log);
     }
 
     private void count() {
@@ -70,8 +62,8 @@ public class CounterView extends VerticalLayout {
         hostnameHeading.setText(entry.getHostname());
         ipAddressHeading.setText(entry.getIpAddress());
 
-        log.add(0, entry);
-        grid.getDataProvider().refreshAll();
+        final var item = new ListItem(entry.getHostname() + " (" + entry.getIpAddress() + ") " + entry.getCount());
+        log.addComponentAsFirst(item);
     }
 
     static class CountEntry implements Serializable {
