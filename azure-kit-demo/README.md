@@ -9,7 +9,7 @@ To deploy the demo application into your cluster, follow these steps:
 
 1. Build the application JAR:
 ```
-# mvn clean package -Pproduction
+# mvn clean package -Pproduction,redis
 ```
 2. Create or update the Docker image:
 ```
@@ -29,6 +29,7 @@ azure-kit-demo-f87bfcbb4-5qjml       1/1     Running   0             22s
 azure-kit-demo-f87bfcbb4-czkzr       1/1     Running   0             22s
 azure-kit-demo-f87bfcbb4-gjqw6       1/1     Running   0             22s
 azure-kit-demo-f87bfcbb4-rxvjb       1/1     Running   0             22s
+azure-kit-redis-788d56c66-8b259      1/1     Running   0             22s
 ```
 
 At this point the demo should be reachable at http://localhost:8000/
