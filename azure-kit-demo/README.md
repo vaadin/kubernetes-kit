@@ -17,7 +17,7 @@ To deploy the demo application into your cluster, follow these steps:
 ```
 3. Deploy the image into the cluster:
 ```
-# kubectl apply -f kubernetes.yaml
+# kubectl apply -f deployment/redis.yaml -f deployment/app.yaml
 ```
 
 You should now see 4 pods running, e.g.
