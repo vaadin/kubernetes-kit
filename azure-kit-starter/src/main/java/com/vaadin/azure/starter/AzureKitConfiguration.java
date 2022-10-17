@@ -7,11 +7,10 @@ import com.hazelcast.config.IndexType;
 import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.nio.serialization.Serializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.hazelcast.HazelcastAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
@@ -34,8 +33,9 @@ public class AzureKitConfiguration {
     @AutoConfiguration
     @EnableRedisHttpSession
     @ConditionalOnClass(RedisIndexedSessionRepository.class)
-    public static class RedisSessionRepositoryConfiguration
-            extends RedisAutoConfiguration {
+    public static class RedisSessionRepositoryConfiguration {
+
+        static final String BEAN_NAME = "vaadinRedisSessionRepositoryCustomizer";
 
         /**
          * Provides a {@link SessionRepositoryCustomizer} bean to configure
@@ -43,7 +43,7 @@ public class AzureKitConfiguration {
          *
          * @return the session-repository customizer
          */
-        @Bean("vaadinAzureKitRedisSessionRepositoryCustomizer")
+        @Bean(BEAN_NAME)
         public SessionRepositoryCustomizer<RedisIndexedSessionRepository> redisSessionRepositoryCustomizer() {
             return repository -> {
                 repository.setSaveMode(SaveMode.ON_GET_ATTRIBUTE);
@@ -54,8 +54,9 @@ public class AzureKitConfiguration {
     @AutoConfiguration
     @EnableHazelcastHttpSession
     @ConditionalOnClass(Hazelcast4IndexedSessionRepository.class)
-    public static class HazelcastSessionRepositoryConfiguration
-            extends HazelcastAutoConfiguration {
+    public static class HazelcastSessionRepositoryConfiguration {
+
+        static final String BEAN_NAME = "vaadinHazelcastSessionRepositoryCustomizer";
 
         /**
          * Provides a {@link SessionRepositoryCustomizer} bean to configure
@@ -63,7 +64,7 @@ public class AzureKitConfiguration {
          *
          * @return the session-repository customizer
          */
-        @Bean("vaadinAzureKitHazelcastSessionRepositoryCustomizer")
+        @Bean(BEAN_NAME)
         @ConditionalOnClass(Hazelcast4IndexedSessionRepository.class)
         public SessionRepositoryCustomizer<Hazelcast4IndexedSessionRepository> hazelcastSessionRepositoryCustomizer() {
             return repository -> {
@@ -77,8 +78,8 @@ public class AzureKitConfiguration {
         public HazelcastInstance hazelcastInstance() {
             final var config = new Config();
 
-            final var attributeConfig = new AttributeConfig();
-            attributeConfig.setName(
+            final var attrConfig = new AttributeConfig();
+            attrConfig.setName(
                     Hazelcast4IndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE)
                     .setExtractorClassName(
                             Hazelcast4PrincipalNameExtractor.class.getName());
@@ -88,16 +89,28 @@ public class AzureKitConfiguration {
 
             config.getMapConfig(
                     Hazelcast4IndexedSessionRepository.DEFAULT_SESSION_MAP_NAME)
-                    .addAttributeConfig(attributeConfig)
-                    .addIndexConfig(indexConfig);
+                    .addAttributeConfig(attrConfig).addIndexConfig(indexConfig);
 
             final var serializerConfig = new SerializerConfig();
-            serializerConfig.setImplementation(new HazelcastSessionSerializer())
-                    .setTypeClass(MapSession.class);
+            serializerConfig.setImplementation(getSerializer());
+            serializerConfig.setTypeClass(MapSession.class);
 
             config.getSerializationConfig()
                     .addSerializerConfig(serializerConfig);
+
+            config.getNetworkConfig().getJoin().getTcpIpConfig()
+                    .setEnabled(false);
+            config.getNetworkConfig().getJoin().getMulticastConfig()
+                    .setEnabled(false);
+            config.getNetworkConfig().getJoin().getKubernetesConfig()
+                    .setEnabled(true).setProperty("namespace", "default")
+                    .setProperty("service-name", "azure-kit-hazelcast-service");
+
             return Hazelcast.newHazelcastInstance(config);
+        }
+
+        private Serializer getSerializer() {
+            return new HazelcastSessionSerializer();
         }
     }
 }
