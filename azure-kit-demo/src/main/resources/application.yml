@@ -3,8 +3,12 @@ server:
 logging:
   level:
     '[com.vaadin.azure]': debug
+vaadin:
+  whitelisted-packages: com.vaadin,org.vaadin,dev.hilla
+  azure:
+    hazelcast:
+      kubernetes:
+        service-name: azure-kit-hazelcast-service
 spring:
   redis:
     host: azure-kit-redis-service
-vaadin:
-  whitelisted-packages: com.vaadin,org.vaadin,dev.hilla

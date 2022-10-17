@@ -11,6 +11,7 @@ import com.hazelcast.nio.serialization.Serializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
@@ -22,12 +23,14 @@ import org.springframework.session.hazelcast.Hazelcast4PrincipalNameExtractor;
 import org.springframework.session.hazelcast.HazelcastSessionSerializer;
 import org.springframework.session.hazelcast.config.annotation.SpringSessionHazelcastInstance;
 import org.springframework.session.hazelcast.config.annotation.web.http.EnableHazelcastHttpSession;
+import org.springframework.util.StringUtils;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
  */
 @AutoConfiguration
+@EnableConfigurationProperties(AzureKitProperties.class)
 public class AzureKitConfiguration {
 
     @AutoConfiguration
@@ -58,6 +61,13 @@ public class AzureKitConfiguration {
 
         static final String BEAN_NAME = "vaadinHazelcastSessionRepositoryCustomizer";
 
+        private final AzureKitProperties properties;
+
+        public HazelcastSessionRepositoryConfiguration(
+                AzureKitProperties properties) {
+            this.properties = properties;
+        }
+
         /**
          * Provides a {@link SessionRepositoryCustomizer} bean to configure
          * {@link Hazelcast4IndexedSessionRepository} to work with Vaadin.
@@ -78,6 +88,19 @@ public class AzureKitConfiguration {
         public HazelcastInstance hazelcastInstance() {
             final var config = new Config();
 
+            configureMapAttributes(config);
+            configureSessionSerializer(config);
+            configureKubernetes(config);
+
+            return createHazelcastInstance(config);
+        }
+
+        // Package protected for testing purposes
+        HazelcastInstance createHazelcastInstance(Config config) {
+            return Hazelcast.newHazelcastInstance(config);
+        }
+
+        private void configureMapAttributes(Config config) {
             final var attrConfig = new AttributeConfig();
             attrConfig.setName(
                     Hazelcast4IndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE)
@@ -90,23 +113,33 @@ public class AzureKitConfiguration {
             config.getMapConfig(
                     Hazelcast4IndexedSessionRepository.DEFAULT_SESSION_MAP_NAME)
                     .addAttributeConfig(attrConfig).addIndexConfig(indexConfig);
+        }
 
+        private void configureSessionSerializer(Config config) {
             final var serializerConfig = new SerializerConfig();
             serializerConfig.setImplementation(getSerializer());
             serializerConfig.setTypeClass(MapSession.class);
 
             config.getSerializationConfig()
                     .addSerializerConfig(serializerConfig);
+        }
 
-            config.getNetworkConfig().getJoin().getTcpIpConfig()
-                    .setEnabled(false);
-            config.getNetworkConfig().getJoin().getMulticastConfig()
-                    .setEnabled(false);
-            config.getNetworkConfig().getJoin().getKubernetesConfig()
-                    .setEnabled(true).setProperty("namespace", "default")
-                    .setProperty("service-name", "azure-kit-hazelcast-service");
+        private void configureKubernetes(Config config) {
+            final var k8sProperties = properties.getHazelcast().getKubernetes();
+            final var k8sServiceName = k8sProperties.getServiceName();
 
-            return Hazelcast.newHazelcastInstance(config);
+            if (StringUtils.hasText(k8sServiceName)) {
+                final var networkConfig = config.getNetworkConfig().getJoin();
+                networkConfig.getTcpIpConfig().setEnabled(false);
+                networkConfig.getMulticastConfig().setEnabled(false);
+
+                final var k8sConfig = networkConfig.getKubernetesConfig();
+                k8sConfig.setEnabled(true);
+
+                final var k8sNamespace = k8sProperties.getNamespace();
+                k8sConfig.setProperty("namespace", k8sNamespace);
+                k8sConfig.setProperty("service-name", k8sServiceName);
+            }
         }
 
         private Serializer getSerializer() {
