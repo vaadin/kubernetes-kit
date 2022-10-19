@@ -9,7 +9,7 @@ To deploy the demo application into your cluster, follow these steps:
 
 1. Build the application JAR:
 ```
-# mvn clean package -Pproduction
+# mvn clean package -Pproduction,redis
 ```
 2. Create or update the Docker image:
 ```
@@ -17,7 +17,7 @@ To deploy the demo application into your cluster, follow these steps:
 ```
 3. Deploy the image into the cluster:
 ```
-# kubectl apply -f kubernetes.yaml
+# kubectl apply -f deployment/redis.yaml -f deployment/app.yaml
 ```
 
 You should now see 4 pods running, e.g.
@@ -29,27 +29,34 @@ azure-kit-demo-f87bfcbb4-5qjml       1/1     Running   0             22s
 azure-kit-demo-f87bfcbb4-czkzr       1/1     Running   0             22s
 azure-kit-demo-f87bfcbb4-gjqw6       1/1     Running   0             22s
 azure-kit-demo-f87bfcbb4-rxvjb       1/1     Running   0             22s
+azure-kit-redis-788d56c66-8b259      1/1     Running   0             22s
 ```
 
 At this point the demo should be reachable at http://localhost:8000/
+
+*NOTE* You can run the demo with Hazelcast instead of Redis by replacing `redis` with `hazelcast` in steps 1 and 3.
 
 ## Scale the deployment
 
 At http://localhost:8000/counter you find a counter which value is held in the UI.
 Pushing the "Increment" button increments the counter and keeps a log of the operation, tracking the hostname and address of the node currently serving the request.
 
-Now try to scale down your deployment to a single pod:
+Now let's simulate the unavailability of the pod handling the requests (assume it's the `azure-kit-demo-f87bfcbb4-5qjml` pod):
 
 ```
-# kubectl scale deployments/azure-kit-demo --replicas=1
+# kubectl delete pod azure-kit-demo-f87bfcbb4-5qjml
 ```
 
-And verify there's now a single one running:
+And wait until the pod is terminated and there's a new one running:
 
 ```
 # kubectl get pods
 NAME                                 READY   STATUS    RESTARTS      AGE
-azure-kit-demo-f87bfcbb4-5qjml       1/1     Running   0             51s
+azure-kit-demo-f87bfcbb4-jj5c4       1/1     Running   0             12s
+azure-kit-demo-f87bfcbb4-czkzr       1/1     Running   0             51s
+azure-kit-demo-f87bfcbb4-gjqw6       1/1     Running   0             51s
+azure-kit-demo-f87bfcbb4-rxvjb       1/1     Running   0             51s
+azure-kit-redis-788d56c66-8b259      1/1     Running   0             51s
 ```
 
-If you try to increment the counter again, there's a chance you get redirected to another pod and see the hostname and address change.
+If you try to increment the counter again, your request will be redirected to another pod but the session should be restored and the counter will keep incrementing.
