@@ -1,10 +1,14 @@
 package com.vaadin.azure.demo.views.counter;
 
 import java.io.Serializable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.vaadin.azure.demo.services.HostInfo;
 import com.vaadin.azure.demo.views.MainLayout;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H1;
@@ -21,6 +25,9 @@ import com.vaadin.flow.router.RouteAlias;
 @Route(value = "counter", layout = MainLayout.class)
 @RouteAlias(value = "", layout = MainLayout.class)
 public class CounterView extends VerticalLayout {
+
+    private static final ScheduledExecutorService executorService = Executors
+            .newSingleThreadScheduledExecutor();
 
     private final H1 counterHeading = new H1();
 
@@ -48,10 +55,41 @@ public class CounterView extends VerticalLayout {
                 ButtonVariant.LUMO_LARGE);
         button.addClickListener(event -> count());
 
+        Button longActionButton = new Button("Long running task", ev -> {
+            int currentCounter = counter.get();
+            addLogEntry("Long Task " + currentCounter + " Started");
+            blocking(5000, () -> addLogEntry(
+                    "Long Task " + currentCounter + " Completed"));
+        });
+        Button backgroundTaskButton = new Button("Background task", ev -> {
+            int currentCounter = counter.get();
+            addLogEntry("Long Task " + currentCounter + " Started");
+            UI ui = ev.getSource().getUI().get();
+            executorService.schedule(
+                    () -> ui.access(() -> addLogEntry(
+                            "Long Task " + currentCounter + " Completed. "
+                                    + "Counter now is " + counter.get())),
+                    10, TimeUnit.SECONDS);
+        });
+
         count();
 
-        add(counterHeading, hostnameHeading, ipAddressHeading, button);
+        add(counterHeading, hostnameHeading, ipAddressHeading, button,
+                longActionButton, backgroundTaskButton);
         addAndExpand(log);
+    }
+
+    private void addLogEntry(String text) {
+        log.addComponentAsFirst(new ListItem(text));
+    }
+
+    private void blocking(int timeoutMs, Runnable action) {
+        try {
+            Thread.sleep(timeoutMs);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        action.run();
     }
 
     private void count() {
@@ -62,7 +100,8 @@ public class CounterView extends VerticalLayout {
         hostnameHeading.setText(entry.getHostname());
         ipAddressHeading.setText(entry.getIpAddress());
 
-        final var item = new ListItem(entry.getHostname() + " (" + entry.getIpAddress() + ") " + entry.getCount());
+        final var item = new ListItem(entry.getHostname() + " ("
+                + entry.getIpAddress() + ") " + entry.getCount());
         log.addComponentAsFirst(item);
     }
 

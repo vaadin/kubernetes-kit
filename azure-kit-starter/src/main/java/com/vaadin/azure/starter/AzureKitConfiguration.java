@@ -9,10 +9,13 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.nio.serialization.Serializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
 import org.springframework.session.config.SessionRepositoryCustomizer;
@@ -25,6 +28,9 @@ import org.springframework.session.hazelcast.config.annotation.SpringSessionHaze
 import org.springframework.session.hazelcast.config.annotation.web.http.EnableHazelcastHttpSession;
 import org.springframework.util.StringUtils;
 
+import com.vaadin.azure.starter.push.CloudPushConnectionListener;
+import com.vaadin.azure.starter.push.SpringSessionCloudPushConnectionListener;
+
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
@@ -32,6 +38,19 @@ import org.springframework.util.StringUtils;
 @AutoConfiguration
 @EnableConfigurationProperties(AzureKitProperties.class)
 public class AzureKitConfiguration {
+
+    @Bean
+    @Primary
+    @ConditionalOnBean(FindByIndexNameSessionRepository.class)
+    DelegateSessionRepository primarySessionRepository(
+            FindByIndexNameSessionRepository delegate) {
+        return new DelegateSessionRepository(delegate);
+    }
+
+    @Bean
+    CloudPushConnectionListener pushConnectionListener(DelegateSessionRepository repository) {
+        return new SpringSessionCloudPushConnectionListener(repository);
+    }
 
     @AutoConfiguration
     @EnableRedisHttpSession
