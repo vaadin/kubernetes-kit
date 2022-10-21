@@ -1,0 +1,83 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-config
+  labels:
+    name: collector-config
+  namespace: observability
+data:
+  collector.yaml: |
+    receivers:
+      otlp:
+        protocols: 
+          grpc:
+    processors:
+      batch:
+        send_batch_size: 10000
+        timeout: 5s
+    exporters:
+      prometheus:
+        endpoint: ":9090"
+      logging:
+        loglevel: debug
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [logging]
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [prometheus, logging]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collector
+  namespace: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: collector
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: collector
+    spec:
+      containers:
+        - name: otelcol
+          args:
+            - --config=/conf/collector.yaml
+          image: otel/opentelemetry-collector:latest
+          volumeMounts:
+            - mountPath: /conf
+              name: collector-config
+      volumes:
+        - configMap:
+            items:
+              - key: collector.yaml
+                path: collector.yaml
+            name: collector-config
+          name: collector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collector
+  namespace: observability
+spec:
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+  selector:
+    app.kubernetes.io/name: collector
+  type: ClusterIP
