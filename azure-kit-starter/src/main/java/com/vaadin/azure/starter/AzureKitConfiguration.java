@@ -13,17 +13,25 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
 import org.springframework.session.config.SessionRepositoryCustomizer;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
-import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 import org.springframework.session.hazelcast.Hazelcast4IndexedSessionRepository;
 import org.springframework.session.hazelcast.Hazelcast4PrincipalNameExtractor;
 import org.springframework.session.hazelcast.HazelcastSessionSerializer;
 import org.springframework.session.hazelcast.config.annotation.SpringSessionHazelcastInstance;
-import org.springframework.session.hazelcast.config.annotation.web.http.EnableHazelcastHttpSession;
 import org.springframework.util.StringUtils;
+
+import com.vaadin.azure.starter.sessiontracker.SessionListener;
+import com.vaadin.azure.starter.sessiontracker.SessionSerializer;
+import com.vaadin.azure.starter.sessiontracker.SessionTrackerFilter;
+import com.vaadin.azure.starter.sessiontracker.backend.BackendConnector;
+import com.vaadin.azure.starter.sessiontracker.backend.HazelcastConnector;
+import com.vaadin.azure.starter.sessiontracker.backend.RedisConnector;
+import com.vaadin.azure.starter.sessiontracker.push.PushSendListener;
+import com.vaadin.azure.starter.sessiontracker.push.PushSessionTracker;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
@@ -34,7 +42,35 @@ import org.springframework.util.StringUtils;
 public class AzureKitConfiguration {
 
     @AutoConfiguration
-    @EnableRedisHttpSession
+    public static class VaadinReplicatedSessionConfiguration {
+
+        @Bean
+        @Order(Integer.MIN_VALUE + 50)
+        SessionTrackerFilter sessionTrackerFilter(
+                SessionSerializer sessionSerializer) {
+            return new SessionTrackerFilter(sessionSerializer);
+        }
+
+        @Bean
+        SessionSerializer sessionSerializer(BackendConnector backendConnector) {
+            return new SessionSerializer(backendConnector);
+        }
+
+        @Bean
+        SessionListener sessionListener(BackendConnector backendConnector,
+                SessionSerializer sessionSerializer) {
+            return new SessionListener(backendConnector, sessionSerializer);
+        }
+
+        @Bean
+        PushSendListener pushSendListener(SessionSerializer sessionSerializer) {
+            return new PushSessionTracker(sessionSerializer);
+        }
+
+    }
+
+    @AutoConfiguration
+    // @EnableRedisHttpSession
     @ConditionalOnClass(RedisIndexedSessionRepository.class)
     public static class RedisSessionRepositoryConfiguration {
 
@@ -52,10 +88,16 @@ public class AzureKitConfiguration {
                 repository.setSaveMode(SaveMode.ON_GET_ATTRIBUTE);
             };
         }
+
+        @Bean
+        RedisConnector redisConnector() {
+            return new RedisConnector();
+        }
+
     }
 
     @AutoConfiguration
-    @EnableHazelcastHttpSession
+    // @EnableHazelcastHttpSession
     @ConditionalOnClass(Hazelcast4IndexedSessionRepository.class)
     public static class HazelcastSessionRepositoryConfiguration {
 
@@ -66,6 +108,12 @@ public class AzureKitConfiguration {
         public HazelcastSessionRepositoryConfiguration(
                 AzureKitProperties properties) {
             this.properties = properties;
+        }
+
+        @Bean
+        HazelcastConnector hazelcastConnector(
+                HazelcastInstance hazelcastInstance) {
+            return new HazelcastConnector(hazelcastInstance);
         }
 
         /**
@@ -139,6 +187,8 @@ public class AzureKitConfiguration {
                 final var k8sNamespace = k8sProperties.getNamespace();
                 k8sConfig.setProperty("namespace", k8sNamespace);
                 k8sConfig.setProperty("service-name", k8sServiceName);
+                k8sConfig.setProperty("service-port",
+                        Integer.toString(k8sProperties.getServicePort()));
             }
         }
 
