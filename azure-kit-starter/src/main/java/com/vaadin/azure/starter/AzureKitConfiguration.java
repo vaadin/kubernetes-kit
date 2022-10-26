@@ -2,6 +2,8 @@ package com.vaadin.azure.starter;
 
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
+import java.util.List;
+import java.util.function.Predicate;
 
 import com.hazelcast.config.AttributeConfig;
 import com.hazelcast.config.Config;
@@ -11,6 +13,8 @@ import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.nio.serialization.Serializer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -18,6 +22,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -41,18 +46,27 @@ import com.vaadin.azure.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.azure.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.azure.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.azure.starter.sessiontracker.push.PushSessionTracker;
+import com.vaadin.azure.starter.sessiontracker.serialization.SpringTransientHandler;
+import com.vaadin.azure.starter.sessiontracker.serialization.TransientHandler;
+import com.vaadin.flow.spring.VaadinConfigurationProperties;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
  */
 @AutoConfiguration(afterName = "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration")
-@EnableConfigurationProperties(AzureKitProperties.class)
+@EnableConfigurationProperties({ AzureKitProperties.class,
+        SerializationProperties.class })
 public class AzureKitConfiguration {
 
     @AutoConfiguration
     @ConditionalOnMissingClass("org.springframework.session.Session")
     public static class VaadinReplicatedSessionConfiguration {
+
+        public static final String TRANSIENT_INJECTABLE_FILTER = "vaadinSerializationTransientInjectableFilter";
+
+        private static final Predicate<Class<?>> TRANSIENT_INJECTABLE_VAADIN_EXCLUSIONS = type -> !type
+                .getPackageName().startsWith("com.vaadin.flow.internal");
 
         SessionTrackerFilter sessionTrackerFilter(
                 SessionSerializer sessionSerializer) {
@@ -65,8 +79,54 @@ public class AzureKitConfiguration {
         }
 
         @Bean
-        SessionSerializer sessionSerializer(BackendConnector backendConnector) {
-            return new SessionSerializer(backendConnector);
+        SpringTransientHandler springDeserializationHandler(
+                ApplicationContext appCtx) {
+            return new SpringTransientHandler(appCtx);
+        }
+
+        @Bean(TRANSIENT_INJECTABLE_FILTER)
+        @ConditionalOnMissingBean
+        Predicate<Class<?>> transientInjectableFilter(
+                SerializationProperties props) {
+            return props.transientInjectableFilter();
+        }
+
+        @Bean
+        SessionSerializer sessionSerializer(BackendConnector backendConnector,
+                TransientHandler transientInjector,
+                @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter) {
+            SessionSerializer sessionSerializer = new SessionSerializer(
+                    backendConnector, transientInjector);
+            if (injectablesFilter != null) {
+                sessionSerializer.setInjectableFilter(injectablesFilter);
+            }
+            return sessionSerializer;
+        }
+
+        /**
+         * Gets a composed transient injectable filter that rejects Vaadin
+         * internal classes that should not be inspected and may break
+         * serialization process due to Java accessibility rules.
+         * 
+         * @param injectablesFilter
+         *            a predicate that will be logically-ANDed with this
+         *            predicate
+         * @return a composed predicate that represents the short-circuiting
+         *         logical AND of Vaadin default predicate and the other
+         *         predicate
+         */
+        public static Predicate<Class<?>> withVaadinDefaultFilter(
+                Predicate<Class<?>> injectablesFilter) {
+            // Some Vaadin classes should be ignored by default to avoid
+            // reflection errors with Java 17
+            // For example NodeMap$HashMapValues that extends HashMap will fail
+            // because of InaccessibleObjectException when getting values of
+            // inherited transient field 'table'
+            Predicate<Class<?>> filter = TRANSIENT_INJECTABLE_VAADIN_EXCLUSIONS;
+            if (injectablesFilter != null) {
+                filter = filter.and(injectablesFilter);
+            }
+            return filter;
         }
 
         @Bean
@@ -91,12 +151,17 @@ public class AzureKitConfiguration {
             return new PushSessionTracker(sessionSerializer);
         }
 
+    }
+
+    @AutoConfiguration
+    @ConditionalOnClass(RedisConnectionFactory.class)
+    public static class RedisConfiguration {
         @Bean
         @ConditionalOnBean(RedisConnectionFactory.class)
+        @ConditionalOnMissingBean
         RedisConnector redisConnector(RedisConnectionFactory factory) {
             return new RedisConnector(factory);
         }
-
     }
 
     @AutoConfiguration

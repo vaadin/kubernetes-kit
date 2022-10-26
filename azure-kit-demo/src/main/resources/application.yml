@@ -1,5 +1,8 @@
 server:
   port: ${PORT:8080}
+  servlet:
+    session:
+      store-dir: /tmp/azure-kit-session
 logging:
   level:
     '[com.vaadin.azure]': debug
@@ -12,3 +15,11 @@ vaadin:
     hazelcast:
       kubernetes:
         service-name: azure-kit-hazelcast-service
+  serialization:
+    include-packages: com.vaadin.azure.demo
+  devmode:
+    sessionSerialization:
+      enabled: true
+
+
+

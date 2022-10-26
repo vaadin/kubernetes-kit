@@ -55,6 +55,18 @@
             <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.23.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-testbench-unit</artifactId>
+            <version>8.1.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

@@ -4,8 +4,8 @@ import javax.servlet.http.HttpSession;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,6 +19,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,9 @@ import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.azure.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.azure.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.azure.starter.sessiontracker.serialization.TransientHandler;
+import com.vaadin.azure.starter.sessiontracker.serialization.TransientInjectableObjectInputStream;
+import com.vaadin.azure.starter.sessiontracker.serialization.TransientInjectableObjectOutputStream;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.server.VaadinSession;
 
@@ -42,19 +46,43 @@ public class SessionSerializer
 
     private final BackendConnector backendConnector;
 
+    private final TransientHandler handler;
+
     private final long optimisticSerializationTimeoutMs;
 
-    public SessionSerializer(BackendConnector backendConnector) {
+    private Predicate<Class<?>> injectableFilter = type -> true;
+
+    public SessionSerializer(BackendConnector backendConnector,
+            TransientHandler transientHandler) {
         this.backendConnector = backendConnector;
+        this.handler = transientHandler;
         optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
     }
 
     // Visible for test
     SessionSerializer(BackendConnector backendConnector,
+            TransientHandler transientHandler,
             long optimisticSerializationTimeoutMs) {
         this.backendConnector = backendConnector;
         this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
+        this.handler = transientHandler;
     }
+
+    /**
+     * Provide a filter to restrict classes suitable for transients field
+     * inspection.
+     * 
+     * If {@literal null} all classes are inspected. This is the default
+     * behavior.
+     * 
+     * @param injectableFilter
+     *            a filter to restrict classes suitable for transients field *
+     *            inspection.
+     */
+    public void setInjectableFilter(Predicate<Class<?>> injectableFilter) {
+        this.injectableFilter = injectableFilter;
+    }
+
 
     public void serialize(HttpSession session) {
         queueSerialization(session.getId(), getAttributes(session));
@@ -260,9 +288,10 @@ public class SessionSerializer
             Map<String, Object> attributes) throws Exception {
         long start = System.currentTimeMillis();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ObjectOutputStream outStream = new ObjectOutputStream(out);
-
-        outStream.writeObject(attributes);
+        try (TransientInjectableObjectOutputStream outStream = new TransientInjectableObjectOutputStream(
+                out, handler, injectableFilter)) {
+            outStream.writeWithTransients(attributes);
+        }
 
         SessionInfo info = new SessionInfo(getClusterKey(attributes),
                 out.toByteArray());
@@ -280,18 +309,17 @@ public class SessionSerializer
             throws IOException, ClassNotFoundException {
         long start = System.currentTimeMillis();
 
-        ByteArrayInputStream in = new ByteArrayInputStream(data);
-        ObjectInputStream inStream = new ObjectInputStream(in);
-
         // Is this needed?
         ClassLoader contextLoader = Thread.currentThread()
                 .getContextClassLoader();
-        
-        Map<String, Object> attributes = (Map<String, Object>) inStream
-                .readObject();
-
-        Thread.currentThread().setContextClassLoader(contextLoader);
-
+        ByteArrayInputStream in = new ByteArrayInputStream(data);
+        Map<String, Object> attributes;
+        try (TransientInjectableObjectInputStream inStream = new TransientInjectableObjectInputStream(
+                in, handler)) {
+            attributes = inStream.readWithTransients();
+        } finally {
+            Thread.currentThread().setContextClassLoader(contextLoader);
+        }
         logSessionDebugInfo("Deserialized session", attributes);
 
         getLogger().info("doDeserialize session with keys {} in {}ms",
@@ -343,5 +371,14 @@ public class SessionSerializer
                     + threadNumber.getAndIncrement());
         }
 
+    }
+
+    @FunctionalInterface
+    public interface ObjectInputStreamFactory {
+
+        ObjectInputStream newInstance(InputStream inputStream)
+                throws IOException;
+
+        ObjectInputStreamFactory DEFAULT = ObjectInputStream::new;
     }
 }

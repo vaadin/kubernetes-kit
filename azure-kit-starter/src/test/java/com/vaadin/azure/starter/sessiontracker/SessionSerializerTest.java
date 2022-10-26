@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.azure.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.azure.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.azure.starter.sessiontracker.serialization.TransientHandler;
 import com.vaadin.flow.function.DeploymentConfiguration;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
@@ -57,6 +58,7 @@ class SessionSerializerTest {
         System.setProperty("sun.io.serialization.extendedDebugInfo", "true");
         connector = mock(BackendConnector.class);
         serializer = new SessionSerializer(connector,
+                mock(TransientHandler.class),
                 TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS);
 
         clusterSID = UUID.randomUUID().toString();
