@@ -131,7 +131,7 @@ public class AzureKitConfigurationTest {
     }
 
     private final class MockHazelcastConfiguration
-            extends AzureKitConfiguration.HazelcastConfiguration {
+            extends AzureKitConfiguration.HazelcastSessionRepositoryConfiguration {
 
         public MockHazelcastConfiguration(AzureKitProperties properties) {
             super(properties);
