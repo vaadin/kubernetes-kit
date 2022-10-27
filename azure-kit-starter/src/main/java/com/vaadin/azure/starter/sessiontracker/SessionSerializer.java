@@ -13,6 +13,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
@@ -31,19 +35,32 @@ public class SessionSerializer
 
     private static final long OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
 
+    private final ExecutorService executorService = Executors
+            .newFixedThreadPool(4, new SerializationThreadFactory());
+
     private final ConcurrentHashMap<String, Boolean> pending = new ConcurrentHashMap<>();
 
     private final BackendConnector backendConnector;
 
+    private final long optimisticSerializationTimeoutMs;
+
     public SessionSerializer(BackendConnector backendConnector) {
         this.backendConnector = backendConnector;
+        optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
+    }
+
+    // Visible for test
+    SessionSerializer(BackendConnector backendConnector,
+            long optimisticSerializationTimeoutMs) {
+        this.backendConnector = backendConnector;
+        this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
     }
 
     public void serialize(HttpSession session) {
         queueSerialization(session.getId(), getAttributes(session));
     }
 
-    Map<String, Object> getAttributes(HttpSession session) {
+    private Map<String, Object> getAttributes(HttpSession session) {
         Map<String, Object> values = new HashMap<>();
         Enumeration<String> attrs = session.getAttributeNames();
         while (attrs.hasMoreElements()) {
@@ -70,22 +87,24 @@ public class SessionSerializer
         backendConnector.markSerializationStarted(clusterKey);
         pending.put(sessionId, true);
 
-        new Thread(() -> {
+        executorService.submit(() -> {
             Consumer<SessionInfo> whenSerialized = sessionInfo -> {
                 backendConnector.sendSession(sessionInfo);
                 backendConnector.markSerializationComplete(clusterKey);
             };
 
             handleSessionSerialization(sessionId, attributes, whenSerialized);
-        }).start();
+        });
     }
 
     private void handleSessionSerialization(String sessionId,
             Map<String, Object> attributes,
             Consumer<SessionInfo> whenSerialized) {
         long start = System.currentTimeMillis();
-        long timeout = start + OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
+        long timeout = start + optimisticSerializationTimeoutMs;
         try {
+            getLogger().info("Optimistic serialization of session {} started",
+                    getClusterKey(attributes));
             while (System.currentTimeMillis() < timeout) {
                 SessionInfo info = serializeOptimisticLocking(sessionId,
                         attributes);
@@ -110,7 +129,7 @@ public class SessionSerializer
                 .accept(serializePessimisticLocking(sessionId, attributes));
     }
 
-    public SessionInfo serializePessimisticLocking(String sessionId,
+    private SessionInfo serializePessimisticLocking(String sessionId,
             Map<String, Object> attributes) {
         long start = System.currentTimeMillis();
         Set<ReentrantLock> locks = getLocks(attributes);
@@ -158,7 +177,7 @@ public class SessionSerializer
 
             if (latestLockTime > latestUnlockTime) {
                 // The session is locked
-                getLogger().warn(
+                getLogger().trace(
                         "Optimistic serialization failed, session is locked. Will retry");
                 return null;
             }
@@ -171,7 +190,7 @@ public class SessionSerializer
                 // Somebody modified the session during serialization and the
                 // result cannot be
                 // used
-                getLogger().warn(
+                getLogger().trace(
                         "Optimistic serialization failed, somebody modified the session during serialization ({} != {}). Will retry",
                         latestUnlockTime, latestUnlockTimeCheck);
                 return null;
@@ -179,7 +198,7 @@ public class SessionSerializer
             logSessionDebugInfo("Serialized session", attributes);
             return info;
         } catch (Exception e) {
-            getLogger().warn(
+            getLogger().trace(
                     "Optimistic serialization failed, a problem occured during serialization. Will retry",
                     e);
             return null;
@@ -267,8 +286,7 @@ public class SessionSerializer
         // Is this needed?
         ClassLoader contextLoader = Thread.currentThread()
                 .getContextClassLoader();
-
-        // delay();
+        
         Map<String, Object> attributes = (Map<String, Object>) inStream
                 .readObject();
 
@@ -313,6 +331,17 @@ public class SessionSerializer
         // the server has not shut down before this and made the session
         // unavailable
         waitForSerialization();
+    }
+
+    private static class SerializationThreadFactory implements ThreadFactory {
+
+        private final AtomicInteger threadNumber = new AtomicInteger(1);
+
+        @Override
+        public Thread newThread(Runnable runnable) {
+            return new Thread(runnable, "sessionSerializer-worker-"
+                    + threadNumber.getAndIncrement());
+        }
 
     }
 }
