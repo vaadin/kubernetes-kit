@@ -188,17 +188,26 @@ public class SessionSerializer
 
     private void logSessionDebugInfo(String prefix,
             Map<String, Object> attributes) {
-        String info = "";
+        StringBuilder info = new StringBuilder();
         for (String key : attributes.keySet()) {
             Object value = attributes.get(key);
             if (value instanceof VaadinSession) {
                 VaadinSession s = (VaadinSession) value;
-                for (UI ui : s.getUIs()) {
-                    info += "[UI " + ui.getUIId() + ", last client message: "
-                            + ui.getInternals()
-                                    .getLastProcessedClientToServerId()
-                            + ", server sync id: "
-                            + ui.getInternals().getServerSyncId() + "]";
+                try {
+                    for (UI ui : s.getUIs()) {
+                        info.append("[UI " + ui.getUIId()
+                                + ", last client message: "
+                                + ui.getInternals()
+                                        .getLastProcessedClientToServerId()
+                                + ", server sync id: "
+                                + ui.getInternals().getServerSyncId() + "]");
+                    }
+                } catch (Exception ex) {
+                    // getting UIs may fail in development mode due to null lock
+                    // (deserialization) or session not locked (serialization)
+                    // ignoring for now since it is just a log
+                    info.append(
+                            "[ VaadinSession not accessible without locking ]");
                 }
             }
         }

@@ -2,7 +2,6 @@ package com.vaadin.azure.starter.sessiontracker;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.WebFilter;
 import javax.servlet.http.HttpFilter;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -11,15 +10,13 @@ import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import com.vaadin.flow.server.HandlerHelper.RequestType;
 import com.vaadin.flow.shared.ApplicationConstants;
 
 public class SessionTrackerFilter extends HttpFilter {
 
-    @Autowired
-    private final SessionSerializer sessionSerializer;
+    private final transient SessionSerializer sessionSerializer;
 
     public SessionTrackerFilter(SessionSerializer sessionSerializer) {
         this.sessionSerializer = sessionSerializer;

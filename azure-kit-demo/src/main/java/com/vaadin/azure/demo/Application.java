@@ -2,7 +2,6 @@ package com.vaadin.azure.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.session.SessionAutoConfiguration;
 
 import com.vaadin.flow.component.dependency.NpmPackage;
 import com.vaadin.flow.component.page.AppShellConfigurator;
@@ -17,7 +16,7 @@ import com.vaadin.flow.theme.Theme;
  * and some desktop browsers.
  *
  */
-@SpringBootApplication(exclude = SessionAutoConfiguration.class)
+@SpringBootApplication
 @Theme("azurekitdemo")
 @PWA(name = "Azure Kit Demo", shortName = "Azure Kit Demo")
 @NpmPackage(value = "line-awesome", version = "1.3.0")

@@ -77,6 +77,11 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
+                <!--
+                <configuration>
+                    <jvmArguments>-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005</jvmArguments>
+                </configuration>
+                -->
                 <executions>
                     <execution>
                         <goals>
@@ -122,6 +127,26 @@
                 <dependency>
                     <groupId>org.springframework.session</groupId>
                     <artifactId>spring-session-hazelcast</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <profile>
+            <id>redis-pure</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-redis</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <profile>
+            <id>hazelcast-pure</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.hazelcast</groupId>
+                    <artifactId>hazelcast</artifactId>
                 </dependency>
             </dependencies>
         </profile>
