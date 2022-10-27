@@ -4,6 +4,7 @@ package com.vaadin.azure.demo.views;
 import com.vaadin.azure.demo.components.appnav.AppNav;
 import com.vaadin.azure.demo.components.appnav.AppNavItem;
 import com.vaadin.azure.demo.views.counter.CounterView;
+import com.vaadin.azure.demo.views.list.ListView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.html.Footer;
@@ -53,6 +54,8 @@ public class MainLayout extends AppLayout {
         AppNav nav = new AppNav();
 
         nav.addItem(new AppNavItem("Counter", CounterView.class,
+                "la la-plus-circle"));
+        nav.addItem(new AppNavItem("List", ListView.class,
                 "la la-plus-circle"));
 
         return nav;
