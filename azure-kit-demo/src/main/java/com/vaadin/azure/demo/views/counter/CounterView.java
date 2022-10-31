@@ -62,7 +62,9 @@ public class CounterView extends VerticalLayout {
         hostnameHeading.setText(entry.getHostname());
         ipAddressHeading.setText(entry.getIpAddress());
 
-        final var item = new ListItem(entry.getHostname() + " (" + entry.getIpAddress() + ") " + entry.getCount());
+        final var item = new ListItem(
+                entry.getHostname() + " v" + System.getenv("APP_VERSION") + " ("
+                        + entry.getIpAddress() + ") " + entry.getCount());
         log.addComponentAsFirst(item);
     }
 

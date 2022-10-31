@@ -1,20 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: azure-kit-demo
+  name: azure-kit-demo-v1
 spec:
   replicas: 4
   selector:
     matchLabels:
       app: azure-kit-demo
+      version: 1.0.0
   template:
     metadata:
       labels:
         app: azure-kit-demo
+        version: 1.0.0
     spec:
       containers:
         - name: azure-kit-demo
-          image: azure-kit-demo:latest
+          image: localhost:5001/azure-kit-demo:1.0.0
+          env:
+            - name: APP_VERSION
+              value: 1.0.0
           ports:
             - name: http
               containerPort: 8080
@@ -24,13 +29,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: azure-kit-demo-balancer
+  name: azure-kit-demo-v1
 spec:
   selector:
     app: azure-kit-demo
+    version: 1.0.0
   ports:
-    - protocol: TCP
-      port: 8000
-      targetPort: 8080
-  type: LoadBalancer
-  sessionAffinity: ClientIP
+    - name: http
+      port: 80
+      targetPort: http
