@@ -77,14 +77,14 @@ If you try to increment the counter again, your request will be redirected to an
 
 1. Build a new application version:
 ```
-docker build -t azure-kit-demo:2.0.0 .
+# docker build -t azure-kit-demo:2.0.0 .
 ```
 Optionally, if you run a local docker registry, add the *localhost:5001* registry address prefix as well and push it to registry. Refer to the image in the config files with *the localhost:5001/azure-kit-demo:1.0.0* name:
 ```
 # docker build localhost:5001/azure-kit-demo:1.0.0 .
 # docker push localhost:5001/azure-kit-demo:1.0.0
 ```
-2. Deploy the new version: and a canary ingress controller for it:
+2. Deploy the new version:
 ```
 # kubectl apply -f deployment/app-v2.yaml
 ```
