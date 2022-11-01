@@ -1,0 +1,4 @@
+.terraform.lock.hcl
+kubeconfig
+plan.out
+.terraform/
