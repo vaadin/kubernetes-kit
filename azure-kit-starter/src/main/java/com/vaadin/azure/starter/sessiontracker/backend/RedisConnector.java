@@ -7,8 +7,6 @@ import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
 public class RedisConnector implements BackendConnector {
-
-    @Autowired
     private RedisConnectionFactory redisConnectionFactory;
 
     public void sendSession(SessionInfo sessionInfo) {
@@ -71,6 +69,11 @@ public class RedisConnector implements BackendConnector {
 
     private byte[] getPendingKey(String clusterKey) {
         return BackendUtil.b("pending-" + clusterKey);
+    }
+
+    @Autowired
+    void setRedisConnectionFactory(RedisConnectionFactory redisConnectionFactory) {
+        this.redisConnectionFactory = redisConnectionFactory;
     }
 
 }
