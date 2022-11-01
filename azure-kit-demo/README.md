@@ -81,8 +81,8 @@ If you try to increment the counter again, your request will be redirected to an
 ```
 Optionally, if you run a local docker registry, add the *localhost:5001* registry address prefix as well and push it to registry. Refer to the image in the config files with *the localhost:5001/azure-kit-demo:1.0.0* name:
 ```
-# docker build localhost:5001/azure-kit-demo:1.0.0 .
-# docker push localhost:5001/azure-kit-demo:1.0.0
+# docker build localhost:5001/azure-kit-demo:2.0.0 .
+# docker push localhost:5001/azure-kit-demo:2.0.0
 ```
 2. Deploy the new version:
 ```
