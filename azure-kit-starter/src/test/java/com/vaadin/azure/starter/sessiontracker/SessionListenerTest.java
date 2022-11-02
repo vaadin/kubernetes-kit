@@ -3,6 +3,7 @@ package com.vaadin.azure.starter.sessiontracker;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import com.vaadin.azure.starter.sessiontracker.backend.BackendConnector;
@@ -17,6 +18,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class SessionListenerTest {
+    @AfterEach
+    void cleanUp() {
+        CurrentKey.clear();
+    }
+
     @Test
     void sessionCreated_nullClusterKey_sessionIsNotDeserialized() {
         BackendConnector backendConnector = mock(BackendConnector.class);
