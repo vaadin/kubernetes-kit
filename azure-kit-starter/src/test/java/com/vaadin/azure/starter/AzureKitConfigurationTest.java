@@ -38,8 +38,7 @@ public class AzureKitConfigurationTest {
 
     @Test
     public void hazelcastRepositoryAvailable_saveModeConfigured() {
-        var prop = new AzureKitProperties();
-        var configuration = new MockHazelcastConfiguration(prop);
+        var configuration = new HazelcastSessionRepositoryConfiguration(new AzureKitProperties());
         var customizer = configuration.hazelcastSessionRepositoryCustomizer();
         var mockRepository = mock(Hazelcast4IndexedSessionRepository.class);
 
@@ -132,7 +131,7 @@ public class AzureKitConfigurationTest {
     }
 
     private final class MockHazelcastConfiguration
-            extends HazelcastSessionRepositoryConfiguration {
+            extends AzureKitConfiguration.HazelcastSessionRepositoryConfiguration {
 
         public MockHazelcastConfiguration(AzureKitProperties properties) {
             super(properties);

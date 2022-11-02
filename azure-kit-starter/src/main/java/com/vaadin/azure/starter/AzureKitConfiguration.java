@@ -1,5 +1,8 @@
 package com.vaadin.azure.starter;
 
+import javax.servlet.FilterRegistration;
+import javax.servlet.ServletContext;
+
 import com.hazelcast.config.AttributeConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.IndexConfig;
@@ -9,10 +12,15 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.nio.serialization.Serializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.session.MapSession;
 import org.springframework.session.SaveMode;
 import org.springframework.session.config.SessionRepositoryCustomizer;
@@ -25,13 +33,71 @@ import org.springframework.session.hazelcast.config.annotation.SpringSessionHaze
 import org.springframework.session.hazelcast.config.annotation.web.http.EnableHazelcastHttpSession;
 import org.springframework.util.StringUtils;
 
+import com.vaadin.azure.starter.sessiontracker.SessionListener;
+import com.vaadin.azure.starter.sessiontracker.SessionSerializer;
+import com.vaadin.azure.starter.sessiontracker.SessionTrackerFilter;
+import com.vaadin.azure.starter.sessiontracker.backend.BackendConnector;
+import com.vaadin.azure.starter.sessiontracker.backend.HazelcastConnector;
+import com.vaadin.azure.starter.sessiontracker.backend.RedisConnector;
+import com.vaadin.azure.starter.sessiontracker.push.PushSendListener;
+import com.vaadin.azure.starter.sessiontracker.push.PushSessionTracker;
+
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration")
 @EnableConfigurationProperties(AzureKitProperties.class)
 public class AzureKitConfiguration {
+
+    @AutoConfiguration
+    @ConditionalOnMissingClass("org.springframework.session.Session")
+    public static class VaadinReplicatedSessionConfiguration {
+
+        SessionTrackerFilter sessionTrackerFilter(
+                SessionSerializer sessionSerializer) {
+            return new SessionTrackerFilter(sessionSerializer);
+        }
+
+        SessionListener sessionListener(BackendConnector backendConnector,
+                SessionSerializer sessionSerializer) {
+            return new SessionListener(backendConnector, sessionSerializer);
+        }
+
+        @Bean
+        SessionSerializer sessionSerializer(BackendConnector backendConnector) {
+            return new SessionSerializer(backendConnector);
+        }
+
+        @Bean
+        @Order(Integer.MIN_VALUE + 50)
+        FilterRegistrationBean<SessionTrackerFilter> sessionTrackerFilterRegistration(
+                BackendConnector backendConnector,
+                SessionSerializer sessionSerializer) {
+            return new FilterRegistrationBean<>(
+                    sessionTrackerFilter(sessionSerializer)) {
+                @Override
+                protected FilterRegistration.Dynamic addRegistration(
+                        String description, ServletContext servletContext) {
+                    servletContext.addListener(sessionListener(backendConnector,
+                            sessionSerializer));
+                    return super.addRegistration(description, servletContext);
+                }
+            };
+        }
+
+        @Bean
+        PushSendListener pushSendListener(SessionSerializer sessionSerializer) {
+            return new PushSessionTracker(sessionSerializer);
+        }
+
+        @Bean
+        @ConditionalOnBean(RedisConnectionFactory.class)
+        RedisConnector redisConnector(RedisConnectionFactory factory) {
+            return new RedisConnector(factory);
+        }
+
+    }
 
     @AutoConfiguration
     @EnableRedisHttpSession
@@ -52,20 +118,20 @@ public class AzureKitConfiguration {
                 repository.setSaveMode(SaveMode.ON_GET_ATTRIBUTE);
             };
         }
+
     }
 
     @AutoConfiguration
     @EnableHazelcastHttpSession
     @ConditionalOnClass(Hazelcast4IndexedSessionRepository.class)
-    public static class HazelcastSessionRepositoryConfiguration {
+    public static class HazelcastSessionRepositoryConfiguration
+            extends HazelcastSupport {
 
         static final String BEAN_NAME = "vaadinHazelcastSessionRepositoryCustomizer";
 
-        private final AzureKitProperties properties;
-
         public HazelcastSessionRepositoryConfiguration(
                 AzureKitProperties properties) {
-            this.properties = properties;
+            super(properties);
         }
 
         /**
@@ -86,21 +152,16 @@ public class AzureKitConfiguration {
         @ConditionalOnMissingBean
         @SpringSessionHazelcastInstance
         public HazelcastInstance hazelcastInstance() {
-            final var config = new Config();
+            return super.hazelcastInstance();
+        }
 
+        @Override
+        protected void configure(Config config) {
             configureMapAttributes(config);
             configureSessionSerializer(config);
-            configureKubernetes(config);
-
-            return createHazelcastInstance(config);
         }
 
-        // Package protected for testing purposes
-        HazelcastInstance createHazelcastInstance(Config config) {
-            return Hazelcast.newHazelcastInstance(config);
-        }
-
-        private void configureMapAttributes(Config config) {
+        private static void configureMapAttributes(Config config) {
             final var attrConfig = new AttributeConfig();
             attrConfig.setName(
                     Hazelcast4IndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE)
@@ -124,6 +185,56 @@ public class AzureKitConfiguration {
                     .addSerializerConfig(serializerConfig);
         }
 
+        private Serializer getSerializer() {
+            return new HazelcastSessionSerializer();
+        }
+    }
+
+    @AutoConfiguration
+    @ConditionalOnClass(HazelcastInstance.class)
+    public static class HazelcastConfiguration extends HazelcastSupport {
+        public HazelcastConfiguration(AzureKitProperties properties) {
+            super(properties);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        HazelcastConnector hazelcastConnector(
+                HazelcastInstance hazelcastInstance) {
+            return new HazelcastConnector(hazelcastInstance);
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
+        public HazelcastInstance hazelcastInstance() {
+            return super.hazelcastInstance();
+        }
+    }
+
+    static class HazelcastSupport {
+        final AzureKitProperties properties;
+
+        public HazelcastSupport(AzureKitProperties properties) {
+            this.properties = properties;
+        }
+
+        HazelcastInstance hazelcastInstance() {
+            final var config = new Config();
+
+            configure(config);
+            configureKubernetes(config);
+
+            return createHazelcastInstance(config);
+        }
+
+        HazelcastInstance createHazelcastInstance(Config config) {
+            return Hazelcast.newHazelcastInstance(config);
+        }
+
+        protected void configure(Config config) {
+            // Do nothing
+        }
+
         private void configureKubernetes(Config config) {
             final var k8sProperties = properties.getHazelcast().getKubernetes();
             final var k8sServiceName = k8sProperties.getServiceName();
@@ -139,11 +250,10 @@ public class AzureKitConfiguration {
                 final var k8sNamespace = k8sProperties.getNamespace();
                 k8sConfig.setProperty("namespace", k8sNamespace);
                 k8sConfig.setProperty("service-name", k8sServiceName);
+                k8sConfig.setProperty("service-port",
+                        Integer.toString(k8sProperties.getServicePort()));
             }
         }
 
-        private Serializer getSerializer() {
-            return new HazelcastSessionSerializer();
-        }
     }
 }

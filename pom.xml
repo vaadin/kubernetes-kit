@@ -22,7 +22,8 @@
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <vaadin.version>23.2-SNAPSHOT</vaadin.version>
+        <vaadin.version>23.3-SNAPSHOT</vaadin.version>
+        <flow.version>23.3.sess-SNAPSHOT</flow.version>
         <spring.boot.version>2.7.4</spring.boot.version>
         <maven.source.version>3.2.1</maven.source.version>
         <maven.javadoc.version>3.4.1</maven.javadoc.version>
@@ -68,6 +69,13 @@
                 <version>${spring.boot.version}</version>
                 <scope>import</scope>
                 <type>pom</type>
+            </dependency>
+            <dependency>
+                <groupId>com.vaadin</groupId>
+                <artifactId>flow-bom</artifactId>
+                <version>${flow.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>com.vaadin</groupId>
