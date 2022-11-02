@@ -60,7 +60,7 @@ class SpringTransientHandlerVaadinScopesTest {
 
     @AfterEach
     void tearDown() {
-        // MockVaadin.tearDown();
+        MockVaadin.tearDown();
     }
 
     @Test
