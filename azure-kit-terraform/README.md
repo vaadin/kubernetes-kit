@@ -1,4 +1,4 @@
-# Vaadin Azure Kit
+# Azure Kit Terraform
 ## Requirements
 * Terraform: https://www.terraform.io/downloads
 * Azure cli: https://learn.microsoft.com/en-us/cli/azure/install-azure-cli
