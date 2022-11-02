@@ -10,13 +10,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import com.vaadin.flow.spring.annotation.RouteScope;
-import com.vaadin.flow.spring.annotation.SpringComponent;
-import com.vaadin.flow.spring.annotation.UIScope;
-import com.vaadin.flow.spring.annotation.VaadinSessionScope;
 
 @Configuration
 @Import({ TestConfig.CtorInjectionTarget.class,
@@ -98,14 +94,15 @@ class TestConfig {
     }
 
     interface PrototypeService {
-
     }
+
     @Component
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     @Qualifier("A")
     static class PrototypeServiceImplA implements PrototypeService {
 
     }
+
     @Component
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     @Qualifier("B")
@@ -121,6 +118,35 @@ class TestConfig {
         transient PrototypeService prototypeServiceA;
         @Autowired
         @Qualifier("B")
+        transient PrototypeService prototypeServiceB;
+    }
+
+    @Component
+    @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.TARGET_CLASS)
+    @Qualifier("A-PROXY")
+    static class ProxiedPrototypeServiceImplA implements PrototypeService {
+        public void action() {
+        }
+    }
+
+    @Component
+    @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.INTERFACES)
+    @Qualifier("B-PROXY")
+    static class ProxiedPrototypeServiceImplB implements PrototypeService {
+
+        public void action() {
+        }
+
+    }
+
+    @Component
+    static class ProxiedPrototypeServiceTarget implements Serializable {
+
+        @Autowired
+        @Qualifier("A-PROXY")
+        transient PrototypeService prototypeServiceA;
+        @Autowired
+        @Qualifier("B-PROXY")
         transient PrototypeService prototypeServiceB;
     }
 

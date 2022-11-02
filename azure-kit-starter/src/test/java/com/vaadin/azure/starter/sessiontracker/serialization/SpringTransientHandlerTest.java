@@ -14,9 +14,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-import com.vaadin.flow.spring.VaadinScopesConfig;
-import com.vaadin.testbench.unit.internal.MockVaadin;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @ContextConfiguration(classes = { TestConfig.class })
@@ -84,7 +81,8 @@ class SpringTransientHandlerTest {
                         "prototypeScoped", TestConfig.PrototypeComponent.class,
                         TestConfig.PrototypeComponent.class.getName()),
                 new TransientDescriptor(TestConfig.PrototypeTarget.class,
-                        "extPrototypeScoped", TestConfig.PrototypeComponent.class,
+                        "extPrototypeScoped",
+                        TestConfig.PrototypeComponent.class,
                         TestConfig.PrototypeComponentExt.class.getName()));
     }
 
@@ -103,6 +101,24 @@ class SpringTransientHandlerTest {
     }
 
     @Test
+    void inspect_proxiedPrototypeScopedBeans_beansAreDetected(
+            @Autowired TestConfig.ProxiedPrototypeServiceTarget target) {
+        List<TransientDescriptor> transients = handler.inspect(target);
+
+        assertThat(transients).containsExactlyInAnyOrder(
+                new TransientDescriptor(
+                        TestConfig.ProxiedPrototypeServiceTarget.class,
+                        "prototypeServiceA", TestConfig.PrototypeService.class,
+                        TestConfig.ProxiedPrototypeServiceImplA.class
+                                .getName()),
+                new TransientDescriptor(
+                        TestConfig.ProxiedPrototypeServiceTarget.class,
+                        "prototypeServiceB", TestConfig.PrototypeService.class,
+                        TestConfig.ProxiedPrototypeServiceImplB.class
+                                .getName()));
+    }
+
+    @Test
     void inspect_proxiedBeans_beansAreDetected(
             @Autowired TestConfig.ProxiedBeanTarget target) {
         List<TransientDescriptor> transients = handler.inspect(target);
@@ -113,7 +129,8 @@ class SpringTransientHandlerTest {
     }
 
     @Test
-    void inspect_notInjected_fieldIsIgnored(@Autowired TestConfig.NotInjected target) {
+    void inspect_notInjected_fieldIsIgnored(
+            @Autowired TestConfig.NotInjected target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
         assertThat(transients).isEmpty();
