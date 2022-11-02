@@ -29,8 +29,7 @@ public class RedisConnectorTest {
         connection = mock(RedisConnection.class);
         when(factory.getConnection()).thenReturn(connection);
 
-        connector = new RedisConnector();
-        connector.setRedisConnectionFactory(factory);
+        connector = new RedisConnector(factory);
     }
 
     @Test

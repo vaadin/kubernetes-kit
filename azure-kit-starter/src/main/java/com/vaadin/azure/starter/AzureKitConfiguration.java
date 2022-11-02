@@ -93,8 +93,8 @@ public class AzureKitConfiguration {
 
         @Bean
         @ConditionalOnBean(RedisConnectionFactory.class)
-        RedisConnector redisConnector() {
-            return new RedisConnector();
+        RedisConnector redisConnector(RedisConnectionFactory factory) {
+            return new RedisConnector(factory);
         }
 
     }

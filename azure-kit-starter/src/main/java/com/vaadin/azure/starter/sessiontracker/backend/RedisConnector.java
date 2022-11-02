@@ -2,12 +2,15 @@ package com.vaadin.azure.starter.sessiontracker.backend;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
 public class RedisConnector implements BackendConnector {
-    private RedisConnectionFactory redisConnectionFactory;
+    private final RedisConnectionFactory redisConnectionFactory;
+
+    public RedisConnector(RedisConnectionFactory redisConnectionFactory) {
+        this.redisConnectionFactory = redisConnectionFactory;
+    }
 
     public void sendSession(SessionInfo sessionInfo) {
         getLogger().info("Sending session {} to Redis", sessionInfo.getClusterKey());
@@ -69,11 +72,6 @@ public class RedisConnector implements BackendConnector {
 
     private byte[] getPendingKey(String clusterKey) {
         return BackendUtil.b("pending-" + clusterKey);
-    }
-
-    @Autowired
-    void setRedisConnectionFactory(RedisConnectionFactory redisConnectionFactory) {
-        this.redisConnectionFactory = redisConnectionFactory;
     }
 
 }
