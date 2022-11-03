@@ -328,7 +328,7 @@ public class SessionSerializer
         return attributes;
     }
 
-    void deserialize(SessionInfo sessionInfo, HttpSession session)
+    public void deserialize(SessionInfo sessionInfo, HttpSession session)
             throws ClassNotFoundException, IOException {
         Map<String, Object> values = doDeserialize(sessionInfo.getData());
 
