@@ -120,6 +120,26 @@
         </profile>
 
         <profile>
+            <id>redis-pure</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-redis</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <profile>
+            <id>hazelcast-pure</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.hazelcast</groupId>
+                    <artifactId>hazelcast</artifactId>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <profile>
             <id>production</id>
             <build>
                 <plugins>

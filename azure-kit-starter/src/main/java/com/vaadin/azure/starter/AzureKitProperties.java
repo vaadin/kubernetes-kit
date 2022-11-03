@@ -76,6 +76,8 @@ public class AzureKitProperties {
 
         private String serviceName;
 
+        private int servicePort = 0;
+
         /**
          * Gets the Kubernetes namespace to use.
          *
@@ -115,6 +117,29 @@ public class AzureKitProperties {
          */
         public void setServiceName(String serviceName) {
             this.serviceName = serviceName;
+        }
+
+        /**
+         * Gets endpoint port of the Hazelcast service
+         *
+         * If specified with a value greater than 0, it overrides the default; 0
+         * by default.
+         * 
+         * @return endpoint port or 0
+         */
+        public int getServicePort() {
+            return servicePort;
+        }
+
+        /**
+         * Sets endpoint port of the Hazelcast service.
+         *
+         * Uxd
+         *
+         * @param port port number or 0
+         */
+        public void setServicePort(int port) {
+            this.servicePort = port;
         }
     }
 }
