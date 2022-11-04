@@ -88,15 +88,24 @@ Optionally, if you run a local docker registry, add the *localhost:5001* registr
 ```
 # kubectl apply -f deployment/app-v2.yaml
 ```
-3. Deploy the canary ingress for it, and set the version cookie for the old version to show version update notification:
+3. Deploy the canary ingress config for it:
 ```
-# kubectl apply -f deployment/ingress-v2-canary.yaml
+# kubectl apply -f deployment/ingress-v2-use-canary.yaml
 ```
-4. Make the new version as a default:
+4. Set the app-update cookie for the old version to show the version update notification:
+```
+# kubectl apply -f deployment/ingress-v1-add-cookie.yaml
+```
+Test and verify if the new version is working properly.
+5. Make the new version as a default and remove the app-update cookie:
 ```
 # kubectl apply -f deployment/ingress-v2.yaml
 ```
-5. Delete the old version:
+6. Delete the old version:
 ```
 # kubectl delete -f deployment/app-v1.yaml
+```
+7. Delete the canary ingress config:
+```
+# kubectl delete -f deployment/ingress-v2-use-canary.yaml
 ```
