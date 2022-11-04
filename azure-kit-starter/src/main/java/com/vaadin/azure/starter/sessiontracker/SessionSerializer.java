@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -19,7 +20,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +36,8 @@ import com.vaadin.azure.starter.sessiontracker.serialization.TransientInjectable
 import com.vaadin.azure.starter.sessiontracker.serialization.TransientInjectableObjectOutputStream;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.flow.server.WrappedHttpSession;
+import com.vaadin.flow.server.WrappedSession;
 
 public class SessionSerializer
         implements ApplicationListener<ContextClosedEvent> {
@@ -83,21 +88,15 @@ public class SessionSerializer
         this.injectableFilter = injectableFilter;
     }
 
-
     public void serialize(HttpSession session) {
-        queueSerialization(session.getId(), getAttributes(session));
+        serialize(new WrappedHttpSession(session));
     }
 
-    private Map<String, Object> getAttributes(HttpSession session) {
-        Map<String, Object> values = new HashMap<>();
-        Enumeration<String> attrs = session.getAttributeNames();
-        while (attrs.hasMoreElements()) {
-            String key = attrs.nextElement();
-            Object value = session.getAttribute(key);
-            values.put(key, value);
-        }
-
-        return values;
+    public void serialize(WrappedSession session) {
+        Map<String, Object> values = session.getAttributeNames().stream()
+                .collect(Collectors.toMap(Function.identity(),
+                        session::getAttribute));
+        queueSerialization(session.getId(), values);
     }
 
     private void queueSerialization(String sessionId,
@@ -225,6 +224,11 @@ public class SessionSerializer
             }
             logSessionDebugInfo("Serialized session", attributes);
             return info;
+        } catch (NotSerializableException e) {
+            getLogger().trace(
+                    "Optimistic serialization failed, some attribute is not serializable. Giving up immediately since the error is not recoverable",
+                    e);
+            throw e;
         } catch (Exception e) {
             getLogger().trace(
                     "Optimistic serialization failed, a problem occured during serialization. Will retry",

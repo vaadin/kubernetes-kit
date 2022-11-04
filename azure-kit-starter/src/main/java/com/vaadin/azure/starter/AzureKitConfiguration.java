@@ -2,7 +2,6 @@ package com.vaadin.azure.starter;
 
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
-import java.util.List;
 import java.util.function.Predicate;
 
 import com.hazelcast.config.AttributeConfig;
@@ -48,7 +47,6 @@ import com.vaadin.azure.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.azure.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.azure.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.azure.starter.sessiontracker.serialization.TransientHandler;
-import com.vaadin.flow.spring.VaadinConfigurationProperties;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
@@ -61,6 +59,7 @@ public class AzureKitConfiguration {
 
     @AutoConfiguration
     @ConditionalOnMissingClass("org.springframework.session.Session")
+    @ConditionalOnBean(BackendConnector.class)
     public static class VaadinReplicatedSessionConfiguration {
 
         public static final String TRANSIENT_INJECTABLE_FILTER = "vaadinSerializationTransientInjectableFilter";

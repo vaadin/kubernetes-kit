@@ -30,10 +30,11 @@ public class PushSessionTrackerTest {
         AtmosphereResource resource = mock(AtmosphereResource.class);
         when(resource.session(anyBoolean())).thenReturn(null);
 
-        PushSessionTracker sessionTracker = new PushSessionTracker(sessionSerializer);
+        PushSessionTracker sessionTracker = new PushSessionTracker(
+                sessionSerializer);
         sessionTracker.onMessageSent(resource);
 
-        verify(sessionSerializer, never()).serialize(any());
+        verify(sessionSerializer, never()).serialize(any(HttpSession.class));
     }
 
     @Test
@@ -48,10 +49,11 @@ public class PushSessionTrackerTest {
         HttpServletRequest servletRequest = mock(HttpServletRequest.class);
         when(request.wrappedRequest()).thenReturn(servletRequest);
         String clusterKey = UUID.randomUUID().toString();
-        when(servletRequest.getCookies()).thenReturn(
-                new Cookie[] { new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
+        when(servletRequest.getCookies()).thenReturn(new Cookie[] {
+                new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
 
-        PushSessionTracker sessionTracker = new PushSessionTracker(sessionSerializer);
+        PushSessionTracker sessionTracker = new PushSessionTracker(
+                sessionSerializer);
         sessionTracker.onMessageSent(resource);
 
         verify(sessionSerializer).serialize(eq(session));

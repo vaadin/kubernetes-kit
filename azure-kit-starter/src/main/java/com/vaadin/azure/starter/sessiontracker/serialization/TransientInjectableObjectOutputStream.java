@@ -3,6 +3,7 @@ package com.vaadin.azure.starter.sessiontracker.serialization;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -53,7 +54,6 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
 
     private final TransientHandler inspector;
     private final IdentityHashMap<Object, TransientAwareHolder> seen = new IdentityHashMap<>();
-
     private final Predicate<Class<?>> injectableFilter;
 
     public TransientInjectableObjectOutputStream(OutputStream out,
@@ -84,26 +84,66 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
 
     @Override
     protected Object replaceObject(Object obj) {
+        track(obj);
         Class<?> type = obj.getClass();
         if (injectableFilter.test(type) && !seen.containsKey(obj)) {
             TransientAwareHolder holder;
-            List<TransientDescriptor> descriptors = inspector.inspect(obj);
-            if (descriptors.isEmpty()) {
-                getLogger().trace(
-                        "No injectable transient fields found for instance of class {}",
-                        obj.getClass());
-                holder = null;
+            Object original = obj;
+            obj = handleNotSerializable(obj);
+            if (obj != null) {
+                List<TransientDescriptor> descriptors = inspector.inspect(obj);
+                if (descriptors.isEmpty()) {
+                    getLogger().trace(
+                            "No injectable transient fields found for instance of class {}",
+                            obj.getClass());
+                    holder = null;
+                } else {
+                    getLogger().trace(
+                            "Found injectable transient fields for instance of class {} : {}",
+                            obj.getClass(), descriptors);
+                    holder = new TransientAwareHolder(obj, descriptors);
+                }
             } else {
-                getLogger().trace(
-                        "Found injectable transient fields for instance of class {} : {}",
-                        obj.getClass(), descriptors);
-                holder = new TransientAwareHolder(obj, descriptors);
+                getLogger().debug(
+                        "Object of type {} will be replaced with NULL and ignored",
+                        original.getClass());
+                holder = TransientAwareHolder.NULL;
             }
             // Marks current object as already seen to avoid infinite loops
             // when it will be serialized as part of TransientAwareHolder
-            seen.put(obj, holder);
+            seen.put(original, holder);
         }
         return obj;
+    }
+
+    /**
+     * In debug mode notify handler of not Serializable Object and potentially
+     * replace current object with a serializable instance or with
+     * {@literal null}, to prevent NotSerializableException and continue the
+     * inspection on other objects
+     */
+    private Object handleNotSerializable(Object obj) {
+        Object replacement = obj;
+        if (!(obj instanceof Serializable)
+                && inspector instanceof TransientHandler.DebugMode) {
+            TransientHandler.DebugMode debugMode = (TransientHandler.DebugMode) inspector;
+            replacement = debugMode.onNotSerializableFound(obj)
+                    .map(Object.class::cast).orElse(obj);
+            if (replacement == TransientHandler.DebugMode.NULLIFY) {
+                return null;
+            }
+        }
+        return replacement;
+    }
+
+    private void track(Object obj) {
+        if (inspector instanceof TransientHandler.DebugMode) {
+            try {
+                ((TransientHandler.DebugMode) inspector).onSerialize(obj);
+            } catch (Exception ex) {
+                // Ignore
+            }
+        }
     }
 
     private static Logger getLogger() {

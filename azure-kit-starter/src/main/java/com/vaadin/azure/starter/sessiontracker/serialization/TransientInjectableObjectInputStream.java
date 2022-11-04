@@ -2,6 +2,7 @@ package com.vaadin.azure.starter.sessiontracker.serialization;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
 import java.io.ObjectStreamClass;
 import java.util.List;
@@ -34,6 +35,29 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
         super(in);
         this.injector = injector;
         enableResolveObject(true);
+
+        if (injector instanceof TransientHandler.DebugMode) {
+            setObjectInputFilter(new TrackingFilter());
+        }
+    }
+
+    private final class TrackingFilter implements ObjectInputFilter {
+
+        @Override
+        public Status checkInput(FilterInfo filterInfo) {
+            Class<?> serialClass = filterInfo.serialClass();
+            if (serialClass != null) {
+                // Track classes being deserialized for debugging purpose
+                try {
+                    ((TransientHandler.DebugMode) TransientInjectableObjectInputStream.this.injector)
+                            .onDeserialize(serialClass, filterInfo.depth());
+                } catch (Exception ex) {
+                    // Ignore, debug handler is not supposed to throw exception
+                    // that may stop deserialization process
+                }
+            }
+            return Status.UNDECIDED;
+        }
     }
 
     @Override
@@ -60,18 +84,37 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
         return (T) out;
     }
 
+    @Override
+    protected Object resolveObject(Object obj) throws IOException {
+        if (injector instanceof TransientHandler.DebugMode) {
+            // track deserialized objects for debugging purpose
+            try {
+                ((TransientHandler.DebugMode) injector).onDeserialized(obj);
+            } catch (Exception ex) {
+                // Ignore, debug handler is not supposed to throw exception
+                // that may stop deserialization process
+            }
+        }
+        return obj;
+    }
+
     private void injectTransients(TransientAwareHolder holder) {
-        List<TransientDescriptor> descriptors = holder.transients();
         Object obj = holder.source();
-        getLogger().debug(
-                "Extract injectable instance of type {} from holder object with transient descriptors: {}",
-                obj.getClass(), descriptors);
-        getLogger().debug("Try injection into {}", obj.getClass());
-        try {
-            injector.inject(obj, descriptors);
-        } catch (Exception ex) {
-            getLogger().error("Failed to inject transient fields into type {}",
-                    obj.getClass());
+        if (obj != null) {
+            List<TransientDescriptor> descriptors = holder.transients();
+            getLogger().debug(
+                    "Extract injectable instance of type {} from holder object with transient descriptors: {}",
+                    obj.getClass(), descriptors);
+            getLogger().debug("Try injection into {}", obj.getClass());
+            try {
+                injector.inject(obj, descriptors);
+            } catch (Exception ex) {
+                getLogger().error(
+                        "Failed to inject transient fields into type {}",
+                        obj.getClass());
+            }
+        } else {
+            getLogger().trace("Ignoring NULL TransientAwareHolder");
         }
     }
 

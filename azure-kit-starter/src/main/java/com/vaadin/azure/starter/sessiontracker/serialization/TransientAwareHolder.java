@@ -2,6 +2,7 @@ package com.vaadin.azure.starter.sessiontracker.serialization;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -13,8 +14,11 @@ import java.util.List;
  */
 final class TransientAwareHolder implements Serializable {
 
+    static final TransientAwareHolder NULL = new TransientAwareHolder(null,
+            Collections.emptyList());
+
     private final List<TransientDescriptor> transientDescriptors;
-    private final Object source;
+    private final Object source; // NOSONAR
 
     TransientAwareHolder(Object source, List<TransientDescriptor> descriptors) {
         this.source = source;
