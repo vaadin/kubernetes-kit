@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: azure-kit-demo-v2
+  namespace: canary
 spec:
   replicas: 4
   selector:
@@ -30,6 +31,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: azure-kit-demo-v2
+  namespace: canary
 spec:
   selector:
     app: azure-kit-demo

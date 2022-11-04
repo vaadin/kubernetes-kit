@@ -16,6 +16,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
+import com.vaadin.flow.server.VaadinSession;
 
 @PageTitle("Counter")
 @Route(value = "counter", layout = MainLayout.class)
@@ -63,8 +64,10 @@ public class CounterView extends VerticalLayout {
         ipAddressHeading.setText(entry.getIpAddress());
 
         final var item = new ListItem(
-                entry.getHostname() + " v" + System.getenv("APP_VERSION") + " ("
-                        + entry.getIpAddress() + ") " + entry.getCount());
+                "host: " + entry.getHostname() + " (" + entry.getIpAddress() + ")" +
+                        " | version: " + System.getenv("APP_VERSION") +
+                        " | session: " + VaadinSession.getCurrent().getSession().getId() +
+                        " | counter: " + entry.getCount());
         log.addComponentAsFirst(item);
     }
 

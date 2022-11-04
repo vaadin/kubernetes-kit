@@ -21,7 +21,7 @@ To deploy the demo application into your cluster, follow these steps:
 ```
 Optionally, if you run a local docker registry, add the *localhost:5001* registry address prefix as well and push it to registry. Refer to the image in the config files with *the localhost:5001/azure-kit-demo:1.0.0* name:
 ```
-# docker build localhost:5001/azure-kit-demo:1.0.0 .
+# docker build -t localhost:5001/azure-kit-demo:1.0.0 .
 # docker push localhost:5001/azure-kit-demo:1.0.0
 ```
 3. Deploy the image, redis service and ingress controller into the cluster:
@@ -81,14 +81,14 @@ If you try to increment the counter again, your request will be redirected to an
 ```
 Optionally, if you run a local docker registry, add the *localhost:5001* registry address prefix as well and push it to registry. Refer to the image in the config files with *the localhost:5001/azure-kit-demo:1.0.0* name:
 ```
-# docker build localhost:5001/azure-kit-demo:2.0.0 .
+# docker build -t localhost:5001/azure-kit-demo:2.0.0 .
 # docker push localhost:5001/azure-kit-demo:2.0.0
 ```
 2. Deploy the new version:
 ```
 # kubectl apply -f deployment/app-v2.yaml
 ```
-3. Deploy the canary ingress controller for it:
+3. Deploy the canary ingress for it, and set the version cookie for the old version to show version update notification:
 ```
 # kubectl apply -f deployment/ingress-v2-canary.yaml
 ```
