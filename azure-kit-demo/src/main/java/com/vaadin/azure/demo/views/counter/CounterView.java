@@ -63,11 +63,11 @@ public class CounterView extends VerticalLayout {
         hostnameHeading.setText(entry.getHostname());
         ipAddressHeading.setText(entry.getIpAddress());
 
-        final var item = new ListItem(
-                "host: " + entry.getHostname() + " (" + entry.getIpAddress() + ")" +
-                        " | version: " + System.getenv("APP_VERSION") +
-                        " | session: " + VaadinSession.getCurrent().getSession().getId() +
-                        " | counter: " + entry.getCount());
+        final var item = new ListItem("host: " + entry.getHostname() + " ("
+                + entry.getIpAddress() + ")" + " | version: "
+                + System.getenv("APP_VERSION") + " | session: "
+                + VaadinSession.getCurrent().getSession().getId()
+                + " | counter: " + entry.getCount());
         log.addComponentAsFirst(item);
     }
 

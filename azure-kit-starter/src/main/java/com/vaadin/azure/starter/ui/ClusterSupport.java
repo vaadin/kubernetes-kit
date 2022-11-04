@@ -23,9 +23,8 @@ import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.shared.Registration;
 
 /**
- * Cluster support for Vaadin applications.
- * This component allows receiving events from the cluster running the Vaadin
- * application.
+ * Cluster support for Vaadin applications. This component allows receiving
+ * events from the cluster running the Vaadin application.
  */
 public class ClusterSupport implements VaadinServiceInitListener {
 
@@ -67,7 +66,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
             private static final long serialVersionUID = 1L;
 
             public SwitchVersionEvent(VersionNotificator source,
-                                      boolean fromClient) {
+                    boolean fromClient) {
                 super(source, fromClient);
             }
         }
@@ -80,9 +79,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
         /**
          * Notify about the cluster node change to allow graceful transition of
-         * the users.
-         * <b>Note:</b> Even returning <code>false</code>, the application might
-         * still be shut down by the environment.
+         * the users. <b>Note:</b> Even returning <code>false</code>, the
+         * application might still be shut down by the environment.
          *
          * @param vaadinRequest
          *            Vaadin request when the change is initiated.
@@ -92,7 +90,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
          *         the change should not be performed.
          */
         boolean clusterSwitch(VaadinRequest vaadinRequest,
-                              VaadinResponse vaadinResponse);
+                VaadinResponse vaadinResponse);
     }
 
     /**
@@ -145,9 +143,9 @@ public class ClusterSupport implements VaadinServiceInitListener {
                 Method method = clz.getDeclaredMethod("getAppVersion");
                 appVersion = (String) method.invoke(null);
             } catch (ClassNotFoundException | NoSuchMethodException
-                     | SecurityException | IllegalAccessException
-                     | IllegalArgumentException
-                     | InvocationTargetException ignore) {
+                    | SecurityException | IllegalAccessException
+                    | IllegalArgumentException
+                    | InvocationTargetException ignore) {
                 // Intentionally ignored, not a spring application
             }
         }
@@ -169,7 +167,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
         // Register a generic request handler for all the requests.
         serviceInitEvent.addRequestHandler((RequestHandler) (vaadinSession,
-                                                             vaadinRequest, vaadinResponse) -> {
+                vaadinRequest, vaadinResponse) -> {
 
             // Set the thread local instance
             CurrentInstance.set(ClusterSupport.class, this);
@@ -190,7 +188,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
                 Cookie currentCookie = getCookieByName(UPDATE_VERSION_COOKIE);
                 if (currentCookie != null && !currentCookie.getValue().isEmpty()
                         && !versionCookie.getValue()
-                        .equals(currentCookie.getValue())) {
+                                .equals(currentCookie.getValue())) {
                     vaadinSession.getUIs().forEach(ui -> {
                         if (ui.getChildren().anyMatch(
                                 c -> (c instanceof VersionNotificator))) {
@@ -204,7 +202,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
                             // switching
                             if (switchVersionListener != null
                                     && !switchVersionListener.clusterSwitch(
-                                    VaadinRequest.getCurrent(), VaadinResponse.getCurrent())) {
+                                            VaadinRequest.getCurrent(),
+                                            VaadinResponse.getCurrent())) {
                                 return;
                             }
                             // When the users click on the notificator remove
