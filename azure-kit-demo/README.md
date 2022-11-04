@@ -96,7 +96,9 @@ Optionally, if you run a local docker registry, add the *localhost:5001* registr
 ```
 # kubectl apply -f deployment/ingress-v1-add-cookie.yaml
 ```
+
 Test and verify if the new version is working properly.
+
 5. Make the new version as a default and remove the app-update cookie:
 ```
 # kubectl apply -f deployment/ingress-v2.yaml
