@@ -543,6 +543,11 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             latch.countDown();
         }
 
+        @Override
+        public void deleteSession(String clusterKey) {
+            // NO-OP
+        }
+
         private SessionInfo waitForCompletion() {
             int timeout = 50000;
             try {

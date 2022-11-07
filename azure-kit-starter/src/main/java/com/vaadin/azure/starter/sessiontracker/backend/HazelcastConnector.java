@@ -29,20 +29,7 @@ public class HazelcastConnector implements BackendConnector {
     public SessionInfo getSession(String clusterKey) {
         getLogger().info("Requesting session for {}", clusterKey);
 
-        String pendingKey = getPendingKey(clusterKey);
-        if (sessions.isLocked(pendingKey)) {
-            getLogger().info(
-                    "Waiting for session to be serialized before using {}",
-                    clusterKey);
-            try {
-                // Wait for pending serialization operation to complete
-                sessions.tryLock(pendingKey, 5, TimeUnit.SECONDS, 1,
-                        TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ex) {
-                getLogger().warn(
-                        "Gave up waiting for the serialization result. The host probably crashed during serialization");
-            }
-        }
+        waitForSerializationCompletion(clusterKey, "getting session");
 
         byte[] data = sessions.get(getKey(clusterKey));
         if (data == null) {
@@ -67,12 +54,40 @@ public class HazelcastConnector implements BackendConnector {
         sessions.forceUnlock(getPendingKey(clusterKey));
     }
 
-    private String getKey(String clusterKey) {
+    @Override
+    public void deleteSession(String clusterKey) {
+        getLogger().debug("Deleting session {}", clusterKey);
+        waitForSerializationCompletion(clusterKey, "deleting");
+        sessions.delete(getKey(clusterKey));
+        sessions.delete(getPendingKey(clusterKey));
+        getLogger().debug("Session {} deleted", clusterKey);
+    }
+
+    private void waitForSerializationCompletion(String clusterKey,
+            String action) {
+        String pendingKey = getPendingKey(clusterKey);
+        if (sessions.isLocked(pendingKey)) {
+            getLogger().info(
+                    "Waiting for session to be serialized before {} {}", action,
+                    clusterKey);
+            try {
+                // Wait for pending serialization operation to complete
+                sessions.tryLock(pendingKey, 5, TimeUnit.SECONDS, 1,
+                        TimeUnit.MILLISECONDS);
+            } catch (InterruptedException ex) {
+                getLogger().warn(
+                        "Gave up waiting for the serialization result of {} before {}. The host probably crashed during serialization",
+                        clusterKey, action);
+            }
+        }
+    }
+
+    static String getKey(String clusterKey) {
         return "session-" + clusterKey;
 
     }
 
-    private String getPendingKey(String clusterKey) {
+    static String getPendingKey(String clusterKey) {
         return "pending-" + clusterKey;
     }
 

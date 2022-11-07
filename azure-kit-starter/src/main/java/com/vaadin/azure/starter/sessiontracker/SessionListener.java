@@ -34,10 +34,27 @@ public class SessionListener implements HttpSessionListener {
                     sessionSerializer.deserialize(sessionInfo, session);
                 } catch (Exception e) {
                     getLogger().error(
-                            "Unable to deserialize session from backend", e);
+                            "Unable to deserialize session {} from backend",
+                            session.getId(), e);
                 }
             }
         }
+    }
+
+    @Override
+    public void sessionDestroyed(HttpSessionEvent se) {
+        HttpSession session = se.getSession();
+        String sessionId = session.getId();
+        getLogger().debug("Session with id {} destroyed", sessionId);
+        SessionTrackerCookie.getFromSession(session).ifPresent(clusterKey -> {
+            getLogger().debug("Deleting session {} from backend", sessionId);
+            try {
+                sessionBackendConnector.deleteSession(clusterKey);
+            } catch (Exception e) {
+                getLogger().error("Unable to delete session {} from backend",
+                        sessionId, e);
+            }
+        });
     }
 
     static Logger getLogger() {

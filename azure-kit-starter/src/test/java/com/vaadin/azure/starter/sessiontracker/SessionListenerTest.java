@@ -39,7 +39,7 @@ public class SessionListenerTest {
         verify(backendConnector, never()).getSession(any());
         try {
             verify(sessionSerializer, never()).deserialize(any(), any());
-        } catch(Exception e) {
+        } catch (Exception e) {
             fail();
         }
     }
@@ -64,7 +64,7 @@ public class SessionListenerTest {
         verify(backendConnector).getSession(eq(clusterKey));
         try {
             verify(sessionSerializer, never()).deserialize(any(), any());
-        } catch(Exception e) {
+        } catch (Exception e) {
             fail();
         }
     }
@@ -92,8 +92,43 @@ public class SessionListenerTest {
         verify(backendConnector).getSession(eq(clusterKey));
         try {
             verify(sessionSerializer).deserialize(eq(sessionInfo), eq(session));
-        } catch(Exception e) {
+        } catch (Exception e) {
             fail();
         }
     }
+
+    @Test
+    void sessionDestroyed_replicateSessionIsDeleted() {
+        BackendConnector backendConnector = mock(BackendConnector.class);
+        SessionSerializer sessionSerializer = mock(SessionSerializer.class);
+        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
+        HttpSession session = mock(HttpSession.class);
+        when(session.getAttribute(CurrentKey.COOKIE_NAME))
+                .thenReturn("clusterKey");
+        when(sessionEvent.getSession()).thenReturn(session);
+
+        SessionListener listener = new SessionListener(backendConnector,
+                sessionSerializer);
+        listener.sessionDestroyed(sessionEvent);
+
+        verify(sessionEvent).getSession();
+        verify(backendConnector).deleteSession(any());
+    }
+
+    @Test
+    void sessionDestroyed_nullClusterKey_replicateSessionIsNotDeleted() {
+        BackendConnector backendConnector = mock(BackendConnector.class);
+        SessionSerializer sessionSerializer = mock(SessionSerializer.class);
+        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
+        HttpSession session = mock(HttpSession.class);
+        when(sessionEvent.getSession()).thenReturn(session);
+
+        SessionListener listener = new SessionListener(backendConnector,
+                sessionSerializer);
+        listener.sessionDestroyed(sessionEvent);
+
+        verify(sessionEvent).getSession();
+        verify(backendConnector, never()).deleteSession(any());
+    }
+
 }

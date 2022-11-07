@@ -21,19 +21,21 @@ public class PushSessionTracker implements PushSendListener {
     @Override
     public void onMessageSent(AtmosphereResource resource) {
         HttpSession session = resource.session(false);
-        getLogger().info("PUSH message sent. HTTP session {}",
-                (session == null) ? "NULL" : session.getClass());
-        if (session != null) {
+        if (session != null && resource.getRequest().wrappedRequest()
+                .isRequestedSessionIdValid()) {
             SessionTrackerCookie
                     .getValue(resource.getRequest().wrappedRequest())
                     .ifPresent(CurrentKey::set);
-            getLogger().info("PUSH message sent. Current Key  {}",
-                    CurrentKey.get());
+            getLogger().debug("Serializing session {} with key {}",
+                    session.getId(), CurrentKey.get());
             try {
                 sessionSerializer.serialize(session);
             } finally {
                 CurrentKey.clear();
             }
+        } else {
+            getLogger().debug(
+                    "Skipping session serialization. Session is invalidated");
         }
     }
 
