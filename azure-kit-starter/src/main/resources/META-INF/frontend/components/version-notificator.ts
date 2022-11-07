@@ -14,25 +14,28 @@ export class VersionNotificator extends LitElement {
         position: absolute;
         max-width: calc(100% - 100px);
         min-height: 40px;
-        bottom: 12px;
-        right: 50px;
+        top: 6px;
+        right: 6px;
         padding: 14px 10px;
         border-radius: 4px;
         text-align: center;
         background: #f5e087e6;
         color: #42302B;
         box-sizing: border-box;
+        box-shadow: inset 0 0 5px;
+        cursor: move;
       }
       a {
         color: #0000ff96;
         cursor: pointer;
+        font-weight: bold;
       }
       `;
     }
 
     render() {
         return html`
-      Version ${this.updateVersion} is available, please save your work and <a @click=${this.onClick}>click here</a>.
+      Version <b>${this.updateVersion}</b> is available, please save your work and <a @click=${this.onClick}>click here</a>.
     `;
     }
 
