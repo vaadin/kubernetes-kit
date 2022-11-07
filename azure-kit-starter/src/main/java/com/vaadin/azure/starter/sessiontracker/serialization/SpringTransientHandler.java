@@ -18,8 +18,8 @@ import org.springframework.context.ApplicationContext;
 import com.vaadin.flow.internal.ReflectTools;
 
 /**
- * Spring specific implementation of {@link TransientInspector} and
- * {@link TransientInjector}.
+ * Spring specific implementation of {@link TransientHandler}, capable to
+ * inspect and inject Spring Beans into transient fields.
  *
  * Inspection finds all transient fields whose actual value matches a Spring
  * managed bean. The bean name is stored into {@link TransientDescriptor} and it
@@ -72,9 +72,9 @@ public class SpringTransientHandler implements TransientHandler {
                     field.getName(), target.getClass());
             TransientDescriptor transientDescriptor = appCtx
                     .getBeansOfType(valueType).entrySet().stream()
-                    .filter(e -> e.getValue() == value || matchesPrototype(e.getKey(), e.getValue(), valueType))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
+                    .filter(e -> e.getValue() == value || matchesPrototype(
+                            e.getKey(), e.getValue(), valueType))
+                    .map(Map.Entry::getKey).findFirst()
                     .map(beanName -> new TransientDescriptor(field, beanName))
                     .orElse(null);
             if (transientDescriptor != null) {
@@ -93,8 +93,10 @@ public class SpringTransientHandler implements TransientHandler {
         return null;
     }
 
-    private boolean matchesPrototype(String beanName, Object beanDefinition, Class<?> fieldValueType) {
-        return appCtx.isPrototype(beanName) && beanDefinition.getClass() == fieldValueType;
+    private boolean matchesPrototype(String beanName, Object beanDefinition,
+            Class<?> fieldValueType) {
+        return appCtx.isPrototype(beanName)
+                && beanDefinition.getClass() == fieldValueType;
     }
 
     private Object getFieldValue(Object target, Field field) {

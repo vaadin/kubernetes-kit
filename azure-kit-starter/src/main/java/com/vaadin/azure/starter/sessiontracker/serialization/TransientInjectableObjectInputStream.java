@@ -17,20 +17,20 @@ import org.slf4j.LoggerFactory;
  * containing wrapper objects with details usable to inject transient fields on
  * deserialized object.
  *
- * Injection is performed by a pluggable {@link TransientInjector} component,
+ * Injection is performed by a pluggable {@link TransientHandler} component,
  * taking as input a deserialized object and transient fields information in the
  * form of {@link TransientDescriptor} objects.
  *
  * @see TransientInjectableObjectOutputStream#replaceObject(Object)
- * @see TransientInjector
+ * @see TransientHandler
  * @see TransientDescriptor
  */
 public class TransientInjectableObjectInputStream extends ObjectInputStream {
 
-    private final TransientInjector injector;
+    private final TransientHandler injector;
 
     public TransientInjectableObjectInputStream(InputStream in,
-            TransientInjector injector) throws IOException {
+            TransientHandler injector) throws IOException {
         super(in);
         this.injector = injector;
         enableResolveObject(true);

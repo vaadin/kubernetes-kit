@@ -62,9 +62,9 @@ public final class TransientDescriptor implements Serializable {
     /**
      * Returns the reference to the field instance value.
      * 
-     * The reference syntax depends on the {@link TransientInspector} that
-     * created this descriptor instance. For example, for Spring it may be the
-     * name of a managed bean.
+     * The reference syntax depends on the {@link TransientHandler} that created
+     * this descriptor instance. For example, for Spring it may be the name of a
+     * managed bean.
      * 
      * @return the reference to the field instance value
      */

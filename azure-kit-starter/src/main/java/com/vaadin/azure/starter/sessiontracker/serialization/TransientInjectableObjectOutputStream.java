@@ -25,9 +25,9 @@ import org.slf4j.LoggerFactory;
  * during deserialization to try to automatically inject values into transient
  * fields of the deserialized object.
  *
- * Object inspection if performed by a pluggable {@link TransientInspector}
- * object whose aim is to provide information about transient fields along with
- * an object identifier for the instance being serialized, in the form of
+ * Object inspection if performed by a pluggable {@link TransientHandler} object
+ * whose aim is to provide information about transient fields along with an
+ * object identifier for the instance being serialized, in the form of
  * {@link TransientDescriptor} objects.
  * 
  * To improve performance, a filter can be provided to inspect only classes
@@ -46,23 +46,23 @@ import org.slf4j.LoggerFactory;
  * {@link TransientInjectableObjectInputStream}.
  *
  * @see TransientInjectableObjectInputStream
- * @see TransientInspector
+ * @see TransientHandler
  * @see TransientDescriptor
  */
 public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
 
-    private final TransientInspector inspector;
+    private final TransientHandler inspector;
     private final IdentityHashMap<Object, TransientAwareHolder> seen = new IdentityHashMap<>();
 
     private final Predicate<Class<?>> injectableFilter;
 
     public TransientInjectableObjectOutputStream(OutputStream out,
-            TransientInspector inspector) throws IOException {
+            TransientHandler inspector) throws IOException {
         this(out, inspector, type -> true);
     }
 
     public TransientInjectableObjectOutputStream(OutputStream out,
-            TransientInspector inspector, Predicate<Class<?>> injectableFilter)
+            TransientHandler inspector, Predicate<Class<?>> injectableFilter)
             throws IOException {
         super(out);
         this.inspector = inspector;
