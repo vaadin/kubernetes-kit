@@ -3,7 +3,6 @@ package com.vaadin.azure.starter.sessiontracker.push;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-
 import java.util.UUID;
 
 import org.atmosphere.cpr.AtmosphereRequest;
@@ -22,7 +21,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-public class PushSessionTrackerTest {
+class PushSessionTrackerTest {
     @Test
     void onMessageSent_nullSession_sessionIsNotSerialized() {
         SessionSerializer sessionSerializer = mock(SessionSerializer.class);
