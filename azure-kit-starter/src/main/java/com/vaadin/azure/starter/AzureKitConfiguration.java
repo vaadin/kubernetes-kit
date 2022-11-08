@@ -2,7 +2,6 @@ package com.vaadin.azure.starter;
 
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
-import java.util.List;
 import java.util.function.Predicate;
 
 import com.hazelcast.config.AttributeConfig;
@@ -16,14 +15,17 @@ import com.hazelcast.nio.serialization.Serializer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.AllNestedConditions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.session.MapSession;
@@ -46,9 +48,9 @@ import com.vaadin.azure.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.azure.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.azure.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.azure.starter.sessiontracker.push.PushSessionTracker;
+import com.vaadin.azure.starter.sessiontracker.serialization.SerializationDebugRequestHandler;
 import com.vaadin.azure.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.azure.starter.sessiontracker.serialization.TransientHandler;
-import com.vaadin.flow.spring.VaadinConfigurationProperties;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
@@ -61,6 +63,7 @@ public class AzureKitConfiguration {
 
     @AutoConfiguration
     @ConditionalOnMissingClass("org.springframework.session.Session")
+    @ConditionalOnBean(BackendConnector.class)
     public static class VaadinReplicatedSessionConfiguration {
 
         public static final String TRANSIENT_INJECTABLE_FILTER = "vaadinSerializationTransientInjectableFilter";
@@ -151,6 +154,35 @@ public class AzureKitConfiguration {
             return new PushSessionTracker(sessionSerializer);
         }
 
+    }
+
+    @AutoConfiguration
+    @Conditional(VaadinReplicatedSessionDevModeConfiguration.OnSessionSerializationDebug.class)
+    public static class VaadinReplicatedSessionDevModeConfiguration {
+        @Bean
+        @ConditionalOnMissingBean
+        SerializationDebugRequestHandler.InitListener sessionSerializationDebugToolInstaller() {
+            return new SerializationDebugRequestHandler.InitListener();
+        }
+
+        private static class OnSessionSerializationDebug
+                extends AllNestedConditions {
+
+            public OnSessionSerializationDebug() {
+                super(ConfigurationPhase.PARSE_CONFIGURATION);
+            }
+
+            @ConditionalOnProperty(prefix = "vaadin", name = "productionMode", havingValue = "false", matchIfMissing = true)
+            static class OnDevelopmentMode {
+
+            }
+
+            @ConditionalOnProperty(prefix = "vaadin", name = "devmode.sessionSerialization.enabled")
+            static class OnSessionSerialization {
+
+            }
+
+        }
     }
 
     @AutoConfiguration
