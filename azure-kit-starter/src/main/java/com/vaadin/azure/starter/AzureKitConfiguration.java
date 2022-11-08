@@ -4,14 +4,9 @@ import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
 import java.util.function.Predicate;
 
-import com.hazelcast.config.AttributeConfig;
 import com.hazelcast.config.Config;
-import com.hazelcast.config.IndexConfig;
-import com.hazelcast.config.IndexType;
-import com.hazelcast.config.SerializerConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.nio.serialization.Serializer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -19,7 +14,6 @@ import org.springframework.boot.autoconfigure.condition.AllNestedConditions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -28,16 +22,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.session.MapSession;
-import org.springframework.session.SaveMode;
-import org.springframework.session.config.SessionRepositoryCustomizer;
-import org.springframework.session.data.redis.RedisIndexedSessionRepository;
-import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
-import org.springframework.session.hazelcast.Hazelcast4IndexedSessionRepository;
-import org.springframework.session.hazelcast.Hazelcast4PrincipalNameExtractor;
-import org.springframework.session.hazelcast.HazelcastSessionSerializer;
-import org.springframework.session.hazelcast.config.annotation.SpringSessionHazelcastInstance;
-import org.springframework.session.hazelcast.config.annotation.web.http.EnableHazelcastHttpSession;
 import org.springframework.util.StringUtils;
 
 import com.vaadin.azure.starter.sessiontracker.SessionListener;
@@ -62,7 +46,6 @@ import com.vaadin.azure.starter.sessiontracker.serialization.TransientHandler;
 public class AzureKitConfiguration {
 
     @AutoConfiguration
-    @ConditionalOnMissingClass("org.springframework.session.Session")
     @ConditionalOnBean(BackendConnector.class)
     public static class VaadinReplicatedSessionConfiguration {
 
@@ -197,101 +180,13 @@ public class AzureKitConfiguration {
     }
 
     @AutoConfiguration
-    @EnableRedisHttpSession
-    @ConditionalOnClass(RedisIndexedSessionRepository.class)
-    public static class RedisSessionRepositoryConfiguration {
-
-        static final String BEAN_NAME = "vaadinRedisSessionRepositoryCustomizer";
-
-        /**
-         * Provides a {@link SessionRepositoryCustomizer} bean to configure
-         * {@link RedisIndexedSessionRepository} to work with Vaadin.
-         *
-         * @return the session-repository customizer
-         */
-        @Bean(BEAN_NAME)
-        public SessionRepositoryCustomizer<RedisIndexedSessionRepository> redisSessionRepositoryCustomizer() {
-            return repository -> {
-                repository.setSaveMode(SaveMode.ON_GET_ATTRIBUTE);
-            };
-        }
-
-    }
-
-    @AutoConfiguration
-    @EnableHazelcastHttpSession
-    @ConditionalOnClass(Hazelcast4IndexedSessionRepository.class)
-    public static class HazelcastSessionRepositoryConfiguration
-            extends HazelcastSupport {
-
-        static final String BEAN_NAME = "vaadinHazelcastSessionRepositoryCustomizer";
-
-        public HazelcastSessionRepositoryConfiguration(
-                AzureKitProperties properties) {
-            super(properties);
-        }
-
-        /**
-         * Provides a {@link SessionRepositoryCustomizer} bean to configure
-         * {@link Hazelcast4IndexedSessionRepository} to work with Vaadin.
-         *
-         * @return the session-repository customizer
-         */
-        @Bean(BEAN_NAME)
-        @ConditionalOnClass(Hazelcast4IndexedSessionRepository.class)
-        public SessionRepositoryCustomizer<Hazelcast4IndexedSessionRepository> hazelcastSessionRepositoryCustomizer() {
-            return repository -> {
-                repository.setSaveMode(SaveMode.ON_GET_ATTRIBUTE);
-            };
-        }
-
-        @Bean
-        @ConditionalOnMissingBean
-        @SpringSessionHazelcastInstance
-        public HazelcastInstance hazelcastInstance() {
-            return super.hazelcastInstance();
-        }
-
-        @Override
-        protected void configure(Config config) {
-            configureMapAttributes(config);
-            configureSessionSerializer(config);
-        }
-
-        private static void configureMapAttributes(Config config) {
-            final var attrConfig = new AttributeConfig();
-            attrConfig.setName(
-                    Hazelcast4IndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE)
-                    .setExtractorClassName(
-                            Hazelcast4PrincipalNameExtractor.class.getName());
-
-            final var indexConfig = new IndexConfig(IndexType.HASH,
-                    Hazelcast4IndexedSessionRepository.PRINCIPAL_NAME_ATTRIBUTE);
-
-            config.getMapConfig(
-                    Hazelcast4IndexedSessionRepository.DEFAULT_SESSION_MAP_NAME)
-                    .addAttributeConfig(attrConfig).addIndexConfig(indexConfig);
-        }
-
-        private void configureSessionSerializer(Config config) {
-            final var serializerConfig = new SerializerConfig();
-            serializerConfig.setImplementation(getSerializer());
-            serializerConfig.setTypeClass(MapSession.class);
-
-            config.getSerializationConfig()
-                    .addSerializerConfig(serializerConfig);
-        }
-
-        private Serializer getSerializer() {
-            return new HazelcastSessionSerializer();
-        }
-    }
-
-    @AutoConfiguration
     @ConditionalOnClass(HazelcastInstance.class)
-    public static class HazelcastConfiguration extends HazelcastSupport {
+    public static class HazelcastConfiguration {
+
+        final AzureKitProperties properties;
+
         public HazelcastConfiguration(AzureKitProperties properties) {
-            super(properties);
+            this.properties = properties;
         }
 
         @Bean
@@ -304,18 +199,6 @@ public class AzureKitConfiguration {
         @Bean
         @ConditionalOnMissingBean
         public HazelcastInstance hazelcastInstance() {
-            return super.hazelcastInstance();
-        }
-    }
-
-    static class HazelcastSupport {
-        final AzureKitProperties properties;
-
-        public HazelcastSupport(AzureKitProperties properties) {
-            this.properties = properties;
-        }
-
-        HazelcastInstance hazelcastInstance() {
             final var config = new Config();
 
             configure(config);

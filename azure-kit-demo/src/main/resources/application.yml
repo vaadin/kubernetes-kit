@@ -11,7 +11,7 @@ vaadin:
   azure:
     hazelcast:
       kubernetes:
-        service-name: azure-kit-hazelcast-service
+        xxxservice-name: azure-kit-hazelcast-service
   serialization:
     include-packages: com.vaadin.azure.demo
   devmode:
