@@ -91,7 +91,7 @@ public class AzureKitConfiguration {
         @ConditionalOnMissingBean
         Predicate<Class<?>> transientInjectableFilter(
                 SerializationProperties props) {
-            return props.transientInjectableFilter();
+            return props.getTransients().transientInjectableFilter();
         }
 
         @Bean
