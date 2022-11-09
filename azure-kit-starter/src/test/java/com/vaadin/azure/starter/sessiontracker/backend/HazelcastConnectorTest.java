@@ -20,7 +20,7 @@ import static org.mockito.Mockito.when;
 
 public class HazelcastConnectorTest {
     String clusterKey;
-    IMap sessionMap;
+    IMap<String, byte[]> sessionMap;
     HazelcastInstance hazelcastInstance;
     HazelcastConnector connector;
 
@@ -31,7 +31,8 @@ public class HazelcastConnectorTest {
         sessionMap = mock(IMap.class);
 
         hazelcastInstance = mock(HazelcastInstance.class);
-        when(hazelcastInstance.getMap(anyString())).thenReturn(sessionMap);
+        when(hazelcastInstance.<String, byte[]> getMap(anyString()))
+                .thenReturn(sessionMap);
 
         connector = new HazelcastConnector(hazelcastInstance);
     }
@@ -40,12 +41,13 @@ public class HazelcastConnectorTest {
     void sendSession_sessionIsAdded() {
         SessionInfo sessionInfo = mock(SessionInfo.class);
         when(sessionInfo.getClusterKey()).thenReturn(clusterKey);
-        byte[] data = new byte[] {'f','o','o'};
+        byte[] data = new byte[] { 'f', 'o', 'o' };
         when(sessionInfo.getData()).thenReturn(data);
 
         connector.sendSession(sessionInfo);
 
-        verify(sessionMap).put(eq("session-" + clusterKey), aryEq(data));
+        verify(sessionMap).put(eq(HazelcastConnector.getKey(clusterKey)),
+                aryEq(data));
     }
 
     @Test
@@ -61,7 +63,7 @@ public class HazelcastConnectorTest {
             fail();
         }
 
-        verify(sessionMap).get(eq("session-" + clusterKey));
+        verify(sessionMap).get(eq(HazelcastConnector.getKey(clusterKey)));
     }
 
     @Test
@@ -77,25 +79,61 @@ public class HazelcastConnectorTest {
         connector.getSession(clusterKey);
 
         try {
-            verify(sessionMap).tryLock(any(), anyLong(), any(), anyLong(), any());
+            verify(sessionMap).tryLock(any(), anyLong(), any(), anyLong(),
+                    any());
         } catch (Exception e) {
             fail();
         }
 
-        verify(sessionMap).get(eq("session-" + clusterKey));
+        verify(sessionMap).get(eq(HazelcastConnector.getKey(clusterKey)));
     }
 
     @Test
     void markSerializationStarted_sessionLocked() {
         connector.markSerializationStarted(clusterKey);
 
-        verify(sessionMap).lock(eq("pending-" + clusterKey));
+        verify(sessionMap)
+                .lock(eq(HazelcastConnector.getPendingKey(clusterKey)));
     }
 
     @Test
     void markSerializationComplete_sessionNotLocked() {
         connector.markSerializationComplete(clusterKey);
 
-        verify(sessionMap).forceUnlock(eq("pending-" + clusterKey));
+        verify(sessionMap)
+                .forceUnlock(eq(HazelcastConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void deleteSession_sessionNotLocked_sessionIsDeleted()
+            throws InterruptedException {
+        when(sessionMap.tryLock(
+                eq(HazelcastConnector.getPendingKey(clusterKey)), anyLong(),
+                any(), anyLong(), any())).thenReturn(true);
+
+        connector.deleteSession(clusterKey);
+
+        verify(sessionMap).delete(HazelcastConnector.getKey(clusterKey));
+        verify(sessionMap).delete(HazelcastConnector.getPendingKey(clusterKey));
+        verify(sessionMap, never()).tryLock(
+                eq(HazelcastConnector.getPendingKey(clusterKey)), anyLong(),
+                any(), anyLong(), any());
+    }
+
+    @Test
+    void deleteSession_sessionLocked_waitsForSessionLock()
+            throws InterruptedException {
+        when(sessionMap.isLocked(any())).thenReturn(true);
+        when(sessionMap.tryLock(
+                eq(HazelcastConnector.getPendingKey(clusterKey)), anyLong(),
+                any(), anyLong(), any())).thenReturn(true);
+
+        connector.deleteSession(clusterKey);
+
+        verify(sessionMap).tryLock(
+                eq(HazelcastConnector.getPendingKey(clusterKey)), anyLong(),
+                any(), anyLong(), any());
+        verify(sessionMap).delete(HazelcastConnector.getKey(clusterKey));
+        verify(sessionMap).delete(HazelcastConnector.getPendingKey(clusterKey));
     }
 }
