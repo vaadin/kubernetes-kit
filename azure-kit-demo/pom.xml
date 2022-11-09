@@ -99,10 +99,6 @@
             <id>redis</id>
             <dependencies>
                 <dependency>
-                    <groupId>org.springframework.session</groupId>
-                    <artifactId>spring-session-data-redis</artifactId>
-                </dependency>
-                <dependency>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-data-redis</artifactId>
                 </dependency>
@@ -111,26 +107,6 @@
 
         <profile>
             <id>hazelcast</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.session</groupId>
-                    <artifactId>spring-session-hazelcast</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
-
-        <profile>
-            <id>redis-pure</id>
-            <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-data-redis</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
-
-        <profile>
-            <id>hazelcast-pure</id>
             <dependencies>
                 <dependency>
                     <groupId>com.hazelcast</groupId>
