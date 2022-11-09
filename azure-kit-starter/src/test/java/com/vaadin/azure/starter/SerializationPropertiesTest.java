@@ -20,7 +20,8 @@ class SerializationPropertiesTest {
 
     @Test
     void transientInjectableFilter_excludedPackages_classIsRejected() {
-        SerializationProperties props = new SerializationProperties();
+        SerializationProperties.TransientsProperties props = new SerializationProperties()
+                .getTransients();
         props.getExcludePackages()
                 .addAll(List.of(VaadinService.class.getPackageName(),
                         TransientDescriptor.class.getPackageName()));
@@ -37,7 +38,8 @@ class SerializationPropertiesTest {
 
     @Test
     void transientInjectableFilter_includedPackages_classIsAccepted() {
-        SerializationProperties props = new SerializationProperties();
+        SerializationProperties.TransientsProperties props = new SerializationProperties()
+                .getTransients();
         props.getIncludePackages()
                 .addAll(List.of(VaadinService.class.getPackageName(),
                         TransientDescriptor.class.getPackageName()));
@@ -54,7 +56,8 @@ class SerializationPropertiesTest {
 
     @Test
     void transientInjectableFilter_mixedPackageRules_classIsAccepted() {
-        SerializationProperties props = new SerializationProperties();
+        SerializationProperties.TransientsProperties props = new SerializationProperties()
+                .getTransients();
         props.getExcludePackages()
                 .addAll(List.of(ViewAccessChecker.class.getPackageName(),
                         TransientDescriptor.class.getPackageName()));
@@ -75,7 +78,8 @@ class SerializationPropertiesTest {
 
     @Test
     void transientInjectableFilter_noRules_allClassesAreAccepted() {
-        SerializationProperties props = new SerializationProperties();
+        SerializationProperties.TransientsProperties props = new SerializationProperties()
+                .getTransients();
         Predicate<Class<?>> filter = AzureKitConfiguration.VaadinReplicatedSessionConfiguration
                 .withVaadinDefaultFilter(props.transientInjectableFilter());
 
