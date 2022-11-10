@@ -2,7 +2,10 @@ package com.vaadin.azure.demo.views.counter;
 
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
+import com.vaadin.azure.demo.entity.Company;
+import com.vaadin.azure.demo.services.CrmService;
 import com.vaadin.azure.demo.services.HostInfo;
 import com.vaadin.azure.demo.views.MainLayout;
 import com.vaadin.flow.component.button.Button;
@@ -11,6 +14,7 @@ import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.ListItem;
+import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.UnorderedList;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
@@ -35,7 +39,10 @@ public class CounterView extends VerticalLayout {
 
     private final AtomicInteger counter = new AtomicInteger();
 
-    public CounterView() {
+    private transient CrmService service;
+
+    public CounterView(CrmService service) {
+        this.service = service;
         setSizeFull();
         setJustifyContentMode(JustifyContentMode.CENTER);
         setDefaultHorizontalComponentAlignment(Alignment.CENTER);
@@ -51,8 +58,18 @@ public class CounterView extends VerticalLayout {
 
         count();
 
-        add(counterHeading, hostnameHeading, ipAddressHeading, button);
+        add(counterHeading, hostnameHeading, ipAddressHeading, button,
+                new Button("Use Service", ev -> doSomethingWithService()));
         addAndExpand(log);
+    }
+
+    public CrmService getService() {
+        return service;
+    }
+
+    private void doSomethingWithService() {
+        add(new Paragraph(getService().findAllCompanies().stream()
+                .map(Company::getName).collect(Collectors.joining(", "))));
     }
 
     private void count() {

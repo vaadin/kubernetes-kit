@@ -12,3 +12,12 @@ vaadin:
     hazelcast:
       kubernetes:
         service-name: azure-kit-hazelcast-service
+  serialization:
+    transients:
+      include-packages: com.vaadin.azure.demo
+  devmode:
+    sessionSerialization:
+      enabled: true
+
+
+

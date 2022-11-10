@@ -5,6 +5,8 @@ public interface BackendConnector {
 
     SessionInfo getSession(String clusterKey);
 
+    void deleteSession(String clusterKey);
+
     void markSerializationStarted(String clusterKey);
 
     void markSerializationComplete(String clusterKey);

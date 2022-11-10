@@ -136,10 +136,12 @@ public class AzureKitProperties {
          *
          * Uxd
          *
-         * @param port port number or 0
+         * @param port
+         *            port number or 0
          */
         public void setServicePort(int port) {
             this.servicePort = port;
         }
     }
+
 }
