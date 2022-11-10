@@ -54,7 +54,7 @@ export class VersionNotificator extends LitElement {
 
     dragstart(e: Event) {
         const event = e as DragEvent & { target: HTMLElement, dataTransfer: DataTransfer};
-        var style = window.getComputedStyle(event.target, null);
+        const style = window.getComputedStyle(event.target, null);
         const left = parseInt(style.getPropertyValue("left"), 10) - event.clientX;
         const top = parseInt(style.getPropertyValue("top"), 10) - event.clientY;
         event.dataTransfer.setData("text/plain", left + ',' + top);
