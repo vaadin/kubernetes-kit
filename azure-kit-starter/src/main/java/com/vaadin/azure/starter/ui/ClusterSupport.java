@@ -117,8 +117,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
                     }
                     VersionNotificator notificator = new VersionNotificator(
                             appVersion, currentCookie.getValue());
-                    notificator
-                            .addSwitchVersionEvent(createSwitchVersionEvent());
+                    notificator.addSwitchVersionEventListener(
+                            createSwitchVersionEventListener());
                     // Show notificator
                     ui.add(notificator);
                 });
@@ -126,7 +126,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
         };
     }
 
-    private ComponentEventListener<VersionNotificator.SwitchVersionEvent> createSwitchVersionEvent() {
+    private ComponentEventListener<VersionNotificator.SwitchVersionEvent> createSwitchVersionEventListener() {
         return e -> {
             // Do nothing if switch version listener prevents switching
             if (switchVersionListener != null && !switchVersionListener

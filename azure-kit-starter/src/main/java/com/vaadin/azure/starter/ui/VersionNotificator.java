@@ -25,9 +25,12 @@ public class VersionNotificator extends Component {
     }
 
     /**
-     * Adds a listener to listen for the switch version events.
+     * Adds a listener to listen for to switch version events.
+     *
+     * @param listener
+     *            the listener to add.
      */
-    public void addSwitchVersionEvent(
+    public void addSwitchVersionEventListener(
             ComponentEventListener<SwitchVersionEvent> listener) {
         getLogger().debug("Adding listener for SwitchVersionEvent.");
         addListener(SwitchVersionEvent.class, listener);
