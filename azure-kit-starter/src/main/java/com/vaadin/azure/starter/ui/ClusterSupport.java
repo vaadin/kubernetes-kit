@@ -118,11 +118,14 @@ public class ClusterSupport implements VaadinServiceInitListener {
     }
 
     private void handleSwitchVersionEvent(VersionNotificator.SwitchVersionEvent event) {
-        // Do nothing if switch version listener prevents switching
-        if (switchVersionListener != null && !switchVersionListener
-                .clusterSwitch(VaadinRequest.getCurrent(),
-                        VaadinResponse.getCurrent())) {
-            return;
+        if (switchVersionListener != null) {
+            // Do nothing if switch version listener prevents switching
+            if (!switchVersionListener.nodeSwitch(VaadinRequest.getCurrent(), VaadinResponse.getCurrent())) {
+                return;
+            }
+
+            // Do application level clean-up before version switch
+            switchVersionListener.doAppCleanup();
         }
 
         // When the user clicks on the notificator remove the cluster

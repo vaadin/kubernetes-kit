@@ -6,7 +6,7 @@ import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;
 
 /**
- * Interface for receiving events on cluster change.
+ * Interface for receiving events on version change.
  */
 public interface SwitchVersionListener extends Serializable {
 
@@ -19,9 +19,16 @@ public interface SwitchVersionListener extends Serializable {
      *            Vaadin request when the change is initiated.
      * @param vaadinResponse
      *            Response from the server to be sent to the client.
-     * @return <code>true</code> if the cluster change is ok, <code>false</code>
-     *         if the change should not be performed.
+     * @return <code>true</code> if the cluster node change is ok (default value),
+     *         <code>false</code> if the change should not be performed.
      */
-    boolean clusterSwitch(VaadinRequest vaadinRequest,
-            VaadinResponse vaadinResponse);
+    default boolean nodeSwitch(VaadinRequest vaadinRequest,
+            VaadinResponse vaadinResponse) {
+        return true;
+    };
+
+    /**
+     * Makes possible to do application level clean-up before the version switch.
+     */
+    default void doAppCleanup() {};
 }
