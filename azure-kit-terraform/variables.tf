@@ -109,8 +109,13 @@ variable "os_disk_size_gb" {
 
 # https://github.com/Azure/k8s-best-practices/blob/master/Cost_Optimization.md#node---vm-sizes
 # https://learn.microsoft.com/en-us/azure/virtual-machines/sizes
+# Standard_D2s_v5 = 2 cpu 8G RAM
+# D – General purpose compute
+# 2 – VM Size
+# s – Premium Storage capable
+# v5 – version
 variable "vm_size" {
-  default = "Standard_B2s"
+  default = "Standard_D2s_v5"
 }
 
 
