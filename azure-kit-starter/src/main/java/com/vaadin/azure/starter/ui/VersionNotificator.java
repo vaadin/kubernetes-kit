@@ -25,7 +25,7 @@ public class VersionNotificator extends Component {
     }
 
     /**
-     * Adds a listener to listen for to switch version events.
+     * Adds a listener to listen to switch version events.
      *
      * @param listener
      *            the listener to add.
@@ -45,7 +45,7 @@ public class VersionNotificator extends Component {
             extends ComponentEvent<VersionNotificator> {
         private static final long serialVersionUID = 1L;
 
-        SwitchVersionEvent(VersionNotificator source, boolean fromClient) {
+        public SwitchVersionEvent(VersionNotificator source, boolean fromClient) {
             super(source, fromClient);
         }
     }

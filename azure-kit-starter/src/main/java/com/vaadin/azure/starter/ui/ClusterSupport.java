@@ -5,10 +5,7 @@ import javax.servlet.http.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.internal.CurrentInstance;
-import com.vaadin.flow.server.Command;
-import com.vaadin.flow.server.RequestHandler;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;
@@ -78,24 +75,15 @@ public class ClusterSupport implements VaadinServiceInitListener {
                         + appVersion);
 
         // Register a generic request handler for all the requests
-        serviceInitEvent.addRequestHandler(createRequestHandler());
+        serviceInitEvent.addRequestHandler(this::handleRequest);
     }
 
-    private RequestHandler createRequestHandler() {
-        return (vaadinSession, vaadinRequest, vaadinResponse) -> {
-            // Set the thread local instance
-            CurrentInstance.set(ClusterSupport.class, this);
+    private boolean handleRequest(VaadinSession vaadinSession,
+            VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
+        // Set the thread local instance
+        CurrentInstance.set(ClusterSupport.class, this);
 
-            vaadinSession.access(handleVersions(vaadinSession, vaadinResponse));
-
-            // If the current and the new versions do not match notify the user
-            return false;
-        };
-    }
-
-    private Command handleVersions(VaadinSession vaadinSession,
-            VaadinResponse vaadinResponse) {
-        return () -> {
+        vaadinSession.access(() -> {
             // Always set the version cookie
             Cookie versionCookie = getCookieByName(CURRENT_VERSION_COOKIE);
             if (versionCookie == null
@@ -118,33 +106,34 @@ public class ClusterSupport implements VaadinServiceInitListener {
                     VersionNotificator notificator = new VersionNotificator(
                             appVersion, currentCookie.getValue());
                     notificator.addSwitchVersionEventListener(
-                            createSwitchVersionEventListener());
+                            this::handleSwitchVersionEvent);
                     // Show notificator
                     ui.add(notificator);
                 });
             }
-        };
+        });
+
+        // If the current and the new versions do not match notify the user
+        return false;
     }
 
-    private ComponentEventListener<VersionNotificator.SwitchVersionEvent> createSwitchVersionEventListener() {
-        return e -> {
-            // Do nothing if switch version listener prevents switching
-            if (switchVersionListener != null && !switchVersionListener
-                    .clusterSwitch(VaadinRequest.getCurrent(),
-                            VaadinResponse.getCurrent())) {
-                return;
-            }
+    private void handleSwitchVersionEvent(VersionNotificator.SwitchVersionEvent event) {
+        // Do nothing if switch version listener prevents switching
+        if (switchVersionListener != null && !switchVersionListener
+                .clusterSwitch(VaadinRequest.getCurrent(),
+                        VaadinResponse.getCurrent())) {
+            return;
+        }
 
-            // When the user clicks on the notificator remove the cluster
-            // and session cookies
-            removeCookie(STICKY_CLUSTER_COOKIE);
-            removeCookie(CURRENT_VERSION_COOKIE);
-            removeCookie(UPDATE_VERSION_COOKIE);
+        // When the user clicks on the notificator remove the cluster
+        // and session cookies
+        removeCookie(STICKY_CLUSTER_COOKIE);
+        removeCookie(CURRENT_VERSION_COOKIE);
+        removeCookie(UPDATE_VERSION_COOKIE);
 
-            // Invalidate the session, vaadin does not synchronizes it
-            // between clusters
-            VaadinRequest.getCurrent().getWrappedSession().invalidate();
-        };
+        // Invalidate the session, Vaadin does not synchronizes it
+        // between clusters
+        VaadinRequest.getCurrent().getWrappedSession().invalidate();
     }
 
     private Cookie getCookieByName(String cookieName) {
