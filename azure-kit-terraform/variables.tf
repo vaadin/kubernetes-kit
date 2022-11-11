@@ -131,3 +131,18 @@ variable "nginx_create_static" {
   type    = bool
   default = true
 }
+
+# For LetsEncrypt SSL
+# https://cert-manager.io/docs/configuration/acme/
+# if you want to use cert-manager for letsencrypt this deploys it for you.
+variable "deploy-cert-manager" {
+  description = "Should we deploy cert-manager to kubernetes cluster?"
+  type = bool
+  default = true
+}
+
+# https://cert-manager.io/docs/release-notes/
+variable "cert-manager-version" {
+  description = "Helm chart version to use for cert-manager"
+  default = "1.10.0"
+}

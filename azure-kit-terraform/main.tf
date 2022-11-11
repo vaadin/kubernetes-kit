@@ -24,13 +24,6 @@ provider "azurerm" {
   features {}
 }
 
-provider "kubernetes" {
-  host                   = module.aks.cluster_host[0]
-  client_key             = base64decode(module.aks.client_key[0])
-  client_certificate     = base64decode(module.aks.client_certificate[0])
-  cluster_ca_certificate = base64decode(module.aks.cluster_ca_certificate[0])
-}
-
 provider "helm" {
   kubernetes {
     host                   = module.aks.cluster_host
@@ -131,6 +124,7 @@ module "keyvault" {
 # Nginx ingress
 module "nginx" {
   source          = "./modules/nginx-ingress"
+  depends_on      = [module.aks]
   replicaCount    = var.nginx_replicas
   nginx_version   = var.nginx_version
   nginx_create_static = var.nginx_create_static
@@ -138,4 +132,12 @@ module "nginx" {
   environment         = var.environment
   location            = var.location
   resource_group_name = module.aks.node_resource_group
+}
+
+# cert-manager
+module "cert-manager" {
+  source = "./modules/cert-manager"
+  depends_on      = [module.aks]
+  cert-manager-version = var.cert-manager-version
+  deploy-cert-manager = var.deploy-cert-manager
 }
