@@ -116,7 +116,7 @@ variable "vm_size" {
 
 variable "nginx_replicas" {
   type    = number
-  default = "2"
+  default = 2
 }
 
 # https://github.com/kubernetes/ingress-nginx/blob/main/charts/ingress-nginx/CHANGELOG.md
