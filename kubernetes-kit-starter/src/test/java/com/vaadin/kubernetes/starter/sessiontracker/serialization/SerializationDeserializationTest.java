@@ -37,7 +37,7 @@ class SerializationDeserializationTest {
     void processConstructorInjectedComponent(
             @Autowired TestConfig.CtorInjectionTarget target) throws Exception {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        new TransientInjectableObjectOutputStream(os, handler)
+        TransientInjectableObjectOutputStream.newInstance(os, handler)
                 .writeWithTransients(target);
 
         Object result = new TransientInjectableObjectInputStream(
@@ -56,7 +56,7 @@ class SerializationDeserializationTest {
     void processComponentWithNullTransients() throws Exception {
         TestConfig.NullTransient target = new TestConfig.NullTransient();
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        new TransientInjectableObjectOutputStream(os, handler)
+        TransientInjectableObjectOutputStream.newInstance(os, handler)
                 .writeWithTransients(target);
 
         Object result = new TransientInjectableObjectInputStream(
@@ -71,7 +71,7 @@ class SerializationDeserializationTest {
     void serialization_filterInjectables_componentIgnored(
             @Autowired TestConfig.CtorInjectionTarget target) throws Exception {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        new TransientInjectableObjectOutputStream(os, handler, type -> false)
+        TransientInjectableObjectOutputStream.newInstance(os, handler, type -> false)
                 .writeWithTransients(target);
 
         Object result = new TransientInjectableObjectInputStream(
@@ -93,7 +93,7 @@ class SerializationDeserializationTest {
         TransientHandler mockHandler = Mockito.mock(TransientHandler.class);
 
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        new TransientInjectableObjectOutputStream(os, mockHandler)
+        TransientInjectableObjectOutputStream.newInstance(os, mockHandler)
                 .writeWithTransients(target);
 
         Mockito.verify(mockHandler).inspect(obj);

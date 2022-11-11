@@ -17,6 +17,8 @@ import java.util.function.Predicate;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import org.apache.commons.logging.LogFactory;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -29,8 +31,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.util.StringUtils;
 
@@ -42,7 +47,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 import com.vaadin.pro.licensechecker.LicenseChecker;
@@ -193,7 +199,21 @@ public class KubernetesKitConfiguration {
 
             }
 
+            @Conditional(SerializationTrackingCondition.class)
+            private static class SerializationTrackingCondition
+                    implements Condition {
+
+                @Override
+                public boolean matches(ConditionContext context,
+                        AnnotatedTypeMetadata metadata) {
+                    return DebugMode
+                            .isTrackingAvailable(LoggerFactory.getLogger(
+                                    VaadinReplicatedSessionDevModeConfiguration.class));
+                }
+            }
+
         }
+
     }
 
     @AutoConfiguration

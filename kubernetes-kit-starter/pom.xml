@@ -89,6 +89,32 @@
                 <filtering>true</filtering>
             </testResource>
         </testResources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>session-serialization-debug-tool-tests</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <argLine>--add-opens java.base/java.io=ALL-UNNAMED</argLine>
+                            <systemPropertyVariables>
+                                <sun.io.serialization.extendedDebugInfo>true</sun.io.serialization.extendedDebugInfo>
+                            </systemPropertyVariables>
+                            <includes>
+                                <include>com.vaadin.kubernetes.starter.VaadinReplicatedSessionDevModeConfigurationTest.java</include>
+                                <include>com.vaadin.kubernetes.starter.sessiontracker.serialization.*Test.java</include>
+                                <include>com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.*Test.java</include>
+                            </includes>
+                            <reportNameSuffix>debugtool</reportNameSuffix>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
 </project>

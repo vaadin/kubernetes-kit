@@ -1,15 +1,18 @@
-package com.vaadin.kubernetes.starter.sessiontracker.serialization;
+package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 import com.vaadin.flow.server.RequestHandler;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -17,6 +20,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+@EnableOnJavaIOReflection
+@EnabledIfSystemProperty(named = "sun.io.serialization.extendedDebugInfo", matches = "true", //
+        disabledReason = "Tests need system property sun.io.serialization.extendedDebugInfo to be enabled")
 class SerializationDebugRequestHandlerInitListenerTest {
 
     SerializationDebugRequestHandler.InitListener listener = new SerializationDebugRequestHandler.InitListener();

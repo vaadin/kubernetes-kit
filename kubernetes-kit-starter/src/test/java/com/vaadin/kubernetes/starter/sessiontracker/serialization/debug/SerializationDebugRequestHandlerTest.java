@@ -1,14 +1,21 @@
-package com.vaadin.kubernetes.starter.sessiontracker.serialization;
+package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
+import org.assertj.core.api.SoftAssertions;
+import org.assertj.core.data.Index;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.mockito.Mockito;
 import org.springframework.mock.web.MockHttpSession;
 
@@ -27,9 +34,11 @@ import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
 import com.vaadin.flow.shared.ApplicationConstants;
 import com.vaadin.flow.shared.communication.PushMode;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler.Runner;
+import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
 
-import static com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler.SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY;
+import static com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler.SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,6 +48,9 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+@EnableOnJavaIOReflection
+@EnabledIfSystemProperty(named = "sun.io.serialization.extendedDebugInfo", matches = "true", //
+        disabledReason = "Tests need system property sun.io.serialization.extendedDebugInfo to be enabled")
 class SerializationDebugRequestHandlerTest {
 
     SerializationDebugRequestHandler handler;
@@ -47,11 +59,10 @@ class SerializationDebugRequestHandlerTest {
     private VaadinSession vaadinSession;
     private VaadinRequest request;
     private VaadinResponse response;
-    private AtomicReference<SerializationDebugRequestHandler.Result> resultHolder;
+    private AtomicReference<Result> resultHolder;
     private HttpSession httpSession;
     private HttpServletRequest httpRequest;
-
-    private SerializationDebugRequestHandler.Runner toolRunner;
+    private Runner toolRunner;
 
     @BeforeEach
     void setUp() {
@@ -66,13 +77,12 @@ class SerializationDebugRequestHandlerTest {
         UI ui = spy(new UI());
         ui.add(new SessionDebugNotifier() {
             @Override
-            public void publishResults(
-                    SerializationDebugRequestHandler.Result result) {
+            public void publishResults(Result result) {
                 resultHolder.set(result);
             }
         });
         doAnswer(i -> {
-            SerializableConsumer<SerializationDebugRequestHandler.Result> consumer = resultHolder::set;
+            SerializableConsumer<Result> consumer = resultHolder::set;
             return consumer;
         }).when(ui).accessLater(any(SerializableConsumer.class),
                 any(SerializableRunnable.class));
@@ -102,7 +112,7 @@ class SerializationDebugRequestHandlerTest {
             return null;
         }).when(request).setAttribute(
                 eq(SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY),
-                any(SerializationDebugRequestHandler.Runner.class));
+                any(Runner.class));
         httpRequest = mock(HttpServletRequest.class);
         when(httpRequest.getAttribute(SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY))
                 .thenReturn(toolRunner);
@@ -119,10 +129,10 @@ class SerializationDebugRequestHandlerTest {
         httpSession.setAttribute("OBJ2", new SerializableParent());
 
         runDebugTool();
-        SerializationDebugRequestHandler.Result result = resultHolder.get();
+        Result result = resultHolder.get();
         assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
-        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                SerializationDebugRequestHandler.Outcome.SUCCESS);
+        assertThat(result.getOutcomes())
+                .containsExactlyInAnyOrder(Outcome.SUCCESS);
         assertThat(result.getStorageKey()).isNotNull()
                 .contains("_SOURCE:" + httpSession.getId());
     }
@@ -166,41 +176,45 @@ class SerializationDebugRequestHandlerTest {
         httpSession.setAttribute("OBJ1", new NotSerializable());
 
         runDebugTool();
-        SerializationDebugRequestHandler.Result result = resultHolder.get();
+        Result result = resultHolder.get();
         assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
         assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                SerializationDebugRequestHandler.Outcome.SERIALIZATION_FAILED,
-                SerializationDebugRequestHandler.Outcome.NOT_SERIALIZABLE_CLASSES);
+                Outcome.SERIALIZATION_FAILED, Outcome.NOT_SERIALIZABLE_CLASSES);
         assertThat(result.getStorageKey()).isNotNull()
                 .contains("_SOURCE:" + httpSession.getId());
     }
-
 
     @Test
     void handleRequest_childObjectNotSerializable_errorReported() {
         httpSession.setAttribute("OBJ1", new ChildNotSerializable());
 
         runDebugTool();
-        SerializationDebugRequestHandler.Result result = resultHolder.get();
+        Result result = resultHolder.get();
         assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
         assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                SerializationDebugRequestHandler.Outcome.SERIALIZATION_FAILED,
-                SerializationDebugRequestHandler.Outcome.NOT_SERIALIZABLE_CLASSES);
+                Outcome.SERIALIZATION_FAILED, Outcome.NOT_SERIALIZABLE_CLASSES);
         assertThat(result.getStorageKey()).isNotNull()
                 .contains("_SOURCE:" + httpSession.getId());
     }
 
     @Test
-    void handleRequest_rootObjectDeserializationFailure_errorCaught() {
+    void handleRequest_rootObjectDeserializationFailure_errorReported() {
         httpSession.setAttribute("OBJ1", new DeserializationFailure());
 
         runDebugTool();
-        SerializationDebugRequestHandler.Result result = resultHolder.get();
+        Result result = resultHolder.get();
         assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
-        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                SerializationDebugRequestHandler.Outcome.DESERIALIZATION_FAILED);
+        assertThat(result.getOutcomes())
+                .containsExactlyInAnyOrder(Outcome.DESERIALIZATION_FAILED);
         assertThat(result.getStorageKey()).isNotNull()
                 .contains("_SOURCE:" + httpSession.getId());
+        assertThat(result.getErrors()).satisfies(
+                log -> assertThat(log).contains(
+                        "- custom writeObject data (class \"java.util.HashMap\")")
+                        .contains("- root object")
+                        .contains("OBJ1="
+                                + DeserializationFailure.class.getName()),
+                Index.atIndex(1));
     }
 
     @Test
@@ -208,10 +222,77 @@ class SerializationDebugRequestHandlerTest {
         httpSession.setAttribute("OBJ1", new ChildDeserializationFailure());
 
         runDebugTool();
-        SerializationDebugRequestHandler.Result result = resultHolder.get();
+        Result result = resultHolder.get();
+        assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
+        assertThat(result.getOutcomes())
+                .containsExactlyInAnyOrder(Outcome.DESERIALIZATION_FAILED);
+        assertThat(result.getStorageKey()).isNotNull()
+                .contains("_SOURCE:" + httpSession.getId());
+        assertThat(result.getErrors())
+                .overridingErrorMessage("Errors should report failures for "
+                        + ChildDeserializationFailure.class.getName())
+                .anyMatch(log -> log.contains("- field (class \""
+                        + ChildDeserializationFailure.class.getName()));
+    }
+
+    @Test
+    void handleRequest_nestedUnserializable_reportsReferencingClasses() {
+        httpSession.setAttribute("OBJ1", new DeepNested());
+
+        runDebugTool();
+        Result result = resultHolder.get();
+        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
+                Outcome.SERIALIZATION_FAILED, Outcome.NOT_SERIALIZABLE_CLASSES);
+        List<String> unserializableInfo = result.getNotSerializableClasses();
+        assertThat(unserializableInfo).element(0)
+                .isEqualTo(NotSerializable.class.getName());
+
+        SoftAssertions softAssertions = new SoftAssertions();
+        Stream.of(ChildNotSerializable.class.getName(),
+                DeepNested.Inner.class.getName(),
+                DeepNested.StaticInner.class.getName())
+                .forEach(entry -> softAssertions.assertThat(unserializableInfo)
+                        .anyMatch(log -> log
+                                .contains("- field (class \"" + entry)));
+        softAssertions.assertAll();
+    }
+
+    @Test
+    void handleRequest_deserializationClassCastException_reportsReferencingClasses() {
+        httpSession.setAttribute("OBJ1", new ClassCastSimulation());
+
+        runDebugTool();
+        Result result = resultHolder.get();
+        assertThat(result.getOutcomes())
+                .containsExactly(Outcome.DESERIALIZATION_FAILED);
+        String unserializableInfo = String.join(System.lineSeparator(),
+                result.getErrors());
+
+        assertThat(unserializableInfo)
+                .contains("cannot assign instance of "
+                        + SerializableChild.class.getName())
+                .contains("field " + ClassCastSimulation.class.getName()
+                        + ".child3")
+                .contains(
+                        "in instance of " + ClassCastSimulation.class.getName())
+                .contains("- object (class \""
+                        + ClassCastSimulation.class.getName());
+    }
+
+    @Test
+    void handleRequest_unserializableObjects_replacedAndRestored() {
+        // Unserializable objects replaced with NULL must be restored on
+        // deserialized to avoid failure with data structure rejecting null
+        // values. For example Map does not allow NULL keys
+        Map<Object, Object> map = Map.of("K1", "OK", new NotSerializable(),
+                "NS VALUE OK");
+        httpSession.setAttribute("OBJ1", map);
+
+        runDebugTool();
+        Result result = resultHolder.get();
         assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
         assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                SerializationDebugRequestHandler.Outcome.DESERIALIZATION_FAILED);
+                Outcome.SERIALIZATION_FAILED, Outcome.NOT_SERIALIZABLE_CLASSES);
         assertThat(result.getStorageKey()).isNotNull()
                 .contains("_SOURCE:" + httpSession.getId());
     }
@@ -219,7 +300,6 @@ class SerializationDebugRequestHandlerTest {
     @Test
     @Disabled("Find a way to simulate SerializedLambda ClassCastException")
     void handleRequest_lambdaSelfReferenceClassCast_errorCaught() {
-
     }
 
     private void assertDebugToolNotExecuted() {
@@ -251,6 +331,29 @@ class SerializationDebugRequestHandlerTest {
         private NotSerializable data = new NotSerializable();
     }
 
+    private static class DeepNested implements Serializable {
+
+        private final ChildNotSerializable root = new ChildNotSerializable();
+        private final Inner inner = new Inner();
+        private final StaticInner staticInner = new StaticInner();
+        private final List<Object> collection = new ArrayList<>(
+                List.of(new Inner(), new StaticInner(),
+                        new ChildNotSerializable(), new NotSerializable()));
+
+        class Inner implements Serializable {
+            private NotSerializable staticInner = new NotSerializable();
+        }
+
+        static class StaticInner implements Serializable {
+            private NotSerializable staticInner1 = new NotSerializable();
+
+            private NotSerializable staticInner2 = null;
+
+            private NotSerializable staticInner3 = new NotSerializable();
+        }
+
+    }
+
     private static class DeserializationFailure implements Serializable {
 
         private void readObject(ObjectInputStream is) {
@@ -262,4 +365,36 @@ class SerializationDebugRequestHandlerTest {
         private DeserializationFailure data = new DeserializationFailure();
     }
 
+    private static class ClassCastSimulation implements Serializable {
+
+        private ClassCastSimulationChild child1 = new ClassCastSimulationChild(
+                false);
+        private ClassCastSimulationChild child2 = new ClassCastSimulationChild(
+                false);
+        private ClassCastSimulationChild child3 = new ClassCastSimulationChild(
+                true);
+        private ClassCastSimulationChild child4 = new ClassCastSimulationChild(
+                false);
+        private ClassCastSimulationChild child5 = new ClassCastSimulationChild(
+                true);
+        private ClassCastSimulationChild child6 = new ClassCastSimulationChild(
+                false);
+    }
+
+    private static class ClassCastSimulationChild implements Serializable {
+
+        private boolean fail;
+
+        public ClassCastSimulationChild(boolean fail) {
+            this.fail = fail;
+        }
+
+        private Object readResolve() {
+            if (fail) {
+                // Force a ClassCastException during deserialization
+                return new SerializableChild();
+            }
+            return this;
+        }
+    }
 }
