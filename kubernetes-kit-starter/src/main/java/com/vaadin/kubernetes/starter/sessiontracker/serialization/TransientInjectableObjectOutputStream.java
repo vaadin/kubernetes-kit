@@ -2,6 +2,7 @@ package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.io.ObjectStreamClass;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,8 +96,15 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     }
 
     @Override
+    protected void writeClassDescriptor(ObjectStreamClass desc)
+            throws IOException {
+        super.writeClassDescriptor(desc);
+        trackClass(desc);
+    }
+
+    @Override
     protected Object replaceObject(Object obj) {
-        track(obj);
+        trackObject(obj);
         Class<?> type = obj.getClass();
         if (injectableFilter.test(type) && !seen.containsKey(obj)) {
             TransientAwareHolder holder;
@@ -147,13 +156,30 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
         return replacement;
     }
 
-    private void track(Object obj) {
+    private void trackObject(Object obj) {
+        if (getLogger().isTraceEnabled()) {
+            getLogger().trace("Serializing object {}", obj.getClass());
+        }
         if (inspector instanceof TransientHandler.DebugMode) {
             try {
                 ((TransientHandler.DebugMode) inspector).onSerialize(obj);
             } catch (Exception ex) {
                 // Ignore
             }
+        }
+    }
+
+    private void trackClass(ObjectStreamClass type) {
+        if (inspector instanceof TransientHandler.DebugMode
+                && getLogger().isTraceEnabled()) {
+            String fields = Stream.of(type.getFields())
+                    .filter(field -> !field.isPrimitive() && !Serializable.class
+                            .isAssignableFrom(field.getType()))
+                    .map(field -> String.format("%s %s",
+                            field.getType().getName(), field.getName()))
+                    .collect(Collectors.joining(System.lineSeparator()));
+            getLogger().trace("Starting serialization of object of type {}{}{}",
+                    type.getName(), System.lineSeparator(), fields);
         }
     }
 

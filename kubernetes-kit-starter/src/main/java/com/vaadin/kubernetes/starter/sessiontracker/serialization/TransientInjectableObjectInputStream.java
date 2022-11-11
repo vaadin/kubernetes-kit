@@ -89,7 +89,7 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
         if (injector instanceof TransientHandler.DebugMode) {
             // track deserialized objects for debugging purpose
             try {
-                ((TransientHandler.DebugMode) injector).onDeserialized(obj);
+                obj = ((TransientHandler.DebugMode) injector).onDeserialized(obj);
             } catch (Exception ex) {
                 // Ignore, debug handler is not supposed to throw exception
                 // that may stop deserialization process

@@ -3,7 +3,10 @@ package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionContext;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.ObjectStreamClass;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.Method;
@@ -12,12 +15,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Stack;
 import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -27,6 +32,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -326,7 +332,9 @@ public class SerializationDebugRequestHandler implements RequestHandler {
 
         private long deserializationDepth = 0;
         private boolean popDeserializationStack = false;
-        private final Map<Long, List<String>> deserializationStack = new TreeMap<>();
+        private final TreeMap<Long, List<String>> deserializationStack = new TreeMap<>();
+
+        private final Map<String, Set<String>> unserializableDetails = new HashMap<>();
 
         private Job(String sessionId) {
             this.sessionId = sessionId;
@@ -339,23 +347,27 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         }
 
         void notSerializable(Class<?> clazz) {
-            StringBuilder info = new StringBuilder(clazz.getName());
-            if (clazz.isSynthetic() && !clazz.isAnonymousClass()
-                    && !clazz.isLocalClass()
-                    && clazz.getSimpleName().contains("$$Lambda$")
-                    && clazz.getInterfaces().length == 1) {
-                // Additional details for lamdba expressions
-                Class<?> samInterface = clazz.getInterfaces()[0];
-                Method samMethod = samInterface.getMethods()[0];
-                StringJoiner sj = new StringJoiner(",",
-                        samMethod.getName() + "(", ")");
-                for (Class<?> parameterType : samMethod.getParameterTypes()) {
-                    sj.add(parameterType.getTypeName());
+            unserializableDetails.computeIfAbsent(clazz.getName(), unused -> {
+                LinkedHashSet<String> info = new LinkedHashSet<>();
+                if (clazz.isSynthetic() && !clazz.isAnonymousClass()
+                        && !clazz.isLocalClass()
+                        && clazz.getSimpleName().contains("$$Lambda$")
+                        && clazz.getInterfaces().length == 1) {
+                    // Additional details for lamdba expressions
+                    Class<?> samInterface = clazz.getInterfaces()[0];
+                    Method samMethod = samInterface.getMethods()[0];
+                    StringJoiner sj = new StringJoiner(",",
+                            samMethod.getName() + "(", ")");
+                    for (Class<?> parameterType : samMethod
+                            .getParameterTypes()) {
+                        sj.add(parameterType.getTypeName());
+                    }
+                    info.add(String.format("[ SAM interface: %s.%s ]",
+                            samInterface.getName(), sj));
                 }
-                info.append(" [ SAM interface: ").append(samInterface.getName())
-                        .append(".").append(sj).append(" ]");
-            }
-            log(Outcome.NOT_SERIALIZABLE_CLASSES.name(), info.toString());
+                return info;
+            });
+            log(Outcome.NOT_SERIALIZABLE_CLASSES.name(), clazz.getName());
             outcome.add(Outcome.NOT_SERIALIZABLE_CLASSES);
         }
 
@@ -422,10 +434,10 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             }
         }
 
-        void pushDeserialization(long depth, String entry) {
+        void pushDeserialization(long depth, String type, String fields) {
             deserializationStack
                     .computeIfAbsent(depth, unused -> new ArrayList<>())
-                    .add(entry);
+                    .add(type + " :: [ " + fields + "]");
             while (popDeserializationStack && deserializationDepth > depth) {
                 deserializationStack.remove(deserializationDepth--);
             }
@@ -433,7 +445,16 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             deserializationDepth = depth;
         }
 
-        void popDeserialization() {
+        void popDeserialization(String currentType) {
+            if (currentType == null) {
+                currentType = deserializationStack.descendingMap().firstEntry()
+                        .getValue().get(0).replaceAll(" ::.*", "");
+            }
+            unserializableDetails.computeIfPresent(currentType,
+                    (unused, source) -> {
+                        source.add(computePath());
+                        return source;
+                    });
             popDeserializationStack = true;
         }
 
@@ -455,12 +476,34 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             return Optional.empty();
         }
 
+        String computePath() {
+            return deserializationStack.entrySet().stream()
+                    .filter(entry -> !entry.getValue().isEmpty())
+                    .map(entry -> "\t" + " ".repeat(entry.getKey().intValue())
+                            + entry.getValue().get(entry.getValue().size() - 1))
+                    .filter(line -> !line
+                            .contains(Unserializable.class.getName()))
+                    .map(line -> line.replaceAll(" ::.*", ""))
+                    .collect(Collectors.joining(System.lineSeparator(),
+                            "Referenced by: " + System.lineSeparator(), ""));
+        }
+
         Result complete() {
             if (outcome.isEmpty()) {
                 outcome.add(Outcome.SUCCESS);
             }
             long duration = TimeUnit.NANOSECONDS
                     .toMillis(System.nanoTime() - this.startTimeNanos);
+            messages.computeIfPresent(Outcome.NOT_SERIALIZABLE_CLASSES.name(),
+                    (unused, info) -> {
+                        return info.stream().flatMap(className -> Stream.concat(
+                                Stream.of(className),
+                                unserializableDetails
+                                        .getOrDefault(className,
+                                                Collections.emptySet())
+                                        .stream().map(entry -> "\t" + entry)))
+                                .collect(Collectors.toList());
+                    });
             return new Result(sessionId, storageKey, outcome, duration,
                     messages);
         }
@@ -587,7 +630,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         @Override
         public Optional<Serializable> onNotSerializableFound(Object object) {
             job.notSerializable(object.getClass());
-            return Optional.of(NULLIFY);
+            return Optional.of(new Unserializable(object.getClass().getName()));
+            // return Optional.of(NULLIFY);
         }
 
         @Override
@@ -614,17 +658,24 @@ public class SerializationDebugRequestHandler implements RequestHandler {
 
         @Override
         public void onDeserialize(Class<?> type, long depth) {
-            String typeAndFields = Arrays
+            String fields = Arrays
                     .stream(ObjectStreamClass.lookupAny(type).getFields())
                     .map(field -> String.format("%s (%s)", field.getName(),
                             field.getType()))
-                    .collect(Collectors.joining(", ", type + " [", "]"));
-            job.pushDeserialization(depth, typeAndFields);
+                    .collect(Collectors.joining(", "));
+            job.pushDeserialization(depth, type.getName(), fields);
         }
 
         @Override
-        public void onDeserialized(Object object) {
-            job.popDeserialization();
+        public Object onDeserialized(Object object) {
+            Object out = object;
+            String type = object != null ? object.getClass().getName() : null;
+            if (object instanceof Unserializable) {
+                type = ((Unserializable) object).className;
+                out = null;
+            }
+            job.popDeserialization(type);
+            return out;
         }
     }
 
@@ -730,4 +781,21 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             return false;
         }
     }
+
+    static class Unserializable implements Serializable {
+        private final String className;
+
+        public Unserializable(String className) {
+            this.className = className;
+        }
+
+        /*
+         * private void readObject(ObjectInputStream stream) throws IOException,
+         * ClassNotFoundException { stream.defaultReadObject(); }
+         * 
+         * private Object readResolve() throws ObjectStreamException { return
+         * null; }
+         */
+    }
+
 }

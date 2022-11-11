@@ -3,8 +3,15 @@ package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 import javax.servlet.http.HttpSession;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -185,6 +192,29 @@ class SerializationDebugRequestHandlerTest {
     }
 
     @Test
+    void handleRequest_nestedUnserializable_reportsReferencingClasses() {
+        httpSession.setAttribute("OBJ1", new DeepNested());
+
+        assertThat(handler.handleRequest(vaadinSession, request, response))
+                .isFalse();
+        SerializationDebugRequestHandler.Result result = resultHolder.get();
+        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
+                SerializationDebugRequestHandler.Outcome.DESERIALIZATION_FAILED);
+        Set<String> unserializableInfo = result.getNotSerializableClasses();
+        assertThat(unserializableInfo).element(0)
+                .isEqualTo(NotSerializable.class.getName());
+
+        SoftAssertions softAssertions = new SoftAssertions();
+        Stream.of(ChildNotSerializable.class.getName(),
+                DeepNested.Inner.class.getName(),
+                DeepNested.StaticInner.class.getName())
+                .forEach(entry -> softAssertions.assertThat(unserializableInfo)
+                        .anyMatch(log -> log.startsWith("\t")
+                                && log.endsWith(entry)));
+        softAssertions.assertAll();
+    }
+
+    @Test
     @Disabled("Find a way to simulate SerializedLambda ClassCastException")
     void handleRequest_lambdaSelfReferenceClassCast_errorCaught() {
 
@@ -204,6 +234,29 @@ class SerializationDebugRequestHandlerTest {
 
     private static class ChildNotSerializable implements Serializable {
         private NotSerializable data = new NotSerializable();
+    }
+
+    private static class DeepNested implements Serializable {
+
+        private final ChildNotSerializable root = new ChildNotSerializable();
+        private final Inner inner = new Inner();
+        private final StaticInner staticInner = new StaticInner();
+        private final List<Object> collection = new ArrayList<>(
+                List.of(new Inner(), new StaticInner(),
+                        new ChildNotSerializable(), new NotSerializable()));
+
+        class Inner implements Serializable {
+            private NotSerializable staticInner = new NotSerializable();
+        }
+
+        static class StaticInner implements Serializable {
+            private NotSerializable staticInner1 = new NotSerializable();
+
+            private NotSerializable staticInner2 = null;
+
+            private NotSerializable staticInner3 = new NotSerializable();
+        }
+
     }
 
     private static class DeserializationFailure implements Serializable {

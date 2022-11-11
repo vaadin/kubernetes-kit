@@ -110,14 +110,15 @@ public interface TransientHandler {
         /**
          * Tracks an object right after deserialization
          *
-         * NOTE: implementation is not supposed not alter the input object, nor
-         * to throw any kind on exception.
+         * Implementors can provide a replacement for current processing object.
          *
+         * By default, the input object is returned.
+         * 
          * @param object
          *            object that is going to be serialized.
          */
-        default void onDeserialized(Object object) {
-            // NO-OP
+        default Object onDeserialized(Object object) {
+            return object;
         }
 
         /**
