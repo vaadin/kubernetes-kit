@@ -1,5 +1,5 @@
 variable "deploy-cert-manager" {
-  description = "Static ip to use with nginx"
+  description = "Should we deploy cert-manager to kubernetes cluster?"
 }
 
 variable "cert-manager-version" {
