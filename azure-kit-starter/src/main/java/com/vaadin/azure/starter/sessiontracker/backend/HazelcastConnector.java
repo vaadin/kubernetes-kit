@@ -17,40 +17,40 @@ public class HazelcastConnector implements BackendConnector {
 
     @Override
     public void sendSession(SessionInfo sessionInfo) {
-        getLogger().info("Sending session {} to Hazelcast",
+        getLogger().debug("Sending session {} to Hazelcast",
                 sessionInfo.getClusterKey());
         String mapKey = getKey(sessionInfo.getClusterKey());
         sessions.put(mapKey, sessionInfo.getData());
-        getLogger().info("Session {} sent to Hazelcast",
+        getLogger().debug("Session {} sent to Hazelcast",
                 sessionInfo.getClusterKey());
     }
 
     @Override
     public SessionInfo getSession(String clusterKey) {
-        getLogger().info("Requesting session for {}", clusterKey);
+        getLogger().debug("Requesting session for {}", clusterKey);
 
         waitForSerializationCompletion(clusterKey, "getting session");
 
         byte[] data = sessions.get(getKey(clusterKey));
         if (data == null) {
-            getLogger().info("Session not found {}", clusterKey);
+            getLogger().debug("Session not found {}", clusterKey);
             return null;
         }
         SessionInfo sessionInfo = new SessionInfo(clusterKey, data);
 
-        getLogger().info("Received {}", sessionInfo);
+        getLogger().debug("Received {}", sessionInfo);
         return sessionInfo;
     }
 
     @Override
     public void markSerializationStarted(String clusterKey) {
-        getLogger().info("Marking serialization started for {}", clusterKey);
+        getLogger().debug("Marking serialization started for {}", clusterKey);
         sessions.lock(getPendingKey(clusterKey));
     }
 
     @Override
     public void markSerializationComplete(String clusterKey) {
-        getLogger().info("Marking serialization complete for {}", clusterKey);
+        getLogger().debug("Marking serialization complete for {}", clusterKey);
         sessions.forceUnlock(getPendingKey(clusterKey));
     }
 
@@ -67,7 +67,7 @@ public class HazelcastConnector implements BackendConnector {
             String action) {
         String pendingKey = getPendingKey(clusterKey);
         if (sessions.isLocked(pendingKey)) {
-            getLogger().info(
+            getLogger().debug(
                     "Waiting for session to be serialized before {} {}", action,
                     clusterKey);
             try {
