@@ -10,6 +10,14 @@ import com.vaadin.azure.starter.sessiontracker.CurrentKey;
 import com.vaadin.azure.starter.sessiontracker.SessionSerializer;
 import com.vaadin.azure.starter.sessiontracker.SessionTrackerCookie;
 
+/**
+ * A {@link PushSendListener} that serialize HTTP session when messages are
+ * pushed to the client.
+ *
+ * It has the same scope of
+ * {@link com.vaadin.azure.starter.sessiontracker.SessionTrackerFilter} but for
+ * PUSH communication.
+ */
 public class PushSessionTracker implements PushSendListener {
 
     private final SessionSerializer sessionSerializer;
