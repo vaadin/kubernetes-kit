@@ -13,13 +13,13 @@ public class RedisConnector implements BackendConnector {
     }
 
     public void sendSession(SessionInfo sessionInfo) {
-        getLogger().info("Sending session {} to Redis",
+        getLogger().debug("Sending session {} to Redis",
                 sessionInfo.getClusterKey());
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
             connection.set(getKey(sessionInfo.getClusterKey()),
                     sessionInfo.getData());
-            getLogger().info("Session {} sent to redis",
+            getLogger().debug("Session {} sent to Redis",
                     sessionInfo.getClusterKey());
         }
     }
@@ -29,7 +29,7 @@ public class RedisConnector implements BackendConnector {
     }
 
     public SessionInfo getSession(String clusterKey) {
-        getLogger().info("Requesting session for {}", clusterKey);
+        getLogger().debug("Requesting session for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
             waitForSerializationCompletion(clusterKey, "getting session",
@@ -41,7 +41,7 @@ public class RedisConnector implements BackendConnector {
             }
             SessionInfo sessionInfo = new SessionInfo(clusterKey, data);
 
-            getLogger().info("Received {}", sessionInfo);
+            getLogger().debug("Received {}", sessionInfo);
             return sessionInfo;
         }
     }
@@ -52,7 +52,7 @@ public class RedisConnector implements BackendConnector {
 
     @Override
     public void markSerializationStarted(String clusterKey) {
-        getLogger().info("Marking serialization started for {}", clusterKey);
+        getLogger().debug("Marking serialization started for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
             connection.set(getPendingKey(clusterKey),
@@ -62,7 +62,7 @@ public class RedisConnector implements BackendConnector {
 
     @Override
     public void markSerializationComplete(String clusterKey) {
-        getLogger().info("Marking serialization complete for {}", clusterKey);
+        getLogger().debug("Marking serialization complete for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
             connection.del(getPendingKey(clusterKey));
@@ -74,7 +74,7 @@ public class RedisConnector implements BackendConnector {
         getLogger().debug("Deleting session for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
-            waitForSerializationCompletion(clusterKey, "getting session",
+            waitForSerializationCompletion(clusterKey, "deleting session",
                     connection);
             connection.del(getKey(clusterKey));
             connection.del(getPendingKey(clusterKey));
@@ -90,7 +90,7 @@ public class RedisConnector implements BackendConnector {
         byte[] pendingKey = getPendingKey(clusterKey);
         if (connection.exists(pendingKey)) {
             long timeout = System.currentTimeMillis() + 5000;
-            getLogger().info(
+            getLogger().debug(
                     "Waiting for session to be serialized before {} {}", action,
                     clusterKey);
             while (connection.exists(pendingKey)
@@ -98,6 +98,7 @@ public class RedisConnector implements BackendConnector {
                 try {
                     Thread.sleep(1);
                 } catch (InterruptedException e) {
+                    // Ignore
                 }
             }
             if (System.currentTimeMillis() > timeout) {
