@@ -9,6 +9,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -33,7 +34,8 @@ import org.slf4j.LoggerFactory;
  * 
  * To improve performance, a filter can be provided to inspect only classes
  * known to have injectable transient fields. For example inspection can be
- * restricted to only some packages.
+ * restricted to only some packages. Classes from Java Platform are excluded
+ * regardless of the configured filters.
  * 
  * <pre>
  * {@code 
@@ -52,20 +54,29 @@ import org.slf4j.LoggerFactory;
  */
 public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
 
+    static final Pattern INSPECTION_REJECTION_PATTERN = Pattern
+            .compile("^(javax?|jakarta|com\\.sun|sun\\.misc)\\..*");
+    private static final Predicate<Class<?>> DEFAULT_INSPECTION_FILTER = type -> !INSPECTION_REJECTION_PATTERN
+            .matcher(type.getPackageName()).matches();
+
     private final TransientHandler inspector;
     private final IdentityHashMap<Object, TransientAwareHolder> seen = new IdentityHashMap<>();
     private final Predicate<Class<?>> injectableFilter;
 
     public TransientInjectableObjectOutputStream(OutputStream out,
             TransientHandler inspector) throws IOException {
-        this(out, inspector, type -> true);
+        this(out, inspector, DEFAULT_INSPECTION_FILTER);
     }
 
     public TransientInjectableObjectOutputStream(OutputStream out,
             TransientHandler inspector, Predicate<Class<?>> injectableFilter)
             throws IOException {
         super(out);
-        this.inspector = inspector;
+        Objects.requireNonNull(injectableFilter, "transient inspection filter");
+        this.inspector = Objects.requireNonNull(inspector, "transient handler");
+        if (injectableFilter != DEFAULT_INSPECTION_FILTER) {
+            injectableFilter = DEFAULT_INSPECTION_FILTER.and(injectableFilter);
+        }
         this.injectableFilter = injectableFilter;
         enableReplaceObject(true);
     }
