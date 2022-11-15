@@ -85,26 +85,26 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
         vaadinSession.access(() -> {
             // Always set the version cookie
-            Cookie versionCookie = getCookieByName(CURRENT_VERSION_COOKIE);
-            if (versionCookie == null
-                    || !versionCookie.getValue().equals(appVersion)) {
-                versionCookie = new Cookie(CURRENT_VERSION_COOKIE, appVersion);
-                versionCookie.setHttpOnly(true);
-                vaadinResponse.addCookie(versionCookie);
+            Cookie currentVersionCookie = getCookieByName(CURRENT_VERSION_COOKIE);
+            if (currentVersionCookie == null
+                    || !currentVersionCookie.getValue().equals(appVersion)) {
+                currentVersionCookie = new Cookie(CURRENT_VERSION_COOKIE, appVersion);
+                currentVersionCookie.setHttpOnly(true);
+                vaadinResponse.addCookie(currentVersionCookie);
             }
 
             // Always check for the new version cookie
-            Cookie currentCookie = getCookieByName(UPDATE_VERSION_COOKIE);
-            if (currentCookie != null && !currentCookie.getValue().isEmpty()
-                    && !versionCookie.getValue()
-                            .equals(currentCookie.getValue())) {
+            Cookie updateVersionCookie = getCookieByName(UPDATE_VERSION_COOKIE);
+            if (updateVersionCookie != null && !updateVersionCookie.getValue().isEmpty()
+                    && !currentVersionCookie.getValue()
+                            .equals(updateVersionCookie.getValue())) {
                 vaadinSession.getUIs().forEach(ui -> {
                     if (ui.getChildren().anyMatch(
                             child -> (child instanceof VersionNotificator))) {
                         return;
                     }
                     VersionNotificator notificator = new VersionNotificator(
-                            appVersion, currentCookie.getValue());
+                            appVersion, updateVersionCookie.getValue());
                     notificator.addSwitchVersionEventListener(
                             this::handleSwitchVersionEvent);
                     // Show notificator
