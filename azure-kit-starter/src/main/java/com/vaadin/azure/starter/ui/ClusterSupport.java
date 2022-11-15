@@ -109,7 +109,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
                     VersionNotificator notificator = new VersionNotificator(
                             appVersion, updateVersionCookie.getValue());
                     notificator.addSwitchVersionEventListener(
-                            this::handleSwitchVersionEvent);
+                            this::onComponentEvent);
                     // Show notificator
                     ui.add(notificator);
                 });
@@ -120,8 +120,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
         return false;
     }
 
-    private void handleSwitchVersionEvent(
-            VersionNotificator.SwitchVersionEvent event) {
+    private void onComponentEvent(VersionNotificator.SwitchVersionEvent event) {
         if (switchVersionListener != null) {
             // Do nothing if switch version listener prevents switching
             if (!switchVersionListener.nodeSwitch(VaadinRequest.getCurrent(),
