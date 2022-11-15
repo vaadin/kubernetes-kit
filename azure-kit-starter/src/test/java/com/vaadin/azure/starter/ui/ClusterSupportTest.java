@@ -40,6 +40,8 @@ public class ClusterSupportTest {
     private VaadinRequest vaadinRequest;
     private VaadinResponse vaadinResponse;
     private MockedStatic<VaadinRequest> vaadinRequestMockedStatic;
+    private ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor;
+    private ArgumentCaptor<Command> commandArgumentCaptor;
 
     @SystemStub
     private EnvironmentVariables environmentVariables;
@@ -52,6 +54,10 @@ public class ClusterSupportTest {
         vaadinRequest = mock(VaadinRequest.class);
         vaadinResponse = mock(VaadinResponse.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
+        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
+        requestHandlerArgumentCaptor = ArgumentCaptor
+                .forClass(RequestHandler.class);
+        commandArgumentCaptor = ArgumentCaptor.forClass(Command.class);
     }
 
     @AfterEach
@@ -61,7 +67,6 @@ public class ClusterSupportTest {
 
     @Test
     void serviceInit_requestHandlerIsAdded() {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
         clusterSupport.serviceInit(serviceInitEvent);
@@ -71,6 +76,7 @@ public class ClusterSupportTest {
 
     @Test
     void serviceInit_withNoAppVersion_requestHandlerIsNotAdded() {
+        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, null);
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
         clusterSupport.serviceInit(serviceInitEvent);
@@ -81,12 +87,7 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_addsCurrentVersionCookie_ifNotPresent()
             throws IOException {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         Cookie[] cookies = {};
-        ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor = ArgumentCaptor
-                .forClass(RequestHandler.class);
-        ArgumentCaptor<Command> commandArgumentCaptor = ArgumentCaptor
-                .forClass(Command.class);
 
         when(vaadinRequest.getCookies()).thenReturn(cookies);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
@@ -106,13 +107,8 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_addsCurrentVersionCookie_ifAppVersionIsDifferent()
             throws IOException {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.CURRENT_VERSION_COOKIE, "1.1.0") };
-        ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor = ArgumentCaptor
-                .forClass(RequestHandler.class);
-        ArgumentCaptor<Command> commandArgumentCaptor = ArgumentCaptor
-                .forClass(Command.class);
 
         when(vaadinRequest.getCookies()).thenReturn(cookies);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
@@ -132,13 +128,8 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_currentVersionCookieNotAdded_ifAppVersionIsSame()
             throws IOException {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.CURRENT_VERSION_COOKIE, "1.0.0") };
-        ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor = ArgumentCaptor
-                .forClass(RequestHandler.class);
-        ArgumentCaptor<Command> commandArgumentCaptor = ArgumentCaptor
-                .forClass(Command.class);
 
         when(vaadinRequest.getCookies()).thenReturn(cookies);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
@@ -158,13 +149,8 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_versionNotificatorAdded_ifUpdateVersionCookieIsPresent()
             throws IOException {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-        ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor = ArgumentCaptor
-                .forClass(RequestHandler.class);
-        ArgumentCaptor<Command> commandArgumentCaptor = ArgumentCaptor
-                .forClass(Command.class);
 
         when(vaadinRequest.getCookies()).thenReturn(cookies);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
@@ -186,14 +172,9 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_versionNotificatorNotAdded_ifUpdateVersionCookieEqualsCurrentVersionCookie()
             throws IOException {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.CURRENT_VERSION_COOKIE, "1.0.0"),
                 new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "1.0.0") };
-        ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor = ArgumentCaptor
-                .forClass(RequestHandler.class);
-        ArgumentCaptor<Command> commandArgumentCaptor = ArgumentCaptor
-                .forClass(Command.class);
 
         when(vaadinRequest.getCookies()).thenReturn(cookies);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
@@ -215,13 +196,8 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_versionNotificatorNotAdded_ifAlreadyPresent()
             throws IOException {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-        ArgumentCaptor<RequestHandler> requestHandlerArgumentCaptor = ArgumentCaptor
-                .forClass(RequestHandler.class);
-        ArgumentCaptor<Command> commandArgumentCaptor = ArgumentCaptor
-                .forClass(Command.class);
 
         when(vaadinRequest.getCookies()).thenReturn(cookies);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
