@@ -13,8 +13,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
 import uk.org.webcompere.systemstubs.environment.EnvironmentVariables;
 import uk.org.webcompere.systemstubs.jupiter.SystemStub;
 import uk.org.webcompere.systemstubs.jupiter.SystemStubsExtension;
@@ -28,7 +30,7 @@ import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;
 import com.vaadin.flow.server.VaadinSession;
-import com.vaadin.flow.server.WrappedHttpSession;
+import com.vaadin.flow.server.WrappedSession;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -38,18 +40,22 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.openMocks;
 
-@ExtendWith(SystemStubsExtension.class)
+@ExtendWith({MockitoExtension.class, SystemStubsExtension.class})
 public class ClusterSupportTest {
 
     private ClusterSupport clusterSupport;
-    private ServiceInitEvent serviceInitEvent;
-    private VaadinSession vaadinSession;
-    private VaadinRequest vaadinRequest;
-    private VaadinResponse vaadinResponse;
     private MockedStatic<VaadinRequest> vaadinRequestMockedStatic;
     private MockedStatic<VaadinResponse> vaadinResponseMockedStatic;
+
+    @Mock
+    private ServiceInitEvent serviceInitEvent;
+    @Mock
+    private VaadinSession vaadinSession;
+    @Mock
+    private VaadinRequest vaadinRequest;
+    @Mock
+    private VaadinResponse vaadinResponse;
 
     @Captor
     private ArgumentCaptor<RequestHandler> requestHandlerArgCaptor;
@@ -63,12 +69,7 @@ public class ClusterSupportTest {
 
     @BeforeEach
     void setUp() {
-        openMocks(this);
         clusterSupport = new ClusterSupport();
-        serviceInitEvent = mock(ServiceInitEvent.class);
-        vaadinSession = mock(VaadinSession.class);
-        vaadinRequest = mock(VaadinRequest.class);
-        vaadinResponse = mock(VaadinResponse.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
         environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
@@ -195,7 +196,6 @@ public class ClusterSupportTest {
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         UI ui = mock(UI.class);
-        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
 
         clusterSupport.serviceInit(serviceInitEvent);
 
@@ -238,7 +238,7 @@ public class ClusterSupportTest {
             throws IOException {
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-        WrappedHttpSession wrappedHttpSession = mock(WrappedHttpSession.class);
+        WrappedSession wrappedHttpSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
         VersionNotificator.SwitchVersionEvent switchVersionEvent = mock(
                 VersionNotificator.SwitchVersionEvent.class);
@@ -273,12 +273,12 @@ public class ClusterSupportTest {
     }
 
     @ParameterizedTest(name = "{index} IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
-    @CsvSource({ "true, 1", "false, 0" })
+    @CsvSource({ "true, 1, 4, 1", "false, 0, 1, 0" })
     void onComponentEvent_ifSwitchVersionListenerPresent(boolean nodeSwitch,
-            int times) throws IOException {
+            int doAppCleanupTimes, int addCookieTimes, int invalidateTimes) throws IOException {
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-        WrappedHttpSession wrappedHttpSession = mock(WrappedHttpSession.class);
+        WrappedSession wrappedHttpSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
         VersionNotificator.SwitchVersionEvent switchVersionEvent = mock(
                 VersionNotificator.SwitchVersionEvent.class);
@@ -312,6 +312,9 @@ public class ClusterSupportTest {
             componentEventListenerArgCaptor.getValue()
                     .onComponentEvent(switchVersionEvent);
         }
-        verify(switchVersionListener, times(times)).doAppCleanup();
+        verify(switchVersionListener, times(doAppCleanupTimes)).doAppCleanup();
+        verify(vaadinResponse, times(addCookieTimes)).addCookie(any());
+        verify(vaadinRequest, times(invalidateTimes)).getWrappedSession();
+        verify(vaadinRequest.getWrappedSession(), times(invalidateTimes)).invalidate();
     }
 }
