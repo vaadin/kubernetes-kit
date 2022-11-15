@@ -233,48 +233,9 @@ public class ClusterSupportTest {
         verify(ui, never()).add((Component) any());
     }
 
-    @Test
-    void onComponentEvent_switchVersionEvent_removesCookiesAndInvalidatesSession()
-            throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-        WrappedSession wrappedHttpSession = mock(WrappedSession.class);
-        UI ui = mock(UI.class);
-        VersionNotificator.SwitchVersionEvent switchVersionEvent = mock(
-                VersionNotificator.SwitchVersionEvent.class);
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedHttpSession);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
-        vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
-                .thenReturn(vaadinResponse);
-        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        verify(serviceInitEvent)
-                .addRequestHandler(requestHandlerArgCaptor.capture());
-        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
-                vaadinRequest, vaadinResponse);
-        try (MockedConstruction<VersionNotificator> mockedVersionNotificator = mockConstruction(
-                VersionNotificator.class)) {
-            verify(vaadinSession).access(commandArgCaptor.capture());
-            commandArgCaptor.getValue().execute();
-            verify(mockedVersionNotificator.constructed().get(0))
-                    .addSwitchVersionEventListener(
-                            componentEventListenerArgCaptor.capture());
-            componentEventListenerArgCaptor.getValue()
-                    .onComponentEvent(switchVersionEvent);
-        }
-        verify(vaadinResponse, times(4)).addCookie(any());
-        verify(vaadinRequest).getWrappedSession();
-        verify(vaadinRequest.getWrappedSession()).invalidate();
-    }
-
-    @ParameterizedTest(name = "{index} IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
+    @ParameterizedTest(name = "{index} And_IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
     @CsvSource({ "true, 1, 4, 1", "false, 0, 1, 0" })
-    void onComponentEvent_ifSwitchVersionListenerPresent(boolean nodeSwitch,
+    void onComponentEvent_removesCookiesAndInvalidatesSession(boolean nodeSwitch,
             int doAppCleanupTimes, int addCookieTimes, int invalidateTimes) throws IOException {
         Cookie[] cookies = {
                 new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
