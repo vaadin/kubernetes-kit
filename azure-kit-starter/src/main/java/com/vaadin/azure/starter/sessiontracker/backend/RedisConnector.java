@@ -19,7 +19,7 @@ public class RedisConnector implements BackendConnector {
                 .getConnection()) {
             connection.set(getKey(sessionInfo.getClusterKey()),
                     sessionInfo.getData());
-            getLogger().debug("Session {} sent to redis",
+            getLogger().debug("Session {} sent to Redis",
                     sessionInfo.getClusterKey());
         }
     }

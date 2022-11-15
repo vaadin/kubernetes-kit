@@ -25,7 +25,7 @@ import com.vaadin.flow.shared.ApplicationConstants;
  *
  * A unique identifier is assigned to valid HTTP sessions and sent to the client
  * as a tracking HTTP Cookie. The same identifier is used to associate the
- * session within the distribute storage.
+ * session within the distributed storage.
  *
  * If the HTTP request has not a valid session but the tracking Cookie exists,
  * the filter forces the creation of a new HTTP session, that is then populated
@@ -49,7 +49,7 @@ public class SessionTrackerFilter extends HttpFilter {
             CurrentKey.set(key);
             if (request.getSession(false) == null) {
                 // Cluster key set but no session, create one, so it can be
-                // imported if neewed
+                // imported if needed
                 getLogger().info("Creating session for cluster key {}", key);
                 request.getSession(true);
             }

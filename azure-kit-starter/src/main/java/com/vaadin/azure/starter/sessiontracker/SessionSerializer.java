@@ -42,7 +42,7 @@ import com.vaadin.flow.server.WrappedSession;
  * HTTP session attributes are serialized and deserialized by
  * {@link SessionSerializer}, using Java Serialization specifications.
  *
- * Transient fields of serialized object are inspected by a pluggable
+ * Transient fields of serialized objects are inspected by a pluggable
  * {@link TransientHandler} component to gather metadata that is stored along
  * the session attributes and then used during deserialization to populate the
  * fields on the new instances.
@@ -78,7 +78,7 @@ import com.vaadin.flow.server.WrappedSession;
  * <li>If so, it discards serialized data and schedules another attempt</li>
  * <li>If after a timeout of 30 seconds it has not been possible to complete the
  * serialization without VaadinSession locks/unlocks it falls back to a
- * pessimist approach</li>
+ * pessimistic approach</li>
  * <li>Pessimistic approach locks the VaadinSession during the
  * serialization</li>
  * <li>Finally serialized data is written to the distributes storage</li>
@@ -146,7 +146,7 @@ public class SessionSerializer
     }
 
     /**
-     * Serializes the given HTTP session and store data on a distributed
+     * Serializes the given HTTP session and stores data on a distributed
      * storage.
      *
      * @param session
@@ -157,7 +157,7 @@ public class SessionSerializer
     }
 
     /**
-     * Serializes the given Vaadin Wrapped session and store data on a
+     * Serializes the given Vaadin Wrapped session and stores data on a
      * distributed storage.
      *
      * @param session
