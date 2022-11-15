@@ -85,17 +85,20 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
         vaadinSession.access(() -> {
             // Always set the version cookie
-            Cookie currentVersionCookie = getCookieByName(CURRENT_VERSION_COOKIE);
+            Cookie currentVersionCookie = getCookieByName(
+                    CURRENT_VERSION_COOKIE);
             if (currentVersionCookie == null
                     || !currentVersionCookie.getValue().equals(appVersion)) {
-                currentVersionCookie = new Cookie(CURRENT_VERSION_COOKIE, appVersion);
+                currentVersionCookie = new Cookie(CURRENT_VERSION_COOKIE,
+                        appVersion);
                 currentVersionCookie.setHttpOnly(true);
                 vaadinResponse.addCookie(currentVersionCookie);
             }
 
             // Always check for the new version cookie
             Cookie updateVersionCookie = getCookieByName(UPDATE_VERSION_COOKIE);
-            if (updateVersionCookie != null && !updateVersionCookie.getValue().isEmpty()
+            if (updateVersionCookie != null
+                    && !updateVersionCookie.getValue().isEmpty()
                     && !currentVersionCookie.getValue()
                             .equals(updateVersionCookie.getValue())) {
                 vaadinSession.getUIs().forEach(ui -> {
@@ -117,10 +120,12 @@ public class ClusterSupport implements VaadinServiceInitListener {
         return false;
     }
 
-    private void handleSwitchVersionEvent(VersionNotificator.SwitchVersionEvent event) {
+    private void handleSwitchVersionEvent(
+            VersionNotificator.SwitchVersionEvent event) {
         if (switchVersionListener != null) {
             // Do nothing if switch version listener prevents switching
-            if (!switchVersionListener.nodeSwitch(VaadinRequest.getCurrent(), VaadinResponse.getCurrent())) {
+            if (!switchVersionListener.nodeSwitch(VaadinRequest.getCurrent(),
+                    VaadinResponse.getCurrent())) {
                 return;
             }
 

@@ -45,7 +45,8 @@ public class VersionNotificator extends Component {
             extends ComponentEvent<VersionNotificator> {
         private static final long serialVersionUID = 1L;
 
-        public SwitchVersionEvent(VersionNotificator source, boolean fromClient) {
+        public SwitchVersionEvent(VersionNotificator source,
+                boolean fromClient) {
             super(source, fromClient);
         }
     }
