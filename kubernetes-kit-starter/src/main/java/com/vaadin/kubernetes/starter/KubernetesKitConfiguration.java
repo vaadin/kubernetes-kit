@@ -32,7 +32,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 

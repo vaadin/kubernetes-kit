@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 
 class VaadinReplicatedSessionDevModeConfigurationTest {
 

@@ -1,11 +1,17 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -16,6 +22,9 @@ import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
 
 /**
  * An {@link ObjectOutputStream} implementation that adds to the binary stream
@@ -62,15 +71,18 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
             .matcher(type.getPackageName()).matches();
 
     private final TransientHandler inspector;
-    private final IdentityHashMap<Object, TransientAwareHolder> seen = new IdentityHashMap<>();
+    private final IdentityHashMap<Object, TransientAwareHolder> inspected = new IdentityHashMap<>();
     private final Predicate<Class<?>> injectableFilter;
 
-    public TransientInjectableObjectOutputStream(OutputStream out,
-            TransientHandler inspector) throws IOException {
-        this(out, inspector, DEFAULT_INSPECTION_FILTER);
-    }
+    private final OutputStream outputStream;
+    private final VarHandle depthHandle;
+    private final MethodHandle lookupObject;
+    private final VarHandle debugStackInfo;
+    private final IdentityHashMap<Object, Track> tracking = new IdentityHashMap<>();
+    private boolean trackingMode = false;
+    private int trackingCounter;
 
-    public TransientInjectableObjectOutputStream(OutputStream out,
+    private TransientInjectableObjectOutputStream(OutputStream out,
             TransientHandler inspector, Predicate<Class<?>> injectableFilter)
             throws IOException {
         super(out);
@@ -80,18 +92,134 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
             injectableFilter = DEFAULT_INSPECTION_FILTER.and(injectableFilter);
         }
         this.injectableFilter = injectableFilter;
+        this.outputStream = out;
         enableReplaceObject(true);
+        boolean extendedDebugInfo = Boolean
+                .getBoolean("sun.io.serialization.extendedDebugInfo");
+        if (!extendedDebugInfo) {
+            getLogger().warn(
+                    "Serialization and deserialization traces cannot be detected if "
+                            + "-Dsun.io.serialization.extendedDebugInfo system property is not enabled. "
+                            + "Please add '-Dsun.io.serialization.extendedDebugInfo=true' to the JVM arguments.");
+        }
+        boolean canAccess = ObjectOutputStream.class.getModule().isOpen(
+                ObjectOutputStream.class.getPackageName(),
+                TransientInjectableObjectOutputStream.class.getModule());
+        if (canAccess) {
+            depthHandle = tryGetDepthHandle();
+            lookupObject = tryGetLookupObject();
+            if (extendedDebugInfo) {
+                debugStackInfo = tryGetDebugStackHandle();
+            } else {
+                debugStackInfo = null;
+            }
+        } else {
+            getLogger().warn(
+                    "Cannot reflect on ObjectOutputStream. Please open java.io to UNNAMED module, adding "
+                            + "'--add-opens java.base/java.io=ALL-UNNAMED' to the JVM arguments.");
+            depthHandle = null;
+            debugStackInfo = null;
+            lookupObject = null;
+        }
+    }
+
+    public static TransientInjectableObjectOutputStream newInstance(
+            OutputStream out, TransientHandler inspector) throws IOException {
+        return newInstance(out, inspector, type -> true);
+    }
+
+    public static TransientInjectableObjectOutputStream newInstance(
+            OutputStream out, TransientHandler inspector,
+            Predicate<Class<?>> injectableFilter) throws IOException {
+        if (inspector instanceof DebugMode) {
+            // Debug mode: setup object tracking
+            return new TransientInjectableObjectOutputStream(
+                    new InternalOutputStream(out), inspector, injectableFilter);
+        }
+        return new TransientInjectableObjectOutputStream(out, inspector,
+                injectableFilter);
+    }
+
+    /**
+     * OutputStream wrapper that copies object tracking metadata at the top of
+     * the stream, so during deserialization it will be possible to access to
+     * debug information (object track id, object graph trace, ...) beforehand.
+     *
+     * This allows for example to print the object graph trace even if the
+     * deserialization process fails before reading the whole stream.
+     */
+    private static class InternalOutputStream extends ByteArrayOutputStream {
+        private final OutputStream wrapped;
+        private int metadataPosition = -1;
+
+        private InternalOutputStream(OutputStream wrapped) {
+            this.wrapped = wrapped;
+        }
+
+        /**
+         * Marks the position where metadata will be written.
+         */
+        void markMetadata() {
+            metadataPosition = count;
+        }
+
+        void copy() throws IOException {
+            // TODO also remove metadata from the end of this stream before
+            // copying.
+            wrapped.write(Arrays.copyOfRange(buf, metadataPosition + 3, count));
+            writeTo(wrapped);
+        }
     }
 
     public void writeWithTransients(Object object) throws IOException {
-        seen.clear();
+        inspected.clear();
+        tracking.clear();
         try {
+            reset();
+            // marks if the stream will contain tracking data
+            writeObject(inspector instanceof DebugMode);
+            trackingMode = true;
             writeObject(object);
+            trackingMode = false;
             // Append transient fields metadata
-            writeObject(new ArrayList<>(seen.values().stream()
+            writeObject(new ArrayList<>(inspected.values().stream()
                     .filter(Objects::nonNull).collect(Collectors.toList())));
+            flush();
+            writeDebugMetadata();
         } finally {
-            seen.clear();
+            inspected.clear();
+            tracking.clear();
+            trackingMode = false;
+        }
+    }
+
+    /**
+     * Adds tracking information to the stream.
+     *
+     * For every serialized object, following tracking metadata is written:
+     * <ul>
+     * <li>tracking id</li>
+     * <li>object graph depth</li>
+     * <li>object graph stack</li>
+     * <li>object handle</li>
+     * </ul>
+     *
+     * @throws IOException
+     *             Any exception thrown by the underlying OutputStream.
+     */
+    private void writeDebugMetadata() throws IOException {
+        if (outputStream instanceof InternalOutputStream) {
+            InternalOutputStream cast = (InternalOutputStream) outputStream;
+            List<Track> trackList = tracking.values().stream()
+                    .filter(Objects::nonNull)
+                    .map(t -> t.assignHandle(this::lookupObjectHandle))
+                    .collect(Collectors.toList());
+            cast.markMetadata();
+            reset();
+            writeStreamHeader();
+            writeObject(inspector instanceof DebugMode);
+            writeObject(new ArrayList<>(trackList));
+            cast.copy();
         }
     }
 
@@ -100,38 +228,45 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
             throws IOException {
         super.writeClassDescriptor(desc);
         trackClass(desc);
+        trackObject(desc);
     }
 
     @Override
     protected Object replaceObject(Object obj) {
         trackObject(obj);
-        Class<?> type = obj.getClass();
-        if (injectableFilter.test(type) && !seen.containsKey(obj)) {
-            TransientAwareHolder holder;
-            Object original = obj;
-            obj = handleNotSerializable(obj);
-            if (obj != null) {
-                List<TransientDescriptor> descriptors = inspector.inspect(obj);
-                if (descriptors.isEmpty()) {
-                    getLogger().trace(
-                            "No injectable transient fields found for instance of class {}",
-                            obj.getClass());
-                    holder = null;
-                } else {
-                    getLogger().trace(
-                            "Found injectable transient fields for instance of class {} : {}",
-                            obj.getClass(), descriptors);
-                    holder = new TransientAwareHolder(obj, descriptors);
+        if (obj != null) {
+            Class<?> type = obj.getClass();
+            if (injectableFilter.test(type) && !inspected.containsKey(obj)) {
+                Object original = obj;
+                TransientAwareHolder holder;
+                if (!(obj instanceof Serializable)
+                        && inspector instanceof DebugMode) {
+                    obj = handleNotSerializable(obj);
                 }
-            } else {
-                getLogger().debug(
-                        "Object of type {} will be replaced with NULL and ignored",
-                        original.getClass());
-                holder = TransientAwareHolder.NULL;
+                if (obj != null) {
+                    List<TransientDescriptor> descriptors = inspector
+                            .inspect(obj);
+                    if (descriptors.isEmpty()) {
+                        getLogger().trace(
+                                "No injectable transient fields found for instance of class {}",
+                                obj.getClass());
+                        holder = null;
+                    } else {
+                        getLogger().trace(
+                                "Found injectable transient fields for instance of class {} : {}",
+                                obj.getClass(), descriptors);
+                        holder = new TransientAwareHolder(obj, descriptors);
+                    }
+                } else {
+                    getLogger().debug(
+                            "Object of type {} will be replaced with NULL and ignored",
+                            original.getClass());
+                    holder = TransientAwareHolder.NULL;
+                }
+                // Marks current object as already seen to avoid infinite loops
+                // when it will be serialized as part of TransientAwareHolder
+                inspected.put(original, holder);
             }
-            // Marks current object as already seen to avoid infinite loops
-            // when it will be serialized as part of TransientAwareHolder
-            seen.put(original, holder);
         }
         return obj;
     }
@@ -142,44 +277,145 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
      * {@literal null}, to prevent NotSerializableException and continue the
      * inspection on other objects
      */
-    private Object handleNotSerializable(Object obj) {
-        Object replacement = obj;
-        if (!(obj instanceof Serializable)
-                && inspector instanceof TransientHandler.DebugMode) {
-            TransientHandler.DebugMode debugMode = (TransientHandler.DebugMode) inspector;
-            replacement = debugMode.onNotSerializableFound(obj)
-                    .map(Object.class::cast).orElse(obj);
-            if (replacement == TransientHandler.DebugMode.NULLIFY) {
-                return null;
-            }
+    protected Object handleNotSerializable(Object obj) {
+        DebugMode debugMode = (DebugMode) inspector;
+        Object replace = debugMode.onNotSerializableFound(obj)
+                .map(Object.class::cast).orElse(obj);
+        if (replace == DebugMode.NULLIFY) {
+            getLogger().debug(
+                    "Unserializable object of type {} replaced with null",
+                    obj.getClass());
+            return null;
         }
-        return replacement;
+        return replace;
     }
 
     private void trackObject(Object obj) {
         if (getLogger().isTraceEnabled()) {
             getLogger().trace("Serializing object {}", obj.getClass());
         }
-        if (inspector instanceof TransientHandler.DebugMode) {
+        if (trackingMode && inspector instanceof DebugMode
+                && !tracking.containsKey(obj)) {
+            Object original = obj;
             try {
-                ((TransientHandler.DebugMode) inspector).onSerialize(obj);
+                Track track = createTrackObject(++trackingCounter, obj);
+                tracking.put(obj, track);
+                obj = ((DebugMode) inspector).onSerialize(obj, track);
+                if (obj == null) {
+                    getLogger().debug(
+                            "Object of type {} will be replaced with NULL and ignored",
+                            original.getClass());
+                } else if (obj != original) {
+                    getLogger().debug(
+                            "Object of type {} will be replaced by an object of type {}",
+                            original.getClass(), obj.getClass());
+                }
             } catch (Exception ex) {
-                // Ignore
+                // Ignore. Debug mode handler is not supposed to throw exception
+                getLogger().error("Error tracking object of type {}",
+                        original.getClass(), ex);
             }
         }
     }
 
+    private int lookupObjectHandle(Object obj) {
+        if (lookupObject != null) {
+            try {
+                return (int) lookupObject.invoke(obj);
+            } catch (Throwable ex) {
+                // Ignore
+                getLogger().trace("Cannot lookup object", ex);
+            }
+        }
+        return -1;
+    }
+
+    private static VarHandle tryGetDepthHandle() {
+        try {
+            return MethodHandles
+                    .privateLookupIn(ObjectOutputStream.class,
+                            MethodHandles.lookup())
+                    .findVarHandle(ObjectOutputStream.class, "depth",
+                            int.class);
+        } catch (Exception ex) {
+            getLogger().trace("Cannot access ObjectOutputStream.depth field",
+                    ex);
+            return null;
+        }
+    }
+
+    private MethodHandle tryGetLookupObject() {
+        try {
+            VarHandle handles = tryGetHandle("handles",
+                    Class.forName("java.io.ObjectOutputStream$HandleTable"));
+            if (handles != null) {
+                return MethodHandles
+                        .privateLookupIn(ObjectOutputStream.class,
+                                MethodHandles.lookup())
+                        .findVirtual(handles.varType(), "lookup",
+                                MethodType.methodType(int.class, Object.class))
+                        .bindTo(handles.get(this));
+            }
+        } catch (Exception ex) {
+            getLogger().trace(
+                    "Cannot access ObjectOutputStream.handles.lookupObject method",
+                    ex);
+        }
+        return null;
+    }
+
+    private static VarHandle tryGetHandle(String name, Class<?> type) {
+        try {
+            return MethodHandles
+                    .privateLookupIn(ObjectOutputStream.class,
+                            MethodHandles.lookup())
+                    .findVarHandle(ObjectOutputStream.class, name, type);
+        } catch (Exception ex) {
+            getLogger().trace("Cannot access ObjectOutputStream.{} field", name,
+                    ex);
+            return null;
+        }
+    }
+
+    private static VarHandle tryGetDebugStackHandle() {
+        try {
+            return MethodHandles
+                    .privateLookupIn(ObjectOutputStream.class,
+                            MethodHandles.lookup())
+                    .findVarHandle(ObjectOutputStream.class, "debugInfoStack",
+                            Class.forName(
+                                    "java.io.ObjectOutputStream$DebugTraceInfoStack"));
+        } catch (Exception ex) {
+            getLogger().trace(
+                    "Cannot access ObjectOutputStream.debugInfoStack field.",
+                    ex);
+            return null;
+        }
+    }
+
+    private Track createTrackObject(int id, Object obj) {
+        int depth = -1;
+        if (depthHandle != null) {
+            depth = (int) depthHandle.get(this);
+        }
+        String stackInfo = null;
+        if (debugStackInfo != null) {
+            stackInfo = debugStackInfo.get(this).toString();
+        }
+        return new Track(id, depth, stackInfo, obj);
+    }
+
     private void trackClass(ObjectStreamClass type) {
-        if (inspector instanceof TransientHandler.DebugMode
-                && getLogger().isTraceEnabled()) {
+        if (inspector instanceof DebugMode && getLogger().isTraceEnabled()) {
             String fields = Stream.of(type.getFields())
                     .filter(field -> !field.isPrimitive() && !Serializable.class
                             .isAssignableFrom(field.getType()))
                     .map(field -> String.format("%s %s",
                             field.getType().getName(), field.getName()))
-                    .collect(Collectors.joining(System.lineSeparator()));
-            getLogger().trace("Starting serialization of object of type {}{}{}",
-                    type.getName(), System.lineSeparator(), fields);
+                    .collect(Collectors.joining(", "));
+            getLogger().trace(
+                    "Inspecting fields of class {} for serialization: [{}]",
+                    type.getName(), fields);
         }
     }
 
