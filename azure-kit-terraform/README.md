@@ -109,9 +109,31 @@ These limits can usually be increased in the portal "Quotas" section.
 https://learn.microsoft.com/en-us/azure/quotas/per-vm-quota-requests
 
 More info regarding Microsoft Azure subscription limits: https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits
+### Set Resource Requests and Limits
+This different for Vertical Pod Autoscaling.
 
-## Multiple Kubernetes clusters (Staging/Prod)
-The best approach when deploying multiple clusters is to use separate directories for each environment.
+For scaling to work better you should use resource requests and limits in your application deployments.
+There are lots of best practices guides out there, and it really depends on your application what is the best.
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+For example:
+
+    containers:
+    - name: prodcontainer1
+      image: ubuntu
+      resources:
+        requests:
+          memory: “64Mi”
+          cpu: “300m”
+        limits:                              
+          memory: “128Mi”
+Links:
+- https://www.containiq.com/post/setting-and-rightsizing-kubernetes-resource-limits
+- https://home.robusta.dev/blog/kubernetes-memory-limit
+- https://home.robusta.dev/blog/stop-using-cpu-limits
+
+## Multiple Kubernetes environments (Staging/Prod)
+The best approach when deploying multiple kubernetes environments is to use separate directories for each environment.
 Then you can modify the variables.tf file for each environment.
 
 Each combination of variables: application, environment and location would result in a different environment.
