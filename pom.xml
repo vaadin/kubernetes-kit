@@ -8,13 +8,13 @@
         <version>2.0.5</version>
     </parent>
 
-    <artifactId>azure-kit</artifactId>
+    <artifactId>kubernetes-kit</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>azure-kit-demo</module>
-        <module>azure-kit-starter</module>
+        <module>kubernetes-kit-demo</module>
+        <module>kubernetes-kit-starter</module>
     </modules>
 
     <properties>

@@ -1,0 +1,22 @@
+server:
+  port: ${PORT:8080}
+logging:
+  level:
+    '[com.vaadin.kubernetes]': debug
+spring:
+  redis:
+    host: kubernetes-kit-redis-service
+vaadin:
+  whitelisted-packages: com.vaadin,org.vaadin,dev.hilla
+  kubernetes:
+    hazelcast:
+      service-name: kubernetes-kit-hazelcast-service
+  serialization:
+    transients:
+      include-packages: com.vaadin.kubernetes.demo
+  devmode:
+    sessionSerialization:
+      enabled: true
+
+
+
