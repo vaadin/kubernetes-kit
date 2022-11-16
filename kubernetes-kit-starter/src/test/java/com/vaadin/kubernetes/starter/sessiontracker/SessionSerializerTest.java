@@ -4,6 +4,7 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -18,9 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
 
-import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
-import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 import com.vaadin.flow.function.DeploymentConfiguration;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
@@ -28,15 +26,21 @@ import com.vaadin.flow.server.VaadinServletService;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNotNull;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -235,6 +239,36 @@ class SessionSerializerTest {
 
     }
 
+    @Test
+    void serialize_notSerializableException_notFallbackToPessimistic() {
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        vaadinSession.setLockTimestamps(10, 20);
+        httpSession.setAttribute("UNSERIALIZABLE", new Unserializable());
+
+        // Spy locks to ensure they are not engaged by pessimistic attempt
+        List<Lock> locks = new ArrayList<>();
+        for (String attrName : Collections
+                .list(httpSession.getAttributeNames())) {
+            Object obj = httpSession.getAttribute(attrName);
+            if (obj instanceof Lock) {
+                obj = spy(obj);
+                locks.add((Lock) obj);
+                httpSession.setAttribute(attrName, obj);
+            }
+        }
+
+        serializer.serialize(httpSession);
+        verify(connector).markSerializationStarted(clusterSID);
+
+        await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector).sendSession(isNull());
+        locks.forEach(l -> verify(l, never()).lock());
+
+    }
+
     private static ConditionFactory await() {
         return Awaitility.with().pollInterval(20, MILLISECONDS);
     }
@@ -331,5 +365,8 @@ class SessionSerializerTest {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    private static class Unserializable {
     }
 }
