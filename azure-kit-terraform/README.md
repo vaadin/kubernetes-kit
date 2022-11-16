@@ -77,9 +77,11 @@ After this the next steps are to configure your ingress to use these certificate
 If you plan to use normal certificates it's best to follow guide by Microsoft: [learn.microsoft.com/en-us/azure/aks/csi-secrets-store-nginx-tls](learn.microsoft.com/en-us/azure/aks/csi-secrets-store-nginx-tls)
 
 ## Autoscaling
-Theres 2 types of autoscaling possible:
-- The cluster autoscaler. 
+Theres different types of autoscaling possible:
 - The horizontal pod autoscaler.
+- Vertical Pod Autoscaling
+- The cluster autoscaler.
+
 ### Horizoncal pod autoscaler
 The [Horizontal Pod Autoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) controls the scale of a Deployment and its ReplicaSet.
 It is implemented as a Kubernetes API resource and a controller and can not be deployed with this terraform.
@@ -87,6 +89,9 @@ It is usually deployed together with the application as scaling is dependent on 
 
 There is a [walkthrough example](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/) of using horizontal pod autoscaling.
 
+### Vertical Pod Autoscaling
+It tries to automatically set resource requests and limits on running containers based on past usage.
+Currently its in preview: https://learn.microsoft.com/en-us/azure/aks/vertical-pod-autoscaler
 
 ### Cluster autoscaler
 The [Azure cluster autoscaler](https://learn.microsoft.com/en-us/azure/aks/cluster-autoscaler) component can watch for pods in your cluster that can't be scheduled because of resource constraints.
