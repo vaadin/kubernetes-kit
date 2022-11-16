@@ -4,9 +4,7 @@ import javax.servlet.http.HttpSession;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.NotSerializableException;
-import java.io.ObjectInputStream;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -37,6 +35,58 @@ import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 
+/**
+ * Component responsible for replicating HTTP session attributes to a
+ * distributed storage.
+ *
+ * HTTP session attributes are serialized and deserialized by
+ * {@link SessionSerializer}, using Java Serialization specifications.
+ *
+ * Transient fields of serialized objects are inspected by a pluggable
+ * {@link TransientHandler} component to gather metadata that is stored along
+ * the session attributes and then used during deserialization to populate the
+ * fields on the new instances.
+ *
+ * When serializing an HTTP session, {@link SessionSerializer} marks the current
+ * session as pending before starting an async serialization process.
+ *
+ * Pending state is hold by the backend connector and removed once the data has
+ * been written on the distributed storage.
+ *
+ * Concurrent attempts are ignored until the pending state is cleared. The
+ * operation is safe and will not lose any Vaadin related data (UI or
+ * {@link VaadinSession} attributes) because the serializer is always working on
+ * the same {@link VaadinSession} instance.
+ *
+ * However, it may potentially be possible to lose attributes that are directly
+ * added on the HTTP session, because the asynchronous job does not work
+ * directly on the HttpSession, but on a map that references the original
+ * attributes. For the same reason, the serializer may persist attributes that a
+ * request has removed during the pending state.
+ *
+ * {@link VaadinSession} data integrity is granted by an optimistic/pessimistic
+ * handling, based on {@link VaadinSession} lock timestamp.
+ *
+ * Session serialization process works as following:
+ *
+ * <ul>
+ * <li>it first checks that VaadinSession is currently unlocked. If so it
+ * performs serialization</li>
+ * <li>if VaadinSession is locked it schedules another attempt</li>
+ * <li>Once data serialization is completed, it checks if the VaadinSession has
+ * been locked and unlocked in the meanwhile</li>
+ * <li>If so, it discards serialized data and schedules another attempt</li>
+ * <li>If after a timeout of 30 seconds it has not been possible to complete the
+ * serialization without VaadinSession locks/unlocks it falls back to a
+ * pessimistic approach</li>
+ * <li>Pessimistic approach locks the VaadinSession during the
+ * serialization</li>
+ * <li>Finally serialized data is written to the distributes storage</li>
+ * </ul>
+ *
+ * In case of a server shutdown, it waits for pending session serializations to
+ * complete.
+ */
 public class SessionSerializer
         implements ApplicationListener<ContextClosedEvent> {
 
@@ -55,6 +105,15 @@ public class SessionSerializer
 
     private Predicate<Class<?>> injectableFilter = type -> true;
 
+    /**
+     * Creates a new {@link SessionSerializer}.
+     *
+     * @param backendConnector
+     *            backend connector to store serialized data on distributed
+     *            storage.
+     * @param transientHandler
+     *            handler to inspect and inject transient fields.
+     */
     public SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler) {
         this.backendConnector = backendConnector;
@@ -86,10 +145,24 @@ public class SessionSerializer
         this.injectableFilter = injectableFilter;
     }
 
+    /**
+     * Serializes the given HTTP session and stores data on a distributed
+     * storage.
+     *
+     * @param session
+     *            the HTTP session.
+     */
     public void serialize(HttpSession session) {
         serialize(new WrappedHttpSession(session));
     }
 
+    /**
+     * Serializes the given Vaadin Wrapped session and stores data on a
+     * distributed storage.
+     *
+     * @param session
+     *            the Vaadin Wrapped session.
+     */
     public void serialize(WrappedSession session) {
         Map<String, Object> values = session.getAttributeNames().stream()
                 .collect(Collectors.toMap(Function.identity(),
@@ -97,18 +170,43 @@ public class SessionSerializer
         queueSerialization(session.getId(), values);
     }
 
+    /**
+     * Deserializes binary data from the distributed storage into the given HTTP
+     * session.
+     *
+     * @param sessionInfo
+     *            session data from distributed storage.
+     * @param session
+     *            the HTTP session
+     *
+     * @throws ClassNotFoundException
+     *             if class of a serialized object cannot be found.
+     * @throws IOException
+     *             any of the usual Input/Output related exceptions.
+     */
+    public void deserialize(SessionInfo sessionInfo, HttpSession session)
+            throws ClassNotFoundException, IOException {
+        Map<String, Object> values = doDeserialize(sessionInfo,
+                session.getId());
+
+        for (Entry<String, Object> entry : values.entrySet()) {
+            session.setAttribute(entry.getKey(), entry.getValue());
+        }
+    }
+
     private void queueSerialization(String sessionId,
             Map<String, Object> attributes) {
         if (pending.containsKey(sessionId)) {
             // This session will be serialized again soon enough
-            getLogger().info(
-                    "Ignoring serialization request for {} as the session is already being serialized ",
+            getLogger().debug(
+                    "Ignoring serialization request for session {} as the session is already being serialized",
                     sessionId);
             return;
         }
-        getLogger().info("Starting serialization of session {}",
-                getClusterKey(attributes));
         String clusterKey = getClusterKey(attributes);
+        getLogger().debug(
+                "Starting asynchronous serialization of session {} with distributed key {}",
+                sessionId, clusterKey);
         backendConnector.markSerializationStarted(clusterKey);
         pending.put(sessionId, true);
 
@@ -127,23 +225,27 @@ public class SessionSerializer
             Consumer<SessionInfo> whenSerialized) {
         long start = System.currentTimeMillis();
         long timeout = start + optimisticSerializationTimeoutMs;
+        String clusterKey = getClusterKey(attributes);
         try {
-            getLogger().info("Optimistic serialization of session {} started",
-                    getClusterKey(attributes));
+            getLogger().debug(
+                    "Optimistic serialization of session {} with distributed key {} started",
+                    sessionId, clusterKey);
             while (System.currentTimeMillis() < timeout) {
                 SessionInfo info = serializeOptimisticLocking(sessionId,
                         attributes);
                 if (info != null) {
                     pending.remove(sessionId); // Is this a race condition?
-                    getLogger().warn(
-                            "Optimistic serialization of session {} completed",
-                            getClusterKey(attributes));
+                    getLogger().debug(
+                            "Optimistic serialization of session {} with distributed key {} completed",
+                            sessionId, clusterKey);
                     whenSerialized.accept(info);
                     return;
                 }
             }
         } catch (IOException e) {
-            getLogger().warn("Optimistic serialization failed", e);
+            getLogger().warn(
+                    "Optimistic serialization of session {} with distributed key {} failed",
+                    sessionId, clusterKey, e);
         }
 
         // Serializing using optimistic locking failed for a long time so be
@@ -157,6 +259,7 @@ public class SessionSerializer
     private SessionInfo serializePessimisticLocking(String sessionId,
             Map<String, Object> attributes) {
         long start = System.currentTimeMillis();
+        String clusterKey = getClusterKey(attributes);
         Set<ReentrantLock> locks = getLocks(attributes);
         for (ReentrantLock lock : locks) {
             lock.lock();
@@ -165,13 +268,15 @@ public class SessionSerializer
             return doSerialize(sessionId, attributes);
         } catch (Exception e) {
             getLogger().error(
-                    "An error occured during pessimistic serialization", e);
+                    "An error occurred during pessimistic serialization of session {} with distributed key {} ",
+                    sessionId, clusterKey, e);
         } finally {
             for (ReentrantLock lock : locks) {
                 lock.unlock();
             }
-            getLogger().info("serializePessimisticLocking done in {}ms",
-                    System.currentTimeMillis() - start);
+            getLogger().debug(
+                    "Pessimistic serialization of session {} with distributed key {} completed in {}ms",
+                    sessionId, clusterKey, System.currentTimeMillis() - start);
         }
         return null;
     }
@@ -196,6 +301,7 @@ public class SessionSerializer
 
     private SessionInfo serializeOptimisticLocking(String sessionId,
             Map<String, Object> attributes) throws IOException {
+        String clusterKey = getClusterKey(attributes);
         try {
             long latestLockTime = findNewestLockTime(attributes);
             long latestUnlockTime = findNewestUnlockTime(attributes);
@@ -203,7 +309,8 @@ public class SessionSerializer
             if (latestLockTime > latestUnlockTime) {
                 // The session is locked
                 getLogger().trace(
-                        "Optimistic serialization failed, session is locked. Will retry");
+                        "Optimistic serialization of session {} with distributed key {} failed, session is locked. Will retry",
+                        sessionId, clusterKey);
                 return null;
             }
 
@@ -213,24 +320,28 @@ public class SessionSerializer
 
             if (latestUnlockTime != latestUnlockTimeCheck) {
                 // Somebody modified the session during serialization and the
-                // result cannot be
-                // used
+                // result cannot be used
                 getLogger().trace(
-                        "Optimistic serialization failed, somebody modified the session during serialization ({} != {}). Will retry",
-                        latestUnlockTime, latestUnlockTimeCheck);
+                        "Optimistic serialization of session {} with distributed key {} failed, "
+                                + "somebody modified the session during serialization ({} != {}). Will retry",
+                        sessionId, clusterKey, latestUnlockTime,
+                        latestUnlockTimeCheck);
                 return null;
             }
-            logSessionDebugInfo("Serialized session", attributes);
+            logSessionDebugInfo("Serialized session " + sessionId
+                    + " with distributed key " + clusterKey, attributes);
             return info;
         } catch (NotSerializableException e) {
             getLogger().trace(
-                    "Optimistic serialization failed, some attribute is not serializable. Giving up immediately since the error is not recoverable",
-                    e);
+                    "Optimistic serialization of session {} with distributed key {} failed,"
+                            + " some attribute is not serializable. Giving up immediately since the error is not recoverable",
+                    sessionId, clusterKey, e);
             throw e;
         } catch (Exception e) {
             getLogger().trace(
-                    "Optimistic serialization failed, a problem occured during serialization. Will retry",
-                    e);
+                    "Optimistic serialization of session {} with distributed key {} failed,"
+                            + " a problem occurred during serialization. Will retry",
+                    sessionId, clusterKey, e);
             return null;
         }
     }
@@ -244,12 +355,13 @@ public class SessionSerializer
                 VaadinSession s = (VaadinSession) value;
                 try {
                     for (UI ui : s.getUIs()) {
-                        info.append("[UI " + ui.getUIId()
-                                + ", last client message: "
-                                + ui.getInternals()
-                                        .getLastProcessedClientToServerId()
-                                + ", server sync id: "
-                                + ui.getInternals().getServerSyncId() + "]");
+                        info.append("[UI ").append(ui.getUIId())
+                                .append(", last client message: ")
+                                .append(ui.getInternals()
+                                        .getLastProcessedClientToServerId())
+                                .append(", server sync id: ")
+                                .append(ui.getInternals().getServerSyncId())
+                                .append("]");
                     }
                 } catch (Exception ex) {
                     // getting UIs may fail in development mode due to null lock
@@ -260,7 +372,7 @@ public class SessionSerializer
                 }
             }
         }
-        getLogger().info(prefix + " UIs: " + info);
+        getLogger().trace("{} UIs: {}", prefix, info);
     }
 
     private long findNewestLockTime(Map<String, Object> attributes) {
@@ -298,8 +410,10 @@ public class SessionSerializer
         SessionInfo info = new SessionInfo(getClusterKey(attributes),
                 out.toByteArray());
 
-        getLogger().info("doSerialize session with keys {} in {}ms",
-                attributes.keySet(), System.currentTimeMillis() - start);
+        getLogger().debug(
+                "Serialization of attributes {} for session {} with distributed key {} completed in {}ms",
+                attributes.keySet(), sessionId, info.getClusterKey(),
+                System.currentTimeMillis() - start);
         return info;
     }
 
@@ -307,8 +421,9 @@ public class SessionSerializer
         return (String) attributes.get(CurrentKey.COOKIE_NAME);
     }
 
-    private Map<String, Object> doDeserialize(byte[] data)
-            throws IOException, ClassNotFoundException {
+    private Map<String, Object> doDeserialize(SessionInfo sessionInfo,
+            String sessionId) throws IOException, ClassNotFoundException {
+        byte[] data = sessionInfo.getData();
         long start = System.currentTimeMillis();
 
         // Is this needed?
@@ -324,32 +439,25 @@ public class SessionSerializer
         }
         logSessionDebugInfo("Deserialized session", attributes);
 
-        getLogger().info("doDeserialize session with keys {} in {}ms",
-                attributes.keySet(), System.currentTimeMillis() - start);
-
+        getLogger().debug(
+                "Deserialization of attributes {} for session {} with distributed key {} completed in {}ms",
+                attributes.keySet(), sessionId, sessionInfo.getClusterKey(),
+                System.currentTimeMillis() - start);
         return attributes;
-    }
-
-    public void deserialize(SessionInfo sessionInfo, HttpSession session)
-            throws ClassNotFoundException, IOException {
-        Map<String, Object> values = doDeserialize(sessionInfo.getData());
-
-        for (Entry<String, Object> entry : values.entrySet()) {
-            session.setAttribute(entry.getKey(), entry.getValue());
-        }
     }
 
     private static Logger getLogger() {
         return LoggerFactory.getLogger(SessionSerializer.class);
     }
 
-    public void waitForSerialization() {
+    void waitForSerialization() {
         while (!pending.isEmpty()) {
-            getLogger().info("Waiting for " + pending.size()
-                    + " sessions to be serialized");
+            getLogger().info("Waiting for {} sessions to be serialized: {}",
+                    pending.size(), pending.keySet());
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
+                // Ignore
             }
         }
     }
@@ -373,14 +481,5 @@ public class SessionSerializer
                     + threadNumber.getAndIncrement());
         }
 
-    }
-
-    @FunctionalInterface
-    public interface ObjectInputStreamFactory {
-
-        ObjectInputStream newInstance(InputStream inputStream)
-                throws IOException;
-
-        ObjectInputStreamFactory DEFAULT = ObjectInputStream::new;
     }
 }

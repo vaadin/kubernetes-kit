@@ -10,6 +10,14 @@ import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerCookie;
 
+/**
+ * A {@link PushSendListener} that serialize HTTP session when messages are
+ * pushed to the client.
+ *
+ * It has the same scope of
+ * {@link com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter} but for
+ * PUSH communication.
+ */
 public class PushSessionTracker implements PushSendListener {
 
     private final SessionSerializer sessionSerializer;

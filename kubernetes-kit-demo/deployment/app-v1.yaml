@@ -1,20 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kubernetes-kit-demo
+  name: kubernetes-kit-demo-v1
+  namespace: canary
 spec:
   replicas: 4
   selector:
     matchLabels:
       app: kubernetes-kit-demo
+      version: 1.0.0
   template:
     metadata:
       labels:
         app: kubernetes-kit-demo
+        version: 1.0.0
     spec:
       containers:
         - name: kubernetes-kit-demo
-          image: kubernetes-kit-demo:latest
+          image: localhost:5001/kubernetes-kit-demo:1.0.0
+          env:
+            - name: APP_VERSION
+              value: 1.0.0
           ports:
             - name: http
               containerPort: 8080
@@ -24,13 +30,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: kubernetes-kit-demo-balancer
+  name: kubernetes-kit-demo-v1
+  namespace: canary
 spec:
   selector:
     app: kubernetes-kit-demo
+    version: 1.0.0
   ports:
-    - protocol: TCP
-      port: 8000
-      targetPort: 8080
-  type: LoadBalancer
-  sessionAffinity: ClientIP
+    - name: http
+      port: 80
+      targetPort: http

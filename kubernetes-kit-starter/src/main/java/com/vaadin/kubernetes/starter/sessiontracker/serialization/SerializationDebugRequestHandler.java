@@ -50,7 +50,7 @@ import com.vaadin.flow.server.startup.ApplicationConfiguration;
  * serialization and deserialization.
  *
  * The request handler is executed only in development mode and it the
- * {@literal devmode.sessionSerialization.enabled} configuration property is set
+ * {@literal vaadin.devmode.sessionSerialization.enabled} configuration property is set
  * to {@literal true}.
  *
  * Potential exceptions are caught and logged in the server console.

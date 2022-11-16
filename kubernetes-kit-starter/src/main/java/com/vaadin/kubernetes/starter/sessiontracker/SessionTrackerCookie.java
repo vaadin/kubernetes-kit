@@ -8,13 +8,29 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-public class SessionTrackerCookie {
+/**
+ * Utility class to handle the storage of the distributed storage session key.
+ */
+public final class SessionTrackerCookie {
 
     private SessionTrackerCookie() {
     }
 
+    /**
+     * Sets the distributed storage session key on the HTTP session.
+     *
+     * If the Cookie does not exist, a new key is generated and the Cookie is
+     * created and added to the HTTP response.
+     *
+     * @param session
+     *            the HTTP session.
+     * @param request
+     *            the HTTP request.
+     * @param response
+     *            the HTTP response.
+     */
     public static void setIfNeeded(HttpSession session,
-                                   HttpServletRequest request, HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response) {
         Optional<Cookie> clusterKeyCookie = getCookie(request);
         if (!clusterKeyCookie.isPresent()) {
             String clusterKey = UUID.randomUUID().toString();
@@ -27,6 +43,14 @@ public class SessionTrackerCookie {
 
     }
 
+    /**
+     * Gets the current distributed storage session key from HTTP session.
+     *
+     * @param session
+     *            the HTTP session.
+     * @return the current distributed storage session key wrapped into an
+     *         {@link Optional}, or an empty Optional if the key does not exist.
+     */
     public static Optional<String> getFromSession(HttpSession session) {
         return Optional.ofNullable(
                 (String) session.getAttribute(CurrentKey.COOKIE_NAME));
@@ -42,6 +66,16 @@ public class SessionTrackerCookie {
                 .findFirst();
     }
 
+    /**
+     * Gets the value of the current distributed storage session key from the
+     * Cookie.
+     *
+     * @param request
+     *            the HTTP request.
+     * @return the current distributed storage session key wrapped into an
+     *         {@link Optional}, or an empty Optional if the Cookie does not
+     *         exist.
+     */
     public static Optional<String> getValue(HttpServletRequest request) {
         return getCookie(request).map(Cookie::getValue);
     }
