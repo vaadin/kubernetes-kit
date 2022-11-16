@@ -52,7 +52,7 @@ class SpringTransientHandlerTest {
                 .createBean(Child.class);
         List<TransientDescriptor> transients = handler.inspect(bean);
 
-        org.assertj.core.api.Assertions.assertThat(transients).hasSize(2).containsExactlyInAnyOrder(
+        assertThat(transients).hasSize(2).containsExactlyInAnyOrder(
                 new TransientDescriptor(Parent.class, "theService",
                         TestService.class, "alternativeImpl"),
                 new TransientDescriptor(Child.class, "theService",
@@ -64,7 +64,7 @@ class SpringTransientHandlerTest {
             @Autowired TestConfig.NamedComponentTarget target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
-        org.assertj.core.api.Assertions.assertThat(transients).containsExactlyInAnyOrder(
+        assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.NamedComponentTarget.class,
                         "named", TestConfig.NamedComponent.class,
                         TestConfig.NamedComponent.NAME));
@@ -76,7 +76,7 @@ class SpringTransientHandlerTest {
             @Autowired TestConfig.PrototypeTarget target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
-        org.assertj.core.api.Assertions.assertThat(transients).containsExactlyInAnyOrder(
+        assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.PrototypeTarget.class,
                         "prototypeScoped", TestConfig.PrototypeComponent.class,
                         TestConfig.PrototypeComponent.class.getName()),
@@ -91,7 +91,7 @@ class SpringTransientHandlerTest {
             @Autowired TestConfig.PrototypeServiceTarget target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
-        org.assertj.core.api.Assertions.assertThat(transients).containsExactlyInAnyOrder(
+        assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.PrototypeServiceTarget.class,
                         "prototypeServiceA", TestConfig.PrototypeService.class,
                         TestConfig.PrototypeServiceImplA.class.getName()),
@@ -105,7 +105,7 @@ class SpringTransientHandlerTest {
             @Autowired TestConfig.ProxiedPrototypeServiceTarget target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
-        org.assertj.core.api.Assertions.assertThat(transients).containsExactlyInAnyOrder(
+        assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(
                         TestConfig.ProxiedPrototypeServiceTarget.class,
                         "prototypeServiceA", TestConfig.PrototypeService.class,
@@ -123,7 +123,7 @@ class SpringTransientHandlerTest {
             @Autowired TestConfig.ProxiedBeanTarget target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
-        org.assertj.core.api.Assertions.assertThat(transients).containsExactlyInAnyOrder(
+        assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.ProxiedBeanTarget.class,
                         "service", TestService.class, "transactionalService"));
     }
@@ -133,7 +133,7 @@ class SpringTransientHandlerTest {
             @Autowired TestConfig.NotInjected target) {
         List<TransientDescriptor> transients = handler.inspect(target);
 
-        org.assertj.core.api.Assertions.assertThat(transients).isEmpty();
+        assertThat(transients).isEmpty();
     }
 
     @Test
