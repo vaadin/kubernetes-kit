@@ -75,3 +75,41 @@ After certmanager is installed you still need to create the cluster issuer separ
 After this the next steps are to configure your ingress to use these certificates. You can follow the same microsoft [guide](https://learn.microsoft.com/en-us/azure/aks/ingress-tls?tabs=azure-cli#update-your-ingress-routes) for this. 
 
 If you plan to use normal certificates it's best to follow guide by Microsoft: [learn.microsoft.com/en-us/azure/aks/csi-secrets-store-nginx-tls](learn.microsoft.com/en-us/azure/aks/csi-secrets-store-nginx-tls)
+
+## Autoscaling
+Theres 2 types of autoscaling possible:
+- The cluster autoscaler. 
+- The horizontal pod autoscaler.
+### Horizoncal pod autoscaler
+The [Horizontal Pod Autoscaler](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/) controls the scale of a Deployment and its ReplicaSet.
+It is implemented as a Kubernetes API resource and a controller and can not be deployed with this terraform.
+It is usually deployed together with the application as scaling is dependent on the load requirements on the application.
+
+There is a [walkthrough example](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/) of using horizontal pod autoscaling.
+
+
+### Cluster autoscaler
+The [Azure cluster autoscaler](https://learn.microsoft.com/en-us/azure/aks/cluster-autoscaler) component can watch for pods in your cluster that can't be scheduled because of resource constraints.
+When issues are detected, the number of nodes in a node pool is increased to meet the application demand.
+
+To enable autoscaling with terraform you need to set up variables in variables.tf file:
+- enable_auto_scaling: true
+- min_count: Minimum number of nodes in cluster
+- max_count: Maximum number of nodes in cluster
+
+NOTE: There is by default quotas in azure on how many specific type resources you can have.
+For example vCPU amounts can be limited to as low as 10 per subscription.
+This will limit the cluster size unless you increase the quota.
+These limits can usually be increased in the portal "Quotas" section.
+https://learn.microsoft.com/en-us/azure/quotas/per-vm-quota-requests
+
+More info regarding Microsoft Azure subscription limits: https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/azure-subscription-service-limits
+
+## Multiple Kubernetes clusters (Staging/Prod)
+The best approach when deploying multiple clusters is to use separate directories for each environment.
+Then you can modify the variables.tf file for each environment.
+
+Each combination of variables: application, environment and location would result in a different environment.
+
+It's also possible to have multiple subscriptions and keep most of the terraform variables identical.
+With multiple subscriptions the storageaccounts cannot have the same name.
