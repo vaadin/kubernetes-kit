@@ -226,6 +226,7 @@ public class SessionSerializer
         long start = System.currentTimeMillis();
         long timeout = start + optimisticSerializationTimeoutMs;
         String clusterKey = getClusterKey(attributes);
+        boolean unrecoverableError = false;
         try {
             getLogger().debug(
                     "Optimistic serialization of session {} with distributed key {} started",
@@ -242,18 +243,26 @@ public class SessionSerializer
                     return;
                 }
             }
+        } catch (NotSerializableException e) {
+            getLogger().error(
+                    "Optimistic serialization of session {} with distributed key {} failed,"
+                            + " some attribute is not serializable. Giving up immediately since the error is not recoverable",
+                    sessionId, clusterKey, e);
+            unrecoverableError = true;
         } catch (IOException e) {
             getLogger().warn(
                     "Optimistic serialization of session {} with distributed key {} failed",
                     sessionId, clusterKey, e);
         }
 
-        // Serializing using optimistic locking failed for a long time so be
-        // pessimistic
-        // and get it done
         pending.remove(sessionId);
-        whenSerialized
-                .accept(serializePessimisticLocking(sessionId, attributes));
+        SessionInfo sessionInfo = null;
+        if (!unrecoverableError) { // NOSONAR
+            // Serializing using optimistic locking failed for a long time so be
+            // pessimistic and get it done
+            sessionInfo = serializePessimisticLocking(sessionId, attributes);
+        }
+        whenSerialized.accept(sessionInfo);
     }
 
     private SessionInfo serializePessimisticLocking(String sessionId,
@@ -332,10 +341,6 @@ public class SessionSerializer
                     + " with distributed key " + clusterKey, attributes);
             return info;
         } catch (NotSerializableException e) {
-            getLogger().trace(
-                    "Optimistic serialization of session {} with distributed key {} failed,"
-                            + " some attribute is not serializable. Giving up immediately since the error is not recoverable",
-                    sessionId, clusterKey, e);
             throw e;
         } catch (Exception e) {
             getLogger().trace(
