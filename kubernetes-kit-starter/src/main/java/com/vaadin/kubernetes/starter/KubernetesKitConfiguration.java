@@ -148,6 +148,13 @@ public class KubernetesKitConfiguration {
             return new SerializationDebugRequestHandler.InitListener();
         }
 
+        @Bean
+        @Order(Integer.MIN_VALUE)
+        FilterRegistrationBean<SerializationDebugRequestHandler.Filter> sessionSerializationDebugToolFilter() {
+            return new FilterRegistrationBean<>(
+                    new SerializationDebugRequestHandler.Filter());
+        }
+
         private static class OnSessionSerializationDebug
                 extends AllNestedConditions {
 
