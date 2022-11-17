@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -107,7 +106,8 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
                     }
                     try {
                         ((DebugMode) TransientInjectableObjectInputStream.this.injector)
-                                .onDeserialize(serialClass, track, currentObject);
+                                .onDeserialize(serialClass, track,
+                                        currentObject);
                     } catch (Exception ex) {
                         // Ignore, debug handler is not supposed to throw
                         // exception
@@ -186,7 +186,10 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
     }
 
     private Object lookupCurrentObject() {
-        return lookupObject((int) passHandleHandle.get(this));
+        if (passHandleHandle != null) {
+            return lookupObject((int) passHandleHandle.get(this));
+        }
+        return null;
     }
 
     private Object lookupObject(int handle) {
@@ -202,7 +205,10 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
     }
 
     private Track lookupCurrentTrackedObject() {
-        return lookupTrackedObject((int) passHandleHandle.get(this));
+        if (passHandleHandle != null) {
+            return lookupTrackedObject((int) passHandleHandle.get(this));
+        }
+        return null;
     }
 
     private Track lookupTrackedObject(int handle) {
@@ -238,6 +244,18 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
             getLogger().trace(
                     "Cannot access ObjectOutputStream.handles.lookupObject method",
                     ex);
+        }
+        return null;
+    }
+
+    public static Object onDebugMode(ObjectInputStream is,
+            Function<DebugMode, Object> action) {
+        if (is instanceof TransientInjectableObjectInputStream
+                && ((TransientInjectableObjectInputStream) is).injector instanceof DebugMode) {
+            DebugMode debugMode = (DebugMode) ((TransientInjectableObjectInputStream) is).injector;
+            return action.apply(debugMode);
+        } else {
+            getLogger().trace("Cannot get a DebugMode for {}", is.getClass());
         }
         return null;
     }

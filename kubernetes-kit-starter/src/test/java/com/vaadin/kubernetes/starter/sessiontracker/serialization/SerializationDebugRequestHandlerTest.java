@@ -5,6 +5,7 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -253,6 +254,25 @@ class SerializationDebugRequestHandlerTest {
                 entry -> softAssertions.assertThat(unserializableInfo).anyMatch(
                         log -> log.contains("- field (class \"" + entry)));
         softAssertions.assertAll();
+    }
+
+    @Test
+    void handleRequest_unserializableObjects_replacedAndRestored() {
+        // Unserializable objects replaced with NULL must be restored on
+        // deserialized to avoid failure with data structure rejecting null
+        // values. For example Map does not allow NULL keys
+        Map<Object, Object> map = Map.of("K1", "OK", new NotSerializable(),
+                "NS VALUE OK");
+        httpSession.setAttribute("OBJ1", map);
+
+        assertThat(handler.handleRequest(vaadinSession, request, response))
+                .isFalse();
+        Result result = resultHolder.get();
+        assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
+        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
+                Outcome.SERIALIZATION_FAILED, Outcome.NOT_SERIALIZABLE_CLASSES);
+        assertThat(result.getStorageKey()).isNotNull()
+                .contains("_SOURCE:" + httpSession.getId());
     }
 
     @Test
