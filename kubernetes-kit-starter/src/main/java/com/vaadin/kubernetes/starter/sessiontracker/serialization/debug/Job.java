@@ -1,6 +1,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
 import java.io.ObjectStreamClass;
+import java.io.ObjectStreamField;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
@@ -23,6 +24,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.slf4j.LoggerFactory;
 
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 
@@ -156,7 +159,7 @@ class Job {
         }
     }
 
-    void pushDeserialization(Class<?> type, Track track) {
+    void pushDeserialization(Class<?> type, Track track, Object obj) {
         if (track != null && track.stackInfo == null) {
             int trackId = track.id;
             int trackDepth = track.depth;
@@ -177,6 +180,16 @@ class Job {
         }
         if (track != null) {
             deserializationStack.push(track);
+        }
+        if (type == ObjectStreamClass.class
+                && obj instanceof ObjectStreamClass) {
+            ObjectStreamClass cast = (ObjectStreamClass) obj;
+            LoggerFactory.getLogger(Job.class)
+                    .debug("Start serialization of {} with fields [{}]",
+                            cast.getName(),
+                            Stream.of(cast.getFields())
+                                    .map(ObjectStreamField::getName)
+                                    .collect(Collectors.joining(",")));
         }
     }
 

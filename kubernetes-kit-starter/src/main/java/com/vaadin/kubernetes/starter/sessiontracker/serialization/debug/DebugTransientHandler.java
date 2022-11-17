@@ -56,8 +56,8 @@ class DebugTransientHandler implements TransientHandler, DebugMode {
     }
 
     @Override
-    public void onDeserialize(Class<?> type, Track track) {
-        job.pushDeserialization(type, track);
+    public void onDeserialize(Class<?> type, Track track, Object object) {
+        job.pushDeserialization(type, track, object);
     }
 
     @Override

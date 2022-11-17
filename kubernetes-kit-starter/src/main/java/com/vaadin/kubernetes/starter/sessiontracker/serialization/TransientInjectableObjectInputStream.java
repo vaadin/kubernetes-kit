@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputFilter;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +40,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
 public class TransientInjectableObjectInputStream extends ObjectInputStream {
 
     private final VarHandle passHandleHandle;
+    private final MethodHandle lookupObjectHandle;
     private final TransientHandler injector;
     private Map<Integer, Track> tracked;
 
@@ -50,11 +54,13 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
                 TransientInjectableObjectInputStream.class.getModule());
         if (canAccess) {
             passHandleHandle = tryGetHandle("passHandle", int.class);
+            lookupObjectHandle = tryGetLookupObject();
         } else {
             getLogger().warn(
                     "Cannot reflect on ObjectInputStream. Please open java.io to UNNAMED module, adding "
                             + "'--add-opens java.base/java.io=ALL-UNNAMED' to the JVM arguments.");
             passHandleHandle = null;
+            lookupObjectHandle = null;
         }
     }
 
@@ -83,7 +89,9 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
         public Status checkInput(FilterInfo filterInfo) {
             if (TransientInjectableObjectInputStream.this.injector instanceof DebugMode) {
                 Track track = TransientInjectableObjectInputStream.this
-                        .lookupObject();
+                        .lookupCurrentTrackedObject();
+                Object currentObject = TransientInjectableObjectInputStream.this
+                        .lookupCurrentObject();
                 Class<?> serialClass = filterInfo.serialClass();
                 if (serialClass != null || track != null) {
 
@@ -99,7 +107,7 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
                     }
                     try {
                         ((DebugMode) TransientInjectableObjectInputStream.this.injector)
-                                .onDeserialize(serialClass, track);
+                                .onDeserialize(serialClass, track, currentObject);
                     } catch (Exception ex) {
                         // Ignore, debug handler is not supposed to throw
                         // exception
@@ -142,7 +150,7 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
             // track deserialized objects for debugging purpose
             try {
                 Track track = TransientInjectableObjectInputStream.this
-                        .lookupObject();
+                        .lookupCurrentTrackedObject();
                 obj = ((DebugMode) injector).onDeserialized(obj, track);
             } catch (Exception ex) {
                 // Ignore, debug handler is not supposed to throw exception
@@ -177,14 +185,28 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
                 .getLogger(TransientInjectableObjectInputStream.class);
     }
 
-    private Track lookupObject() {
-        try {
-            int handle = (int) passHandleHandle.get(this);
-            return tracked.get(handle);
-        } catch (Throwable e) {
-            // Ignore
+    private Object lookupCurrentObject() {
+        return lookupObject((int) passHandleHandle.get(this));
+    }
+
+    private Object lookupObject(int handle) {
+        if (lookupObjectHandle != null) {
+            try {
+                return lookupObjectHandle.invoke(handle);
+            } catch (Throwable ex) {
+                // Ignore
+                getLogger().trace("Cannot lookup object", ex);
+            }
         }
         return null;
+    }
+
+    private Track lookupCurrentTrackedObject() {
+        return lookupTrackedObject((int) passHandleHandle.get(this));
+    }
+
+    private Track lookupTrackedObject(int handle) {
+        return tracked.get(handle);
     }
 
     private static VarHandle tryGetHandle(String name, Class<?> type) {
@@ -198,6 +220,26 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
                     ex);
             return null;
         }
+    }
+
+    private MethodHandle tryGetLookupObject() {
+        try {
+            VarHandle handles = tryGetHandle("handles",
+                    Class.forName("java.io.ObjectInputStream$HandleTable"));
+            if (handles != null) {
+                return MethodHandles
+                        .privateLookupIn(ObjectInputStream.class,
+                                MethodHandles.lookup())
+                        .findVirtual(handles.varType(), "lookupObject",
+                                MethodType.methodType(Object.class, int.class))
+                        .bindTo(handles.get(this));
+            }
+        } catch (Exception ex) {
+            getLogger().trace(
+                    "Cannot access ObjectOutputStream.handles.lookupObject method",
+                    ex);
+        }
+        return null;
     }
 
 }

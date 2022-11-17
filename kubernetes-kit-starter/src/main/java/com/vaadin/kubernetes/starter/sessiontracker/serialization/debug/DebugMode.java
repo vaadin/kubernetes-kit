@@ -63,7 +63,7 @@ public interface DebugMode {
      * @param track
      *            The tracking information for object to deserialize.
      */
-    default void onDeserialize(Class<?> type, Track track) {
+    default void onDeserialize(Class<?> type, Track track, Object object) {
         // NO-OP
     }
 
