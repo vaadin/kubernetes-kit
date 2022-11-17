@@ -77,7 +77,7 @@ class DebugTransientHandler implements TransientHandler, DebugMode {
 
     @Override
     public Object onDeserialized(Object object, Track track) {
-        job.popDeserialization(track);
+        job.popDeserialization(track, object);
         if (object instanceof Unserializable && track != null) {
             return resolveUnserializable(track.id);
         }

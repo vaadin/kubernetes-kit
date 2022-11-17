@@ -2,6 +2,7 @@ package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
 import java.io.ObjectStreamClass;
 import java.io.ObjectStreamField;
+import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
@@ -11,6 +12,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Stack;
 import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -25,6 +28,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
@@ -129,15 +133,15 @@ class Job {
                 && messages.containsKey(SerializedLambda.class.getName())) {
             String targetType = tryDetectClassCastTarget(ex.getMessage());
             if (targetType != null) {
-                String bestCandidates = messages
-                        .getOrDefault(SerializedLambda.class.getName(),
-                                Collections.emptyList())
-                        .stream()
-                        .filter(entry -> entry
-                                .contains("functionalInterfaceClass="
-                                        + targetType.replace('.', '/')))
-                        .map(lambda -> "\t" + lambda)
+                String bestCandidates = serializedLambdaMap.values().stream()
+                        .filter(serializedLambda -> serializedLambda
+                                .getFunctionalInterfaceClass()
+                                .equals(targetType.replace('.', '/')))
+                        .map(serializedLambda -> "\t" + serializedLambda
+                                + System.lineSeparator()
+                                + tracked.get(serializedLambda).stackInfo)
                         .collect(Collectors.joining(System.lineSeparator()));
+
                 if (!bestCandidates.isEmpty()) {
                     log(CATEGORY_ERRORS,
                             "SERIALIZED LAMBDA CLASS CAST EXCEPTION BEST CANDIDATES:"
@@ -146,20 +150,41 @@ class Job {
                                     + System.lineSeparator() + bestCandidates);
                 }
             }
-            log(CATEGORY_ERRORS, messages
-                    .getOrDefault(SerializedLambda.class.getName(),
-                            Collections.emptyList())
-                    .stream().map(lambda -> "\t" + lambda)
-                    .collect(Collectors.joining(System.lineSeparator(),
-                            "SERIALIZED LAMBDA CLASS CAST EXCEPTION ALL DETECTED TARGETS:"
-                                    + System.lineSeparator()
-                                    + "============================================================"
-                                    + System.lineSeparator(),
-                            "")));
         }
     }
 
+    private Logger getLogger() {
+        return LoggerFactory.getLogger(DebugMode.class);
+    }
+
+    private final Map<Integer, SerializedLambda> serializedLambdaMap = new HashMap<>();
+
     void pushDeserialization(Class<?> type, Track track, Object obj) {
+        if (obj instanceof SerializedLambda) {
+            // Detected a potential self reference class cast exception
+            // get serialized instance from tracked objects
+            // save it and then ensure it is deserialized correctly
+            int trackId = track.id;
+            Object serializedObject = tracked.values().stream()
+                    .filter(t -> t.id == trackId).findFirst().get().object;
+            // Following condition should always be true, otherwise it means the
+            // stream is somehow corrupted
+            if (serializedObject instanceof SerializedLambda) {
+                SerializedLambda cast = (SerializedLambda) serializedObject;
+                MethodHandleInfo
+                        .referenceKindToString(cast.getImplMethodKind());
+                serializedLambdaMap.put(trackId, cast);
+            } else {
+                getLogger().warn(
+                        "Expected tracked object {} to be instance of {}, but was {} ",
+                        trackId, SerializedLambda.class.getName(),
+                        (serializedObject == null) ? "NULL"
+                                : serializedObject.getClass());
+            }
+        } else if (type == SerializedLambda.class) {
+            // Reflection not enabled, add all potential candidates
+            getLogger().trace("Reflection not enabled, can't get SerializedLambda details");
+        }
         if (track != null && track.stackInfo == null) {
             int trackId = track.id;
             int trackDepth = track.depth;
@@ -177,19 +202,86 @@ class Job {
                 info = guessPotentialStack(type);
             }
             track = new Track(track.id, track.depth, info, null);
+
+            // Analyzing class for a new object: readNonProxyDesc
+            /*
+             * if (type != null && track.id == -1) { testStack.push(new
+             * ObjectStreamClassEntry( ObjectStreamClass.lookup(type),
+             * Track.unknown(track.depth, type))); }
+             */
         }
-        if (track != null) {
+        if (track != null && !(obj instanceof ObjectStreamClass)) {
             deserializationStack.push(track);
         }
-        if (type == ObjectStreamClass.class
-                && obj instanceof ObjectStreamClass) {
+        if (obj instanceof ObjectStreamClass) {
             ObjectStreamClass cast = (ObjectStreamClass) obj;
             LoggerFactory.getLogger(Job.class)
-                    .debug("Start serialization of {} with fields [{}]",
+                    .info("Start serialization of {} with fields [{}]",
                             cast.getName(),
                             Stream.of(cast.getFields())
                                     .map(ObjectStreamField::getName)
                                     .collect(Collectors.joining(",")));
+            testStack.push(new ObjectStreamClassEntry(cast, track));
+        }
+    }
+
+    private final Stack<ObjectStreamClassEntry> testStack = new Stack<>();
+
+    static class ObjectStreamClassEntry {
+        private final ObjectStreamClass desc;
+
+        private final Track track;
+        private List<ObjectStreamField> fields;
+
+        ObjectStreamClassEntry(ObjectStreamClass desc, Track track) {
+            this.desc = desc;
+            this.track = track;
+            this.fields = Stream.of(desc.getFields())
+                    .filter(f -> !f.isPrimitive())
+                    .collect(Collectors.toCollection(ArrayList::new));
+        }
+
+        // Visible for test
+        List<String> fields() {
+            return fields.stream().map(ObjectStreamField::getName)
+                    .collect(Collectors.toList());
+        }
+
+        boolean canPop(Track track) {
+            return track.depth < this.track.depth;
+            // return (this.track.id != -1 && track.id == this.track.id
+            // && track.depth == this.track.depth)
+            // || track.depth <= this.track.depth;
+        }
+
+        boolean canPopOld(Track track) {
+            if (track.depth > this.track.depth + 1) {
+                return false;
+            } else if (track.depth == this.track.depth + 1) {
+                Iterator<ObjectStreamField> iterator = fields.iterator();
+                while (iterator.hasNext()) {
+                    ObjectStreamField field = iterator.next();
+                    LoggerFactory.getLogger(ObjectStreamClassEntry.class).info(
+                            "Is tracked object {} of type {} value for field {}.{} of type {}?",
+                            track.id, track.className, field.getType(),
+                            field.getName(), desc.getName());
+                    try {
+                        if (field.getType().isAssignableFrom(
+                                Class.forName(track.className))) {
+                            LoggerFactory
+                                    .getLogger(ObjectStreamClassEntry.class)
+                                    .info("Educated guess is yes");
+                            iterator.remove();
+                            break;
+                        }
+                    } catch (ClassNotFoundException e) {
+                        LoggerFactory.getLogger(ObjectStreamClassEntry.class)
+                                .info("Holy Crap! {}", e.getMessage());
+                    }
+                }
+                return fields.isEmpty();
+            }
+            return true;
         }
     }
 
@@ -210,16 +302,41 @@ class Job {
         return info;
     }
 
-    void popDeserialization(Track track) {
-        lastDeserialized = track;
+    void popDeserialization(Track track, Object obj) {
+        if (track != null) {
+            if (serializedLambdaMap.containsKey(track.id)
+                    && !(obj instanceof SerializedLambda)) {
+                serializedLambdaMap.remove(track.id);
+            }
+            while (!testStack.isEmpty() && testStack.peek().canPop(track)) {
+                testStack.pop();
+            }
+            if (!testStack.isEmpty()) {
+                testStack.pop();
+            }
+            lastDeserialized = track;
 
-        if (deserializationStack.stream().anyMatch(t -> t.id == track.id)) {
             while (!deserializationStack.isEmpty()
-                    && deserializationStack.peek().id != track.id) {
+                    && (track.id == deserializationStack.peek().id
+                            || track.depth < deserializationStack
+                                    .peek().depth)) {
                 deserializationStack.pop();
             }
+            /*
+            if (deserializationStack.stream().anyMatch(t -> t.id == track.id)) {
+                while (!deserializationStack.isEmpty()
+                        && deserializationStack.peek().id != track.id) {
+                    deserializationStack.pop();
+                }
+            }
+             */
+        } else {
+            // Tracking disabled
+            getLogger().trace("Tracking disable :(");
         }
     }
+    // Check that SerializedLambda has been correctly replaced by an
+    // functional interface implementation instance
 
     Optional<String> dumpDeserializationStack() {
         if (!deserializationStack.isEmpty()) {
