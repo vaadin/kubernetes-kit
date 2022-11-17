@@ -244,7 +244,7 @@ public class SessionSerializer
                 }
             }
         } catch (NotSerializableException e) {
-            getLogger().trace(
+            getLogger().error(
                     "Optimistic serialization of session {} with distributed key {} failed,"
                             + " some attribute is not serializable. Giving up immediately since the error is not recoverable",
                     sessionId, clusterKey, e);
