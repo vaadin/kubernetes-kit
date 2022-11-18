@@ -1,10 +1,13 @@
 package com.vaadin.kubernetes.starter.ui;
 
+import java.util.Optional;
+
 import javax.servlet.http.Cookie;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
@@ -25,14 +28,9 @@ public class ClusterSupport implements VaadinServiceInitListener {
     public static final String ENV_APP_VERSION = "APP_VERSION";
 
     /**
-     * Current version cookie name.
-     */
-    public static final String CURRENT_VERSION_COOKIE = "app-version";
-
-    /**
      * Update version cookie name.
      */
-    public static final String UPDATE_VERSION_COOKIE = "app-update";
+    public static final String UPDATE_VERSION_HEADER = "X-AppUpdate";
 
     /**
      * Sticky cluster cookie name.
@@ -74,46 +72,42 @@ public class ClusterSupport implements VaadinServiceInitListener {
                 "ClusterSupport service initialized. Registering RequestHandler with Application Version: "
                         + appVersion);
 
+        // Set the thread local instance
+        CurrentInstance.set(ClusterSupport.class, this);
+
         // Register a generic request handler for all the requests
         serviceInitEvent.addRequestHandler(this::handleRequest);
     }
 
     private boolean handleRequest(VaadinSession vaadinSession,
             VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
-        // Set the thread local instance
-        CurrentInstance.set(ClusterSupport.class, this);
 
         vaadinSession.access(() -> {
-            // Always set the version cookie
-            Cookie currentVersionCookie = getCookieByName(
-                    CURRENT_VERSION_COOKIE);
-            if (currentVersionCookie == null
-                    || !currentVersionCookie.getValue().equals(appVersion)) {
-                currentVersionCookie = new Cookie(CURRENT_VERSION_COOKIE,
-                        appVersion);
-                currentVersionCookie.setHttpOnly(true);
-                vaadinResponse.addCookie(currentVersionCookie);
-            }
+            // Always check for the new version header
+            String headerVersion = vaadinRequest
+                    .getHeader(UPDATE_VERSION_HEADER);
 
-            // Always check for the new version cookie
-            Cookie updateVersionCookie = getCookieByName(UPDATE_VERSION_COOKIE);
-            if (updateVersionCookie != null
-                    && !updateVersionCookie.getValue().isEmpty()
-                    && !currentVersionCookie.getValue()
-                            .equals(updateVersionCookie.getValue())) {
-                vaadinSession.getUIs().forEach(ui -> {
-                    if (ui.getChildren().anyMatch(
-                            child -> (child instanceof VersionNotificator))) {
-                        return;
+            vaadinSession.getUIs().forEach(ui -> {
+                Optional<Component> first = ui.getChildren()
+                        .filter(c -> (c instanceof VersionNotificator))
+                        .findFirst();
+                if (first.isPresent()) {
+                    // Remove notificator in a version roll-back or
+                    // proxy is not setting the new version header
+                    if (headerVersion == null || headerVersion.isEmpty()
+                            || appVersion.equals(headerVersion)) {
+                        ui.remove(first.get());
                     }
+                } else if (headerVersion != null && !headerVersion.isEmpty()
+                        && !appVersion.equals(headerVersion)) {
+                    // Show notificator because versions do not match
                     VersionNotificator notificator = new VersionNotificator(
-                            appVersion, updateVersionCookie.getValue());
+                            appVersion, headerVersion);
                     notificator.addSwitchVersionEventListener(
                             this::onComponentEvent);
-                    // Show notificator
                     ui.add(notificator);
-                });
-            }
+                }
+            });
         });
 
         // If the current and the new versions do not match notify the user
@@ -132,29 +126,12 @@ public class ClusterSupport implements VaadinServiceInitListener {
             switchVersionListener.doAppCleanup();
         }
 
-        // When the user clicks on the notificator remove the cluster
-        // and session cookies
+        // When the user clicks on the notificator remove session cookies
         removeCookie(STICKY_CLUSTER_COOKIE);
-        removeCookie(CURRENT_VERSION_COOKIE);
-        removeCookie(UPDATE_VERSION_COOKIE);
 
         // Invalidate the session, Vaadin does not synchronizes it
         // between clusters
         VaadinRequest.getCurrent().getWrappedSession().invalidate();
-    }
-
-    private Cookie getCookieByName(String cookieName) {
-        VaadinRequest request = VaadinRequest.getCurrent();
-        if (cookieName == null || request == null
-                || request.getCookies() == null) {
-            return null;
-        }
-        for (Cookie cookie : request.getCookies()) {
-            if (cookieName.equals(cookie.getName())) {
-                return cookie;
-            }
-        }
-        return null;
     }
 
     private void removeCookie(String cookieName) {
