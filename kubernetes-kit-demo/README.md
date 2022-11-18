@@ -94,7 +94,7 @@ Optionally, if you run a local docker registry, add the *localhost:5001* registr
 ```
 4. Set the app-update cookie for the old version to show the version update notification:
 ```
-# kubectl apply -f deployment/ingress-v1-add-cookie.yaml
+# kubectl apply -f deployment/ingress-v1-add-header.yaml
 ```
 
 Test and verify if the new version is working properly.
