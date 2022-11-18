@@ -8,9 +8,9 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationD
 import elemental.json.Json;
 import elemental.json.JsonObject;
 
-@Tag("vaadin-session-debug-notificator")
-@JsModule("./components/session-debug-notificator.ts")
-public class SessionDebugNotificator extends Component {
+@Tag("vaadin-session-debug-notifier")
+@JsModule("./components/session-debug-notifier.ts")
+public class SessionDebugNotifier extends Component {
 
     public void publishResults(SerializationDebugRequestHandler.Result result) {
         // Add serialization result to show notifications on browser

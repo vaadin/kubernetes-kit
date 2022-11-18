@@ -6,7 +6,6 @@ import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicReference;
 
-import ch.qos.logback.core.net.server.ServerRunner;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
 import com.vaadin.flow.shared.ApplicationConstants;
 import com.vaadin.flow.shared.communication.PushMode;
-import com.vaadin.kubernetes.starter.ui.SessionDebugNotificator;
+import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
 
 import static com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler.SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -65,7 +64,7 @@ class SerializationDebugRequestHandlerTest {
         PushConfiguration pushConfiguration = mock(PushConfiguration.class);
         when(pushConfiguration.getPushMode()).thenReturn(PushMode.AUTOMATIC);
         UI ui = spy(new UI());
-        ui.add(new SessionDebugNotificator() {
+        ui.add(new SessionDebugNotifier() {
             @Override
             public void publishResults(
                     SerializationDebugRequestHandler.Result result) {
@@ -110,11 +109,6 @@ class SerializationDebugRequestHandlerTest {
         when(httpRequest.getSession(false)).thenReturn(httpSession);
         when(httpRequest.isRequestedSessionIdValid()).thenReturn(true);
         resultHolder = new AtomicReference<>();
-        /*
-         * doAnswer(i -> resultHolder.compareAndSet(null, i.getArgument(1)))
-         * .when(request).setAttribute(
-         * eq(SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY), any());
-         */
         response = mock(VaadinResponse.class);
 
     }

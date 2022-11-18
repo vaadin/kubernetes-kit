@@ -1,8 +1,8 @@
 import { css, html, LitElement, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-@customElement('vaadin-session-debug-notificator')
-export class SessionDebugNotificator extends LitElement {
+@customElement('vaadin-session-debug-notifier')
+export class SessionDebugNotifier extends LitElement {
 
     @property() outcome? : {
       success: boolean,

@@ -54,7 +54,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
-import com.vaadin.kubernetes.starter.ui.SessionDebugNotificator;
+import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
 
 /**
  * A {@link RequestHandler} implementation that performs a check on HTTP session
@@ -119,18 +119,17 @@ public class SerializationDebugRequestHandler extends HttpFilter
                     if (ui != null) {
                         boolean pushEnabled = ui.getPushConfiguration()
                                 .getPushMode().isEnabled();
-                        SessionDebugNotificator debugNotificator = ui
-                                .getChildren()
-                                .filter(SessionDebugNotificator.class::isInstance)
-                                .map(SessionDebugNotificator.class::cast)
-                                .findAny().orElseGet(() -> {
-                                    SessionDebugNotificator notificator = new SessionDebugNotificator();
-                                    ui.add(notificator);
-                                    return notificator;
+                        SessionDebugNotifier debugNotifier = ui.getChildren()
+                                .filter(SessionDebugNotifier.class::isInstance)
+                                .map(SessionDebugNotifier.class::cast).findAny()
+                                .orElseGet(() -> {
+                                    SessionDebugNotifier notifier = new SessionDebugNotifier();
+                                    ui.add(notifier);
+                                    return notifier;
                                 });
                         if (pushEnabled) {
                             onSuccess = ui.accessLater(
-                                    debugNotificator::publishResults, () -> {
+                                    debugNotifier::publishResults, () -> {
                                     });
                         }
                     }
