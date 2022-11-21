@@ -1,8 +1,14 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
+import javax.servlet.FilterChain;
 import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpFilter;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionContext;
+import java.io.IOException;
 import java.io.ObjectStreamClass;
 import java.io.Serializable;
 import java.lang.invoke.SerializedLambda;
@@ -31,27 +37,32 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
-import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
-import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
-import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.function.SerializableConsumer;
 import com.vaadin.flow.server.HandlerHelper;
 import com.vaadin.flow.server.RequestHandler;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;
+import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
 
 /**
  * A {@link RequestHandler} implementation that performs a check on HTTP session
  * serialization and deserialization.
  *
  * The request handler is executed only in development mode and it the
- * {@literal vaadin.devmode.sessionSerialization.enabled} configuration property is set
- * to {@literal true}.
+ * {@literal vaadin.devmode.sessionSerialization.enabled} configuration property
+ * is set to {@literal true}.
  *
  * Potential exceptions are caught and logged in the server console.
  *
@@ -73,7 +84,8 @@ import com.vaadin.flow.server.startup.ApplicationConfiguration;
  * {@literal -Dsun.io.serialization.extendedDebugInfo} system property to
  * {@literal true}.
  */
-public class SerializationDebugRequestHandler implements RequestHandler {
+public class SerializationDebugRequestHandler extends HttpFilter
+        implements RequestHandler {
 
     private static final Logger LOGGER = LoggerFactory
             .getLogger(SerializationDebugRequestHandler.class);
@@ -100,10 +112,32 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         if (HandlerHelper.isRequestType(vaadinRequest,
                 HandlerHelper.RequestType.UIDL)) {
             try {
-                serializeAndDeserialized(vaadinSession,
-                        result -> vaadinRequest.setAttribute(
-                                SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY,
-                                result));
+                VaadinService vaadinService = vaadinSession.getService();
+                vaadinSession.accessSynchronously(() -> {
+                    SerializableConsumer<Result> onSuccess = null;
+                    UI ui = vaadinService.findUI(vaadinRequest);
+                    if (ui != null) {
+                        boolean pushEnabled = ui.getPushConfiguration()
+                                .getPushMode().isEnabled();
+                        SessionDebugNotifier debugNotifier = ui.getChildren()
+                                .filter(SessionDebugNotifier.class::isInstance)
+                                .map(SessionDebugNotifier.class::cast).findAny()
+                                .orElseGet(() -> {
+                                    SessionDebugNotifier notifier = new SessionDebugNotifier();
+                                    ui.add(notifier);
+                                    return notifier;
+                                });
+                        if (pushEnabled) {
+                            onSuccess = ui.accessLater(
+                                    debugNotifier::publishResults, () -> {
+                                    });
+                        }
+                    }
+                    vaadinRequest.setAttribute(
+                            SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY,
+                            new Runner(onSuccess));
+                });
+
             } catch (Exception ex) {
                 LOGGER.debug("Error during serialization debug", ex);
             }
@@ -111,9 +145,55 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         return false;
     }
 
-    public static void serializeAndDeserialized(VaadinSession vaadinSession,
+    static class Runner implements Consumer<HttpServletRequest> {
+
+        private final Consumer<Result> onSuccess;
+
+        public Runner(Consumer<Result> onSuccess) {
+            this.onSuccess = onSuccess;
+        }
+
+        private void executeOnSuccess(Result result) {
+            if (onSuccess != null) {
+                try {
+                    onSuccess.accept(result);
+                } catch (Exception ex) {
+                    // Do not interrupt the request
+                    ex.printStackTrace();
+                }
+            }
+        }
+
+        public void accept(HttpServletRequest request) {
+            HttpSession session = request.getSession(false);
+            if (session != null && request.isRequestedSessionIdValid()) {
+                serializeAndDeserialized(new WrappedHttpSession(session),
+                        this::executeOnSuccess);
+            }
+        }
+    }
+
+    public static class Filter extends HttpFilter {
+
+        private static final Logger LOGGER = LoggerFactory
+                .getLogger(Filter.class);
+
+        @Override
+        protected void doFilter(HttpServletRequest req, HttpServletResponse res,
+                FilterChain chain) throws IOException, ServletException {
+            chain.doFilter(req, res);
+            Object action = req
+                    .getAttribute(SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY);
+            if (action instanceof Runner) {
+                LOGGER.debug(
+                        "Vaadin Request processed, Running Session Serialized Debug Tool");
+                ((Runner) action).accept(req);
+            }
+        }
+    }
+
+    public static void serializeAndDeserialized(WrappedSession session,
             Consumer<Result> onComplete) {
-        WrappedSession session = vaadinSession.getSession();
         // Work on a copy of the session to avoid overwriting attributes
         DebugHttpSession debugHttpSession = new DebugHttpSession(session);
         Job job = new Job(session.getId());
