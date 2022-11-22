@@ -62,9 +62,10 @@ public class SessionTrackerFilter extends HttpFilter {
             }
             super.doFilter(request, response, chain);
 
-            if (session != null && RequestType.UIDL.getIdentifier()
-                    .equals(request.getParameter(
-                            ApplicationConstants.REQUEST_TYPE_PARAMETER))) {
+            if (session != null && request.isRequestedSessionIdValid()
+                    && RequestType.UIDL.getIdentifier()
+                            .equals(request.getParameter(
+                                    ApplicationConstants.REQUEST_TYPE_PARAMETER))) {
                 sessionSerializer.serialize(session);
             }
         } finally {
