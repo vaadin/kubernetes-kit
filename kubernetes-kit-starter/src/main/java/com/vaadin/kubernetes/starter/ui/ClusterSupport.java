@@ -14,6 +14,7 @@ import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;
 import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.flow.server.WrappedSession;
 
 /**
  * Cluster support for Vaadin applications. This component allows receiving
@@ -28,7 +29,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
     public static final String ENV_APP_VERSION = "APP_VERSION";
 
     /**
-     * Update version cookie name.
+     * Update version header name.
      */
     public static final String UPDATE_VERSION_HEADER = "X-AppUpdate";
 
@@ -50,8 +51,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     /**
      * Register the global version switch listener. If set to <code>null</code>
-     * the current session and the cookies are removed without any version
-     * switch condition check.
+     * the current session and the sticky cluster cookie are removed without any
+     * version switch condition check.
      *
      * @param listener
      *            the listener to register.
@@ -83,28 +84,36 @@ public class ClusterSupport implements VaadinServiceInitListener {
             VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
 
         vaadinSession.access(() -> {
-            // Always check for the new version header
-            String headerVersion = vaadinRequest
+            // Always check for the update version header
+            String versionHeader = vaadinRequest
                     .getHeader(UPDATE_VERSION_HEADER);
 
             vaadinSession.getUIs().forEach(ui -> {
-                Optional<Component> first = ui.getChildren()
-                        .filter(c -> (c instanceof VersionNotificator))
+                WrappedSession session = VaadinRequest.getCurrent()
+                        .getWrappedSession();
+                Optional<Component> versionNotificator = ui.getChildren()
+                        .filter(child -> (child instanceof VersionNotificator))
                         .findFirst();
-                if (first.isPresent()) {
-                    // Remove notificator in a version roll-back or
-                    // proxy is not setting the new version header
-                    if (headerVersion == null || headerVersion.isEmpty()
-                            || appVersion.equals(headerVersion)) {
-                        ui.remove(first.get());
+                if (versionNotificator.isPresent()) {
+                    // Remove the notificator in case of version roll-back or
+                    // when the proxy is not setting the update version header
+                    if (versionHeader == null || versionHeader.isEmpty()
+                            || appVersion.equals(versionHeader)) {
+                        getLogger().info("Removing notificator: updateVersion="
+                                + versionHeader + ", appVersion=" + appVersion
+                                + ", session=" + session.getId());
+                        ui.remove(versionNotificator.get());
                     }
-                } else if (headerVersion != null && !headerVersion.isEmpty()
-                        && !appVersion.equals(headerVersion)) {
+                } else if (versionHeader != null && !versionHeader.isEmpty()
+                        && !appVersion.equals(versionHeader)) {
                     // Show notificator because versions do not match
                     VersionNotificator notificator = new VersionNotificator(
-                            appVersion, headerVersion);
+                            appVersion, versionHeader);
                     notificator.addSwitchVersionEventListener(
                             this::onComponentEvent);
+                    getLogger().info("Notifying version update: updateVersion="
+                            + versionHeader + ", appVersion=" + appVersion
+                            + ", session=" + session.getId());
                     ui.add(notificator);
                 }
             });
@@ -126,17 +135,17 @@ public class ClusterSupport implements VaadinServiceInitListener {
             switchVersionListener.doAppCleanup();
         }
 
-        // When the user clicks on the notificator remove session cookies
-        removeCookie(STICKY_CLUSTER_COOKIE);
-
-        // Invalidate the session, Vaadin does not synchronizes it
-        // between clusters
-        VaadinRequest.getCurrent().getWrappedSession().invalidate();
+        // When the user clicks on the notificator remove the sticky cluster
+        // cookie and invalidate the session
+        removeStickyClusterCookie();
+        WrappedSession session = VaadinRequest.getCurrent().getWrappedSession();
+        getLogger().debug("Invalidating session " + session.getId());
+        session.invalidate();
     }
 
-    private void removeCookie(String cookieName) {
-        getLogger().debug("Removing cookie '{}'.", cookieName);
-        Cookie cookie = new Cookie(cookieName, "");
+    private void removeStickyClusterCookie() {
+        getLogger().debug("Removing cookie '{}'.", STICKY_CLUSTER_COOKIE);
+        Cookie cookie = new Cookie(STICKY_CLUSTER_COOKIE, "");
         cookie.setMaxAge(0);
         VaadinResponse.getCurrent().addCookie(cookie);
     }

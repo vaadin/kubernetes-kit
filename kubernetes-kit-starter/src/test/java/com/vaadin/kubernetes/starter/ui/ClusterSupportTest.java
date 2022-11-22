@@ -1,6 +1,5 @@
 package com.vaadin.kubernetes.starter.ui;
 
-import javax.servlet.http.Cookie;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.stream.Stream;
@@ -24,6 +23,7 @@ import uk.org.webcompere.systemstubs.jupiter.SystemStubsExtension;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.Command;
 import com.vaadin.flow.server.RequestHandler;
 import com.vaadin.flow.server.ServiceInitEvent;
@@ -41,10 +41,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith({MockitoExtension.class, SystemStubsExtension.class})
+@ExtendWith({ MockitoExtension.class, SystemStubsExtension.class })
 public class ClusterSupportTest {
 
     private ClusterSupport clusterSupport;
+    private MockedStatic<CurrentInstance> currentInstanceMockedStatic;
     private MockedStatic<VaadinRequest> vaadinRequestMockedStatic;
     private MockedStatic<VaadinResponse> vaadinResponseMockedStatic;
 
@@ -70,6 +71,7 @@ public class ClusterSupportTest {
     @BeforeEach
     void setUp() {
         clusterSupport = new ClusterSupport();
+        currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
         environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
@@ -77,8 +79,19 @@ public class ClusterSupportTest {
 
     @AfterEach
     void tearDown() {
+        currentInstanceMockedStatic.close();
         vaadinRequestMockedStatic.close();
         vaadinResponseMockedStatic.close();
+    }
+
+    @Test
+    void serviceInit_clusterSupportIsSetInCurrentInstance() {
+        ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
+
+        clusterSupport.serviceInit(serviceInitEvent);
+
+        currentInstanceMockedStatic
+                .verify(() -> CurrentInstance.set(any(), any()));
     }
 
     @Test
@@ -101,78 +114,122 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void handleRequest_addsCurrentVersionCookie_ifNotPresent()
+    void handleRequest_versionNotificatorIsRemoved_ifAlreadyPresent_And_VersionHeaderIsNull()
             throws IOException {
-        Cookie[] cookies = {};
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        verify(serviceInitEvent)
-                .addRequestHandler(requestHandlerArgCaptor.capture());
-        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
-                vaadinRequest, vaadinResponse);
-        verify(vaadinSession).access(commandArgCaptor.capture());
-        commandArgCaptor.getValue().execute();
-        verify(vaadinResponse).addCookie(any());
-    }
-
-    @Test
-    void handleRequest_addsCurrentVersionCookie_ifAppVersionIsDifferent()
-            throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.CURRENT_VERSION_COOKIE, "1.1.0") };
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        verify(serviceInitEvent)
-                .addRequestHandler(requestHandlerArgCaptor.capture());
-        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
-                vaadinRequest, vaadinResponse);
-        verify(vaadinSession).access(commandArgCaptor.capture());
-        commandArgCaptor.getValue().execute();
-        verify(vaadinResponse).addCookie(any());
-    }
-
-    @Test
-    void handleRequest_currentVersionCookieNotAdded_ifAppVersionIsSame()
-            throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.CURRENT_VERSION_COOKIE, "1.0.0") };
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        verify(serviceInitEvent)
-                .addRequestHandler(requestHandlerArgCaptor.capture());
-        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
-                vaadinRequest, vaadinResponse);
-        verify(vaadinSession).access(commandArgCaptor.capture());
-        commandArgCaptor.getValue().execute();
-        verify(vaadinResponse, never()).addCookie(any());
-    }
-
-    @Test
-    void handleRequest_versionNotificatorAdded_ifUpdateVersionCookieIsPresent()
-            throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
+        WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
+        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn(null);
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+
+        clusterSupport.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        verify(vaadinSession).access(commandArgCaptor.capture());
+        commandArgCaptor.getValue().execute();
+        verify(ui).remove((Component) any());
+    }
+
+    @Test
+    void handleRequest_versionNotificatorIsRemoved_ifAlreadyPresent_And_VersionHeaderIsEmpty()
+            throws IOException {
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn("");
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+
+        clusterSupport.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        verify(vaadinSession).access(commandArgCaptor.capture());
+        commandArgCaptor.getValue().execute();
+        verify(ui).remove((Component) any());
+    }
+
+    @Test
+    void handleRequest_versionNotificatorIsRemoved_ifAlreadyPresent_And_VersionHeaderEqualsAppVersion()
+            throws IOException {
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn("1.0.0");
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+
+        clusterSupport.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        verify(vaadinSession).access(commandArgCaptor.capture());
+        commandArgCaptor.getValue().execute();
+        verify(ui).remove((Component) any());
+    }
+
+    @Test
+    void handleRequest_versionNotificatorIsNotRemoved_ifAlreadyPresent_And_VersionHeaderNotEqualsAppVersion()
+            throws IOException {
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn("2.0.0");
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+
+        clusterSupport.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        verify(vaadinSession).access(commandArgCaptor.capture());
+        commandArgCaptor.getValue().execute();
+        verify(ui, never()).remove((Component) any());
+    }
+
+    @Test
+    void handleRequest_versionNotificatorIsAdded_ifNotPresent_And_VersionHeaderEqualsAppVersion()
+            throws IOException {
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn("2.0.0");
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.empty());
 
         clusterSupport.serviceInit(serviceInitEvent);
 
@@ -185,74 +242,28 @@ public class ClusterSupportTest {
         verify(ui).add((Component) any());
     }
 
-    @Test
-    void handleRequest_versionNotificatorNotAdded_ifUpdateVersionCookieEqualsCurrentVersionCookie()
-            throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.CURRENT_VERSION_COOKIE, "1.0.0"),
-                new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "1.0.0") };
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
-        UI ui = mock(UI.class);
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        verify(serviceInitEvent)
-                .addRequestHandler(requestHandlerArgCaptor.capture());
-        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
-                vaadinRequest, vaadinResponse);
-        verify(vaadinSession).access(commandArgCaptor.capture());
-        commandArgCaptor.getValue().execute();
-        verify(ui, never()).add((Component) any());
-    }
-
-    @Test
-    void handleRequest_versionNotificatorNotAdded_ifAlreadyPresent()
-            throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
-                .thenReturn(vaadinRequest);
-        UI ui = mock(UI.class);
-        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
-        when(ui.getChildren()).thenReturn(
-                Stream.of(new VersionNotificator("1.0.0", "2.0.0")));
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        verify(serviceInitEvent)
-                .addRequestHandler(requestHandlerArgCaptor.capture());
-        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
-                vaadinRequest, vaadinResponse);
-        verify(vaadinSession).access(commandArgCaptor.capture());
-        commandArgCaptor.getValue().execute();
-        verify(ui, never()).add((Component) any());
-    }
-
     @ParameterizedTest(name = "{index} And_IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
-    @CsvSource({ "true, 1, 4, 1", "false, 0, 1, 0" })
-    void onComponentEvent_removesCookiesAndInvalidatesSession(boolean nodeSwitch,
-            int doAppCleanupTimes, int addCookieTimes, int invalidateTimes) throws IOException {
-        Cookie[] cookies = {
-                new Cookie(ClusterSupport.UPDATE_VERSION_COOKIE, "2.0.0") };
-        WrappedSession wrappedHttpSession = mock(WrappedSession.class);
+    @CsvSource({ "true, 1, 1, 2, 1", "false, 0, 0, 1, 0" })
+    void onComponentEvent_removesStickyClusterCookieAndInvalidatesSession(
+            boolean nodeSwitch, int doAppCleanupTimes, int addCookieTimes,
+            int getWrappedSessionTimes, int invalidateTimes)
+            throws IOException {
+        WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
         VersionNotificator.SwitchVersionEvent switchVersionEvent = mock(
                 VersionNotificator.SwitchVersionEvent.class);
         SwitchVersionListener switchVersionListener = mock(
                 SwitchVersionListener.class);
 
-        when(vaadinRequest.getCookies()).thenReturn(cookies);
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedHttpSession);
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn("2.0.0");
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
                 .thenReturn(vaadinResponse);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.empty());
         when(switchVersionListener.nodeSwitch(any(), any()))
                 .thenReturn(nodeSwitch);
 
@@ -275,7 +286,9 @@ public class ClusterSupportTest {
         }
         verify(switchVersionListener, times(doAppCleanupTimes)).doAppCleanup();
         verify(vaadinResponse, times(addCookieTimes)).addCookie(any());
-        verify(vaadinRequest, times(invalidateTimes)).getWrappedSession();
-        verify(vaadinRequest.getWrappedSession(), times(invalidateTimes)).invalidate();
+        verify(vaadinRequest, times(getWrappedSessionTimes))
+                .getWrappedSession();
+        verify(vaadinRequest.getWrappedSession(), times(invalidateTimes))
+                .invalidate();
     }
 }
