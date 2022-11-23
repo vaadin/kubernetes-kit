@@ -92,14 +92,14 @@ Optionally, if you run a local docker registry, add the *localhost:5001* registr
 ```
 # kubectl apply -f deployment/ingress-v2-use-canary.yaml
 ```
-4. Set the app-update cookie for the old version to show the version update notification:
+4. Set the X-AppUpdate header for the old version to show the version update notification:
 ```
-# kubectl apply -f deployment/ingress-v1-add-cookie.yaml
+# kubectl apply -f deployment/ingress-v1-add-header.yaml
 ```
 
 Test and verify if the new version is working properly.
 
-5. Make the new version as a default and remove the app-update cookie:
+5. Make the new version as a default:
 ```
 # kubectl apply -f deployment/ingress-v2.yaml
 ```

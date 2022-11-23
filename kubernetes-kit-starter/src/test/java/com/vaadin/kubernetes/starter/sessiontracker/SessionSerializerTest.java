@@ -58,8 +58,6 @@ class SessionSerializerTest {
 
     @BeforeEach
     void setUp() {
-
-        System.setProperty("sun.io.serialization.extendedDebugInfo", "true");
         connector = mock(BackendConnector.class);
         serializer = new SessionSerializer(connector,
                 mock(TransientHandler.class),
