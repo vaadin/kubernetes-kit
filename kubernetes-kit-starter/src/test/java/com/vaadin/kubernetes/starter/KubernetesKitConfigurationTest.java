@@ -1,9 +1,15 @@
 package com.vaadin.kubernetes.starter;
 
+import java.io.IOException;
+import java.util.Properties;
+
 import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.support.PropertiesLoaderUtils;
 
+import static org.hamcrest.CoreMatchers.startsWith;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,6 +17,16 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class KubernetesKitConfigurationTest {
+
+    static final String PROPERTIES_RESOURCE = "kubernetes-kit.properties";
+
+    @Test
+    public void correctVersionPassedToLicenseChecker() {
+        final var version = getProperties().getProperty("version");
+
+        assertThat(version,
+                startsWith(KubernetesKitConfiguration.PRODUCT_VERSION));
+    }
 
     @Test
     public void hazelcastInstance_serviceNameSet_kubernetesConfigured() {
@@ -47,6 +63,14 @@ class KubernetesKitConfigurationTest {
             final var mockHazelcastInstance = mock(HazelcastInstance.class);
             when(mockHazelcastInstance.getConfig()).thenReturn(config);
             return mockHazelcastInstance;
+        }
+    }
+
+    private Properties getProperties() {
+        try {
+            return PropertiesLoaderUtils.loadAllProperties(PROPERTIES_RESOURCE);
+        } catch (IOException e) {
+            throw new ExceptionInInitializerError(e);
         }
     }
 }
