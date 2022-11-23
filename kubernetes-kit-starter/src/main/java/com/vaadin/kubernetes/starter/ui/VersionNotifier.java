@@ -11,15 +11,15 @@ import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.dependency.JsModule;
 
 /**
- * The version notificator component is used when there is a new version and the
+ * The version notifier component is used when there is a new version and the
  * update version cookie is set.
  */
-@Tag("version-notificator")
-@JsModule("./components/version-notificator.ts")
-public class VersionNotificator extends Component {
+@Tag("version-notifier")
+@JsModule("./components/version-notifier.ts")
+public class VersionNotifier extends Component {
     private static final long serialVersionUID = 1L;
 
-    VersionNotificator(String current, String update) {
+    VersionNotifier(String current, String update) {
         getElement().setProperty("currentVersion", current);
         getElement().setProperty("updateVersion", update);
     }
@@ -38,20 +38,19 @@ public class VersionNotificator extends Component {
 
     /**
      * Event which is dispatched when the user accepts the version change
-     * through the notificator.
+     * through the notifier.
      */
     @DomEvent("load-version")
     public static class SwitchVersionEvent
-            extends ComponentEvent<VersionNotificator> {
+            extends ComponentEvent<VersionNotifier> {
         private static final long serialVersionUID = 1L;
 
-        public SwitchVersionEvent(VersionNotificator source,
-                boolean fromClient) {
+        public SwitchVersionEvent(VersionNotifier source, boolean fromClient) {
             super(source, fromClient);
         }
     }
 
     private static Logger getLogger() {
-        return LoggerFactory.getLogger(VersionNotificator.class);
+        return LoggerFactory.getLogger(VersionNotifier.class);
     }
 }

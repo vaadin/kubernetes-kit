@@ -63,7 +63,7 @@ public class ClusterSupportTest {
     @Captor
     private ArgumentCaptor<Command> commandArgCaptor;
     @Captor
-    private ArgumentCaptor<ComponentEventListener<VersionNotificator.SwitchVersionEvent>> componentEventListenerArgCaptor;
+    private ArgumentCaptor<ComponentEventListener<VersionNotifier.SwitchVersionEvent>> componentEventListenerArgCaptor;
 
     @SystemStub
     private EnvironmentVariables environmentVariables;
@@ -114,11 +114,11 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void handleRequest_versionNotificatorIsRemoved_ifAlreadyPresent_And_VersionHeaderIsNull()
+    void handleRequest_versionNotifierIsRemoved_ifAlreadyPresent_And_VersionHeaderIsNull()
             throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
-        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+        VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn(null);
@@ -126,7 +126,7 @@ public class ClusterSupportTest {
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
-        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
         clusterSupport.serviceInit(serviceInitEvent);
 
@@ -140,11 +140,11 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void handleRequest_versionNotificatorIsRemoved_ifAlreadyPresent_And_VersionHeaderIsEmpty()
+    void handleRequest_versionNotifierIsRemoved_ifAlreadyPresent_And_VersionHeaderIsEmpty()
             throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
-        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+        VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("");
@@ -152,7 +152,7 @@ public class ClusterSupportTest {
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
-        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
         clusterSupport.serviceInit(serviceInitEvent);
 
@@ -166,11 +166,11 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void handleRequest_versionNotificatorIsRemoved_ifAlreadyPresent_And_VersionHeaderEqualsAppVersion()
+    void handleRequest_versionNotifierIsRemoved_ifAlreadyPresent_And_VersionHeaderEqualsAppVersion()
             throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
-        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+        VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("1.0.0");
@@ -178,7 +178,7 @@ public class ClusterSupportTest {
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
-        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
         clusterSupport.serviceInit(serviceInitEvent);
 
@@ -192,11 +192,11 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void handleRequest_versionNotificatorIsNotRemoved_ifAlreadyPresent_And_VersionHeaderNotEqualsAppVersion()
+    void handleRequest_versionNotifierIsNotRemoved_ifAlreadyPresent_And_VersionHeaderNotEqualsAppVersion()
             throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
-        VersionNotificator versionNotificator = mock(VersionNotificator.class);
+        VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("2.0.0");
@@ -204,7 +204,7 @@ public class ClusterSupportTest {
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
-        when(ui.getChildren()).thenReturn(Stream.of(versionNotificator));
+        when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
         clusterSupport.serviceInit(serviceInitEvent);
 
@@ -218,7 +218,7 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void handleRequest_versionNotificatorIsAdded_ifNotPresent_And_VersionHeaderEqualsAppVersion()
+    void handleRequest_versionNotifierIsAdded_ifNotPresent_And_VersionHeaderEqualsAppVersion()
             throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
@@ -250,8 +250,8 @@ public class ClusterSupportTest {
             throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
-        VersionNotificator.SwitchVersionEvent switchVersionEvent = mock(
-                VersionNotificator.SwitchVersionEvent.class);
+        VersionNotifier.SwitchVersionEvent switchVersionEvent = mock(
+                VersionNotifier.SwitchVersionEvent.class);
         SwitchVersionListener switchVersionListener = mock(
                 SwitchVersionListener.class);
 
@@ -274,11 +274,11 @@ public class ClusterSupportTest {
                 .addRequestHandler(requestHandlerArgCaptor.capture());
         requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
                 vaadinRequest, vaadinResponse);
-        try (MockedConstruction<VersionNotificator> mockedVersionNotificator = mockConstruction(
-                VersionNotificator.class)) {
+        try (MockedConstruction<VersionNotifier> mockedVersionNotifier = mockConstruction(
+                VersionNotifier.class)) {
             verify(vaadinSession).access(commandArgCaptor.capture());
             commandArgCaptor.getValue().execute();
-            verify(mockedVersionNotificator.constructed().get(0))
+            verify(mockedVersionNotifier.constructed().get(0))
                     .addSwitchVersionEventListener(
                             componentEventListenerArgCaptor.capture());
             componentEventListenerArgCaptor.getValue()
