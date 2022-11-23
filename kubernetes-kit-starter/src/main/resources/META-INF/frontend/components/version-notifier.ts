@@ -1,7 +1,8 @@
-import { css, html, LitElement, customElement } from 'lit-element';
+import { css, html, LitElement } from 'lit';
+import { customElement } from 'lit/decorators.js';
 
-@customElement('version-notificator')
-export class VersionNotificator extends LitElement {
+@customElement('version-notifier')
+export class VersionNotifier extends LitElement {
 
     currentVersion?: string;
     updateVersion?: string;
