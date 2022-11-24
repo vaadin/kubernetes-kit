@@ -17,9 +17,36 @@ public class KubernetesKitProperties {
     public static final String PREFIX = "vaadin.kubernetes";
 
     /**
+     * Enables (or disables) auto-configuration.
+     */
+    private boolean autoConfigure = true;
+
+    /**
      * Hazelcast configuration properties.
      */
     private HazelcastProperties hazelcast = new HazelcastProperties();
+
+    /**
+     * Checks if auto-configuration of {@link KubernetesKitConfiguration} is
+     * enabled.
+     *
+     * @return true, if auto-configuration is enabled
+     */
+    public boolean isAutoConfigure() {
+        return autoConfigure;
+    }
+
+    /**
+     * Enables or disables auto-configuration of
+     * {@link KubernetesKitConfiguration}.
+     *
+     * @param autoConfigure
+     *            {@code true} to enable auto-configuration, {@code false} to
+     *            disable
+     */
+    public void setAutoConfigure(boolean autoConfigure) {
+        this.autoConfigure = autoConfigure;
+    }
 
     /**
      * Gets Hazelcast configuration properties.
