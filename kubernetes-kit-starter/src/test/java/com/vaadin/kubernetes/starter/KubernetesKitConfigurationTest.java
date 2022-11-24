@@ -8,12 +8,15 @@ import com.hazelcast.core.HazelcastInstance;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
 
+import com.vaadin.pro.licensechecker.LicenseChecker;
+
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 class KubernetesKitConfigurationTest {
@@ -26,6 +29,19 @@ class KubernetesKitConfigurationTest {
 
         assertThat(version,
                 startsWith(KubernetesKitConfiguration.PRODUCT_VERSION));
+    }
+
+    @Test
+    public void licenseChecker_licenseIsCheckedFromStaticBlock() {
+        final var mockController = mockStatic(LicenseChecker.class);
+
+        new KubernetesKitConfiguration();
+
+        mockController.verify(() -> LicenseChecker.checkLicenseFromStaticBlock(
+                KubernetesKitConfiguration.PRODUCT_NAME,
+                KubernetesKitConfiguration.PRODUCT_VERSION, null));
+
+        mockController.close();
     }
 
     @Test
