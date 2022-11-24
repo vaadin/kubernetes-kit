@@ -36,7 +36,6 @@ import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
-import com.vaadin.pro.licensechecker.BuildType;
 import com.vaadin.pro.licensechecker.LicenseChecker;
 
 /**
@@ -55,7 +54,7 @@ public class KubernetesKitConfiguration {
 
     static {
         LicenseChecker.checkLicenseFromStaticBlock(PRODUCT_NAME,
-                PRODUCT_VERSION, BuildType.PRODUCTION);
+                PRODUCT_VERSION, null);
     }
 
     @AutoConfiguration
