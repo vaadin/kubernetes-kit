@@ -27,7 +27,7 @@ public class KubernetesKitProperties {
     private HazelcastProperties hazelcast = new HazelcastProperties();
 
     /**
-     * Checks is auto-configuration of {@link KubernetesKitConfiguration} is
+     * Checks if auto-configuration of {@link KubernetesKitConfiguration} is
      * enabled.
      *
      * @return true, if auto-configuration is enabled
