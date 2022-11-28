@@ -31,6 +31,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -265,6 +266,34 @@ class SessionSerializerTest {
         verify(connector).sendSession(isNull());
         locks.forEach(l -> verify(l, never()).lock());
 
+    }
+
+    @Test
+    void deserialize_sessionAttributesAreSet() {
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true))
+                .when(connector)
+                .markSerializationComplete(clusterSID);
+
+        List<SessionInfo> infoList = new ArrayList<>();
+        doAnswer(i -> infoList.add(i.getArgument(0))).when(connector)
+                .sendSession(any());
+
+        vaadinSession.setLockTimestamps(10, 20);
+
+        serializer.serialize(httpSession);
+
+        await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+
+        HttpSession deserializedSession = mock(HttpSession.class);
+        try {
+            serializer.deserialize(infoList.get(0), deserializedSession);
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        verify(deserializedSession, times(3)).setAttribute(any(), any());
     }
 
     private static ConditionFactory await() {
