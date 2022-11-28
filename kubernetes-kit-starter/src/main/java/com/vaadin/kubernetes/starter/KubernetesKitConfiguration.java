@@ -2,6 +2,7 @@ package com.vaadin.kubernetes.starter;
 
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
+
 import java.util.function.Predicate;
 
 import com.hazelcast.config.Config;
@@ -35,15 +36,26 @@ import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationDebugRequestHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
+import com.vaadin.pro.licensechecker.LicenseChecker;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
  */
+@ConditionalOnProperty(name = "auto-configure", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
 @AutoConfiguration(afterName = "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration")
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
+
+    static final String PRODUCT_NAME = "vaadin-kubernetes-kit";
+
+    static final String PRODUCT_VERSION = "1.0";
+
+    static {
+        LicenseChecker.checkLicenseFromStaticBlock(PRODUCT_NAME,
+                PRODUCT_VERSION, null);
+    }
 
     @AutoConfiguration
     @ConditionalOnBean(BackendConnector.class)
