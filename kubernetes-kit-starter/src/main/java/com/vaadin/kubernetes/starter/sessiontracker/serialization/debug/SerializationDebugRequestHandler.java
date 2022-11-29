@@ -157,7 +157,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         public void accept(HttpServletRequest request) {
             HttpSession session = request.getSession(false);
             if (session != null && request.isRequestedSessionIdValid()) {
-                serializeAndDeserialized(new WrappedHttpSession(session),
+                serializeAndDeserialize(new WrappedHttpSession(session),
                         this::executeOnSuccess);
             }
         }
@@ -182,8 +182,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         }
     }
 
-    public static void serializeAndDeserialized(WrappedSession session,
-            Consumer<Result> onComplete) {
+    public static void serializeAndDeserialize(WrappedSession session,
+                                               Consumer<Result> onComplete) {
         // Work on a copy of the session to avoid overwriting attributes
         DebugHttpSession debugHttpSession = new DebugHttpSession(session);
         Job job = new Job(session.getId());
