@@ -416,8 +416,8 @@ public class SessionSerializer
             Map<String, Object> attributes) throws Exception {
         long start = System.currentTimeMillis();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (TransientInjectableObjectOutputStream outStream = new TransientInjectableObjectOutputStream(
-                out, handler, injectableFilter)) {
+        try (TransientInjectableObjectOutputStream outStream = TransientInjectableObjectOutputStream
+                .newInstance(out, handler, injectableFilter)) {
             outStream.writeWithTransients(attributes);
         }
 
