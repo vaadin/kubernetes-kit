@@ -154,6 +154,9 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
     @SuppressWarnings("unchecked")
     public <T> T readWithTransients()
             throws IOException, ClassNotFoundException {
+        if (injector instanceof DebugMode) {
+            ((DebugMode) injector).onDeserializationStart();
+        }
         Object out = readObject();
         // Read TransientAwareHolder to inject transient fields
         List<TransientAwareHolder> holders = (List<TransientAwareHolder>) readObject();
