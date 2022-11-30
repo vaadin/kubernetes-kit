@@ -33,6 +33,11 @@ class DebugTransientHandler implements TransientHandler, DebugMode {
     }
 
     @Override
+    public void onSerializationStart() {
+        job.reset();
+    }
+
+    @Override
     public void inject(Object object, List<TransientDescriptor> transients) {
         // NO-OP
     }

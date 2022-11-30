@@ -170,6 +170,9 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     public void writeWithTransients(Object object) throws IOException {
         inspected.clear();
         tracking.clear();
+        if (inspector instanceof DebugMode) {
+            ((DebugMode)inspector).onSerializationStart();
+        }
         try {
             reset();
             // marks if the stream will contain tracking data

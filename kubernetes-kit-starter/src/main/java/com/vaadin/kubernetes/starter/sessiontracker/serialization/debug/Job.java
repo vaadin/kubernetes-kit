@@ -46,7 +46,7 @@ class Job {
             "class java.lang.invoke.SerializedLambda cannot be cast to class ([^ ]+)( |$)");
 
     private final String sessionId;
-    private final long startTimeNanos;
+    private long startTimeNanos;
     private final Set<Outcome> outcome = new LinkedHashSet<>();
     private final Map<String, List<String>> messages = new LinkedHashMap<>();
     private String storageKey;
@@ -62,9 +62,20 @@ class Job {
         this.startTimeNanos = System.nanoTime();
     }
 
-    public void serializationStarted() {
-        // No-Op
+    void reset() {
+        startTimeNanos = System.nanoTime();
+        storageKey = null;
+        outcome.clear();
+        messages.clear();
+        tracked.clear();
+        deserializingStack.clear();
+        unserializableDetails.clear();
+        serializedLambdaMap.clear();
         outcome.add(Outcome.SERIALIZATION_FAILED);
+    }
+
+    public void serializationStarted() {
+        reset();
     }
 
     void notSerializable(Object obj) {
