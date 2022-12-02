@@ -10,6 +10,10 @@
 
     <artifactId>kubernetes-kit-starter</artifactId>
 
+    <properties>
+        <cvdl.name>vaadin-kubernetes-kit</cvdl.name>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>jakarta.servlet</groupId>
@@ -83,13 +87,28 @@
     </dependencies>
 
     <build>
-        <testResources>
-            <testResource>
-                <directory>src/test/resources</directory>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
                 <filtering>true</filtering>
-            </testResource>
-        </testResources>
+            </resource>
+        </resources>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven.jar.version}</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                        <manifestEntries>
+                            <CvdlName>${cvdl.name}</CvdlName>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>

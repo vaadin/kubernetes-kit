@@ -17,16 +17,17 @@ import java.util.function.Predicate;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-import org.apache.commons.logging.LogFactory;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.AllNestedConditions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationContext;
@@ -39,6 +40,7 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.util.StringUtils;
 
+import com.vaadin.flow.spring.SpringBootAutoConfiguration;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionListener;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter;
@@ -47,30 +49,21 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
-import com.vaadin.pro.licensechecker.LicenseChecker;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 
 /**
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
  */
 @ConditionalOnProperty(name = "auto-configure", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
-@AutoConfiguration(afterName = "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration")
+@AutoConfigureAfter({ SpringBootAutoConfiguration.class,
+        RedisAutoConfiguration.class })
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
-
-    static final String PRODUCT_NAME = "vaadin-kubernetes-kit";
-
-    static final String PRODUCT_VERSION = "1.0";
-
-    static {
-        LicenseChecker.checkLicenseFromStaticBlock(PRODUCT_NAME,
-                PRODUCT_VERSION, null);
-    }
 
     @AutoConfiguration
     @ConditionalOnBean(BackendConnector.class)

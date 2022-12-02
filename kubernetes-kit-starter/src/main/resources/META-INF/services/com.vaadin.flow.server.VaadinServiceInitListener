@@ -1,1 +1,2 @@
+com.vaadin.kubernetes.starter.LicenseCheckerServiceInitListener
 com.vaadin.kubernetes.starter.ui.ClusterSupport
