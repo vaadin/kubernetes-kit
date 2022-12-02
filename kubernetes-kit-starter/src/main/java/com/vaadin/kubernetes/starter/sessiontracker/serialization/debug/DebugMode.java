@@ -22,6 +22,14 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
  * serialization process.
  */
 public interface DebugMode {
+
+    /**
+     * Hook invoked when serialization process is about to start.
+     */
+    default void onSerializationStart() {
+        // NO-OP
+    }
+
     /**
      * Hook invoked when a not {@link Serializable} object is found during
      * serialization process.
@@ -63,8 +71,14 @@ public interface DebugMode {
      *            object that is going to be serialized.
      */
     default Object onSerialize(Object object, Track track) {
-        // NO-OP
         return object;
+    }
+
+    /**
+     * Hook invoked when deserialization process is about to start.
+     */
+    default void onDeserializationStart() {
+        // NO-OP
     }
 
     /**
