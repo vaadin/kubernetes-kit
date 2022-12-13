@@ -20,9 +20,21 @@
     </licenses>
 
     <modules>
-        <module>kubernetes-kit-demo</module>
         <module>kubernetes-kit-starter</module>
     </modules>
+    <profiles>
+        <profile>
+            <id>demo</id>
+            <activation>
+                <property>
+                    <name>!release</name>
+                </property>
+            </activation>
+            <modules>
+                <module>kubernetes-kit-demo</module>
+            </modules>
+        </profile>
+    </profiles>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
