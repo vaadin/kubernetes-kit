@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import com.vaadin.flow.internal.UsageStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
@@ -98,6 +99,10 @@ import com.vaadin.flow.server.WrappedSession;
  */
 public class SessionSerializer
         implements ApplicationListener<ContextClosedEvent> {
+
+    static {
+        UsageStatistics.markAsUsed("kubernetes/SessionSerializer", null);
+    }
 
     private static final long OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
 

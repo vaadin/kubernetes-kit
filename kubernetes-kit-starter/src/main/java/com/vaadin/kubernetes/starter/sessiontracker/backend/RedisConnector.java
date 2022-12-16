@@ -9,12 +9,18 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.backend;
 
+import com.vaadin.flow.internal.UsageStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
 public class RedisConnector implements BackendConnector {
+
+    static {
+        UsageStatistics.markAsUsed("kubernetes/RedisConnector", null);
+    }
+
     private final RedisConnectionFactory redisConnectionFactory;
 
     public RedisConnector(RedisConnectionFactory redisConnectionFactory) {

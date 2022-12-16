@@ -13,11 +13,16 @@ import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
+import com.vaadin.flow.internal.UsageStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HazelcastConnector implements BackendConnector {
 
+    static {
+        UsageStatistics.markAsUsed("kubernetes/HazelcastConnector", null);
+    }
+    
     private final IMap<String, byte[]> sessions;
 
     public HazelcastConnector(HazelcastInstance hazelcastInstance) {
