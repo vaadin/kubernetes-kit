@@ -11,7 +11,6 @@ package com.vaadin.kubernetes.starter;
 
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
-
 import java.util.function.Predicate;
 
 import com.hazelcast.config.Config;
@@ -58,6 +57,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Serializ
  * This configuration bean is provided to auto-configure Vaadin apps to run in a
  * clustered environment.
  */
+@AutoConfiguration
 @ConditionalOnProperty(name = "auto-configure", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
 @AutoConfigureAfter({ SpringBootAutoConfiguration.class,
         RedisAutoConfiguration.class })
