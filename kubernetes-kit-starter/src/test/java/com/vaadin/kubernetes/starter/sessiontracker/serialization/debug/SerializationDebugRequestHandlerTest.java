@@ -1,7 +1,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;

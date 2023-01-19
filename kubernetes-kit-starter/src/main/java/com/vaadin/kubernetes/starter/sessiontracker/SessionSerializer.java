@@ -9,7 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker;
 
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSession;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

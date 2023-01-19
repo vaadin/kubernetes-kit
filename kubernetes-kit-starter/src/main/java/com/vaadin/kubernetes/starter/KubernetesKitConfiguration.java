@@ -9,8 +9,8 @@
  */
 package com.vaadin.kubernetes.starter;
 
-import javax.servlet.FilterRegistration;
-import javax.servlet.ServletContext;
+import jakarta.servlet.FilterRegistration;
+import jakarta.servlet.ServletContext;
 import java.util.function.Predicate;
 
 import com.hazelcast.config.Config;
