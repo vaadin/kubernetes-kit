@@ -130,7 +130,7 @@ class TestConfig {
     }
 
     @Component
-    @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.INTERFACES)
+    @Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.TARGET_CLASS)
     @Qualifier("B-PROXY")
     static class ProxiedPrototypeServiceImplB implements PrototypeService {
 
