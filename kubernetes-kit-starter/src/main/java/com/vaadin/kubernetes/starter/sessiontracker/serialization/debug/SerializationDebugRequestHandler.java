@@ -9,14 +9,13 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
-import javax.servlet.FilterChain;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpFilter;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionContext;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpFilter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -260,7 +259,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
      * {@link VaadinServiceInitListener} implementation that installs the
      * {@link SerializationDebugRequestHandler} if the following preconditions
      * are met:
-     * 
+     *
      * <ul>
      * <li>application is running in development mode.</li>
      * <li>session serialization debug is enabled by setting the
@@ -346,18 +345,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         }
 
         @Override
-        public HttpSessionContext getSessionContext() {
-            return null;
-        }
-
-        @Override
         public Object getAttribute(String name) {
             return storage.get(name);
-        }
-
-        @Override
-        public Object getValue(String name) {
-            return getAttribute(name);
         }
 
         @Override
@@ -366,28 +355,13 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         }
 
         @Override
-        public String[] getValueNames() {
-            return storage.keySet().toArray(new String[0]);
-        }
-
-        @Override
         public void setAttribute(String name, Object value) {
             storage.put(name, value);
         }
 
         @Override
-        public void putValue(String name, Object value) {
-            setAttribute(name, value);
-        }
-
-        @Override
         public void removeAttribute(String name) {
             storage.remove(name);
-        }
-
-        @Override
-        public void removeValue(String name) {
-            removeAttribute(name);
         }
 
         @Override

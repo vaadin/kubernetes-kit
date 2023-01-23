@@ -11,7 +11,7 @@ package com.vaadin.kubernetes.starter.ui;
 
 import java.util.Optional;
 
-import javax.servlet.http.Cookie;
+import jakarta.servlet.http.Cookie;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

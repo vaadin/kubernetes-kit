@@ -1,7 +1,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
-import javax.servlet.http.HttpSession;
-import javax.servlet.http.HttpSessionEvent;
+import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSessionEvent;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package com.vaadin.kubernetes.demo.views.list;
 
-import javax.annotation.security.PermitAll;
+import jakarta.annotation.security.PermitAll;
 
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
