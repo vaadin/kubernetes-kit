@@ -1,6 +1,6 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
-import javax.activation.MimeType;
+import jakarta.activation.MimeType;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
