@@ -9,16 +9,17 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.backend;
 
-import com.vaadin.flow.internal.UsageStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
+import com.vaadin.kubernetes.starter.ProductUtils;
+
 public class RedisConnector implements BackendConnector {
 
     static {
-        UsageStatistics.markAsUsed("kubernetes/RedisConnector", null);
+        ProductUtils.markAsUsed(RedisConnector.class.getSimpleName());
     }
 
     private final RedisConnectionFactory redisConnectionFactory;
@@ -27,6 +28,7 @@ public class RedisConnector implements BackendConnector {
         this.redisConnectionFactory = redisConnectionFactory;
     }
 
+    @Override
     public void sendSession(SessionInfo sessionInfo) {
         getLogger().debug("Sending session {} to Redis",
                 sessionInfo.getClusterKey());
@@ -43,6 +45,7 @@ public class RedisConnector implements BackendConnector {
         return BackendUtil.b("session-" + clusterKey);
     }
 
+    @Override
     public SessionInfo getSession(String clusterKey) {
         getLogger().debug("Requesting session for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory

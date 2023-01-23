@@ -56,7 +56,7 @@ class LicenseCheckerServiceInitListenerTest {
                 .thenReturn(false);
 
         final var version = getProperties()
-                .getProperty(LicenseCheckerServiceInitListener.VERSION_PROPERTY);
+                .getProperty(ProductUtils.VERSION_PROPERTY);
 
         // Assert version is in X.Y format
         assertThat(version, matchesPattern("^\\d\\.\\d.*"));
@@ -67,7 +67,7 @@ class LicenseCheckerServiceInitListenerTest {
         // Verify the license is checked
         BuildType buildType = null;
         licenseChecker.verify(() -> LicenseChecker.checkLicense(
-                LicenseCheckerServiceInitListener.PRODUCT_NAME, version, buildType));
+                ProductUtils.PRODUCT_NAME, version, buildType));
     }
 
     @Test
@@ -83,8 +83,8 @@ class LicenseCheckerServiceInitListenerTest {
 
     private Properties getProperties() {
         try {
-            return PropertiesLoaderUtils.loadAllProperties(
-                    LicenseCheckerServiceInitListener.PROPERTIES_RESOURCE);
+            return PropertiesLoaderUtils
+                    .loadAllProperties(ProductUtils.PROPERTIES_RESOURCE);
         } catch (IOException e) {
             throw new ExceptionInInitializerError(e);
         }
