@@ -15,6 +15,12 @@ import com.vaadin.flow.internal.UsageStatistics;
 
 import static org.springframework.core.io.support.PropertiesLoaderUtils.loadAllProperties;
 
+/**
+ * This is an internal class used to mark usage of the product features.
+ *
+ * @author Vaadin Ltd
+ * @since 2.0
+ */
 public final class ProductUtils {
 
     static final String PROPERTIES_RESOURCE = "kubernetes-kit.properties";
@@ -23,6 +29,12 @@ public final class ProductUtils {
 
     static final String PRODUCT_NAME = "vaadin-kubernetes-kit";
 
+    /**
+     * Marks a feature as used.
+     *
+     * @param feature
+     *            the feature name
+     */
     public static void markAsUsed(String feature) {
         final var version = getVersion();
         UsageStatistics.markAsUsed(PRODUCT_NAME + '/' + feature, version);
