@@ -9,9 +9,6 @@
  */
 package com.vaadin.kubernetes.starter;
 
-import java.io.IOException;
-import java.util.Properties;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +17,6 @@ import org.mockito.Answers;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.core.io.support.PropertiesLoaderUtils;
 
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinService;
@@ -55,8 +51,7 @@ class LicenseCheckerServiceInitListenerTest {
         when(service.getDeploymentConfiguration().isProductionMode())
                 .thenReturn(false);
 
-        final var version = getProperties()
-                .getProperty(LicenseCheckerServiceInitListener.VERSION_PROPERTY);
+        final var version = ProductUtilsTest.getVersion();
 
         // Assert version is in X.Y format
         assertThat(version, matchesPattern("^\\d\\.\\d.*"));
@@ -67,7 +62,7 @@ class LicenseCheckerServiceInitListenerTest {
         // Verify the license is checked
         BuildType buildType = null;
         licenseChecker.verify(() -> LicenseChecker.checkLicense(
-                LicenseCheckerServiceInitListener.PRODUCT_NAME, version, buildType));
+                ProductUtils.PRODUCT_NAME, version, buildType));
     }
 
     @Test
@@ -79,14 +74,5 @@ class LicenseCheckerServiceInitListenerTest {
         listener.serviceInit(new ServiceInitEvent(service));
 
         licenseChecker.verifyNoInteractions();
-    }
-
-    private Properties getProperties() {
-        try {
-            return PropertiesLoaderUtils.loadAllProperties(
-                    LicenseCheckerServiceInitListener.PROPERTIES_RESOURCE);
-        } catch (IOException e) {
-            throw new ExceptionInInitializerError(e);
-        }
     }
 }

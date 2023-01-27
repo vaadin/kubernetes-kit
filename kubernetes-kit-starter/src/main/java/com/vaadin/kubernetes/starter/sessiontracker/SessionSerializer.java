@@ -10,6 +10,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
 import jakarta.servlet.http.HttpSession;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,15 +35,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.flow.server.WrappedHttpSession;
+import com.vaadin.flow.server.WrappedSession;
+import com.vaadin.kubernetes.starter.ProductUtils;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectInputStream;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectOutputStream;
-import com.vaadin.flow.component.UI;
-import com.vaadin.flow.server.VaadinSession;
-import com.vaadin.flow.server.WrappedHttpSession;
-import com.vaadin.flow.server.WrappedSession;
 
 /**
  * Component responsible for replicating HTTP session attributes to a
@@ -98,6 +100,10 @@ import com.vaadin.flow.server.WrappedSession;
  */
 public class SessionSerializer
         implements ApplicationListener<ContextClosedEvent> {
+
+    static {
+        ProductUtils.markAsUsed(SessionSerializer.class.getSimpleName());
+    }
 
     private static final long OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
 
