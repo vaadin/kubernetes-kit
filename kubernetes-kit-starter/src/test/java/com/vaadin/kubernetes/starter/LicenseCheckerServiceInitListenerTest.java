@@ -26,7 +26,6 @@ import com.vaadin.pro.licensechecker.LicenseChecker;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.text.MatchesPattern.matchesPattern;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LicenseCheckerServiceInitListenerTest {
@@ -47,10 +46,7 @@ class LicenseCheckerServiceInitListenerTest {
     }
 
     @Test
-    public void developmentMode_licenseIsCheckedRuntime() {
-        when(service.getDeploymentConfiguration().isProductionMode())
-                .thenReturn(false);
-
+    public void serviceInit_licenseIsCheckedRuntime() {
         final var version = ProductUtilsTest.getVersion();
 
         // Assert version is in X.Y format
@@ -63,16 +59,5 @@ class LicenseCheckerServiceInitListenerTest {
         BuildType buildType = null;
         licenseChecker.verify(() -> LicenseChecker.checkLicense(
                 ProductUtils.PRODUCT_NAME, version, buildType));
-    }
-
-    @Test
-    public void productionMode_licenseIsNotCheckedRuntime() {
-        when(service.getDeploymentConfiguration().isProductionMode())
-                .thenReturn(true);
-
-        final var listener = new LicenseCheckerServiceInitListener();
-        listener.serviceInit(new ServiceInitEvent(service));
-
-        licenseChecker.verifyNoInteractions();
     }
 }
