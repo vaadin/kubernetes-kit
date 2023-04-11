@@ -4,8 +4,9 @@ logging:
   level:
     '[com.vaadin.kubernetes]': debug
 spring:
-  redis:
-    host: kubernetes-kit-redis-service
+  data:
+    redis:
+      host: kubernetes-kit-redis-service
 vaadin:
   whitelisted-packages: com.vaadin,org.vaadin,dev.hilla
   kubernetes:
@@ -15,8 +16,6 @@ vaadin:
     transients:
       include-packages: com.vaadin.kubernetes.demo
   devmode:
+    optimizedBundle: true
     sessionSerialization:
       enabled: true
-
-
-
