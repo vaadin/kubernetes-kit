@@ -6,12 +6,12 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.vaadin.exampledata.DataType;
+import com.vaadin.exampledata.ExampleDataGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
-import org.vaadin.artur.exampledata.DataType;
-import org.vaadin.artur.exampledata.ExampleDataGenerator;
 
 import com.vaadin.kubernetes.demo.entity.Company;
 import com.vaadin.kubernetes.demo.entity.Contact;
@@ -20,6 +20,7 @@ import com.vaadin.kubernetes.demo.repository.CompanyRepository;
 import com.vaadin.kubernetes.demo.repository.ContactRepository;
 import com.vaadin.kubernetes.demo.repository.StatusRepository;
 import com.vaadin.flow.spring.annotation.SpringComponent;
+
 
 @SpringComponent
 public class DataGenerator {

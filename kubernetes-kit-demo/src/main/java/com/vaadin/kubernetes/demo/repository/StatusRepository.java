@@ -6,4 +6,5 @@ import com.vaadin.kubernetes.demo.entity.Status;
 
 public interface StatusRepository extends JpaRepository<Status, Integer> {
 
+    Status findByName(String name);
 }

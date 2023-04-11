@@ -79,7 +79,13 @@ public class ListView extends VerticalLayout {
     }
 
     private void saveContact(ContactForm.SaveEvent event) {
-        service.saveContact(event.getContact());
+
+        if (event.isDetached()) {
+            service.saveDetachedContact(event.getContact());
+        } else {
+            service.saveContact(event.getContact());
+        }
+
         updateList();
         closeEditor();
     }
@@ -94,8 +100,8 @@ public class ListView extends VerticalLayout {
         if (contact == null) {
             closeEditor();
         } else {
-            form.setContact(contact);
             form.setVisible(true);
+            form.setContact(contact);
             addClassName("editing");
         }
     }

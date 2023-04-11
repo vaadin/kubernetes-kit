@@ -1,13 +1,6 @@
 package com.vaadin.kubernetes.demo.views.list;
 
-import java.util.List;
-
-import com.vaadin.kubernetes.demo.entity.Company;
-import com.vaadin.kubernetes.demo.entity.Contact;
-import com.vaadin.kubernetes.demo.entity.Status;
-import com.vaadin.flow.component.ComponentEvent;
-import com.vaadin.flow.component.ComponentEventListener;
-import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.*;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -19,17 +12,23 @@ import com.vaadin.flow.data.binder.BeanValidationBinder;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.ValidationException;
 import com.vaadin.flow.shared.Registration;
+import com.vaadin.kubernetes.demo.entity.Company;
+import com.vaadin.kubernetes.demo.entity.Contact;
+import com.vaadin.kubernetes.demo.entity.Status;
+
+import java.util.List;
+import java.util.Optional;
 
 public class ContactForm extends FormLayout {
+    private static final String CONTACT_ID_SESSION = "CONTACT_ID_SESSION";
     private Contact contact;
-
     TextField firstName = new TextField("First name");
     TextField lastName = new TextField("Last name");
     EmailField email = new EmailField("Email");
     ComboBox<Status> status = new ComboBox<>("Status");
     ComboBox<Company> company = new ComboBox<>("Company");
-    Binder<Contact> binder = new BeanValidationBinder<>(Contact.class);
 
+    Binder<Contact> binder = new BeanValidationBinder<>(Contact.class);
     Button save = new Button("Save");
     Button delete = new Button("Delete");
     Button close = new Button("Cancel");
@@ -40,8 +39,10 @@ public class ContactForm extends FormLayout {
 
         company.setItems(companies);
         company.setItemLabelGenerator(Company::getName);
+
         status.setItems(statuses);
         status.setItemLabelGenerator(Status::getName);
+
         add(firstName,
                 lastName,
                 email,
@@ -69,14 +70,30 @@ public class ContactForm extends FormLayout {
     }
 
     public void setContact(Contact contact) {
+
         this.contact = contact;
+
+        //store contact id in vaadin session
+        Optional.ofNullable(UI.getCurrent()).ifPresentOrElse(
+                ui -> ui.getSession().setAttribute(CONTACT_ID_SESSION, contact == null ? null : contact.getId()),
+                    () -> System.err.println("ui session is not available yet"));
+
         binder.readBean(contact);
     }
 
     private void validateAndSave() {
         try {
             binder.writeBean(contact);
-            fireEvent(new SaveEvent(this, contact));
+            if (contact.getId() != null)
+                fireEvent(new SaveEvent(this, contact, false));
+            else {
+                Optional.ofNullable(UI.getCurrent()).ifPresentOrElse(ui -> {
+                    var session = ui.getSession();
+                    var id = Integer.valueOf(session.getAttribute(CONTACT_ID_SESSION).toString());
+                    contact.setId(id);
+                    fireEvent(new SaveEvent(this, contact, true));
+                }, () -> System.err.println("ui session is not available yet"));
+            }
         } catch (ValidationException e) {
             e.printStackTrace();
         }
@@ -84,7 +101,7 @@ public class ContactForm extends FormLayout {
 
     // Events
     public static abstract class ContactFormEvent extends ComponentEvent<ContactForm> {
-        private Contact contact;
+        private final Contact contact;
 
         protected ContactFormEvent(ContactForm source, Contact contact) {
             super(source, false);
@@ -97,8 +114,15 @@ public class ContactForm extends FormLayout {
     }
 
     public static class SaveEvent extends ContactFormEvent {
-        SaveEvent(ContactForm source, Contact contact) {
+        private final boolean detached;
+
+        SaveEvent(ContactForm source, Contact contact, boolean detached) {
             super(source, contact);
+            this.detached = detached;
+        }
+
+        public boolean isDetached() {
+            return detached;
         }
     }
 
