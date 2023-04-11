@@ -16,7 +16,8 @@ spec:
     spec:
       containers:
         - name: kubernetes-kit-demo
-          image: localhost:5001/kubernetes-kit-demo:1.0.0
+          image: kubernetes-kit-demo:1.0.0
+          imagePullPolicy: IfNotPresent
           env:
             - name: APP_VERSION
               value: 1.0.0
