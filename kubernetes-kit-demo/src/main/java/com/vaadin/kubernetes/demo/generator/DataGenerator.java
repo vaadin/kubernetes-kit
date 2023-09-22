@@ -62,8 +62,10 @@ public class DataGenerator {
             Random r = new Random(seed);
             List<Contact> contacts = Stream.generate(contactGenerator)
                     .peek(contact -> {
-                contact.setCompany(companies.get(r.nextInt(companies.size())));
-                contact.setStatus(statuses.get(r.nextInt(statuses.size())));
+                        int companyIndex = r.nextInt(companies.size());
+                        contact.setCompany(companies.get(companyIndex));
+                        int contactIndex = r.nextInt(statuses.size());
+                        contact.setStatus(statuses.get(contactIndex));
                     }).limit(50).toList();
 
             contactRepository.saveAll(contacts);
