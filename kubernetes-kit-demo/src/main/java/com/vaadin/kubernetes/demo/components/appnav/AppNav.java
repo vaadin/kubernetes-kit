@@ -103,7 +103,9 @@ public class AppNav extends Component implements HasSize, HasStyle {
     }
 
     private Optional<Element> getExistingLabelElement() {
-        return getElement().getChildren().filter(child -> "label".equals(child.getAttribute("slot"))).findFirst();
+        return getElement().getChildren()
+                .filter(child -> "label".equals(child.getAttribute("slot")))
+                .findFirst();
     }
 
     private Element getLabelElement() {

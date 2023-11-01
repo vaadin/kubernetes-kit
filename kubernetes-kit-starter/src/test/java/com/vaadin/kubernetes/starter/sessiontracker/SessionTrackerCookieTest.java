@@ -54,13 +54,14 @@ public class SessionTrackerCookieTest {
         HttpSession session = mock(HttpSession.class);
         when(session.getAttribute(anyString())).thenReturn(null);
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getCookies()).thenReturn(
-                new Cookie[] { new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
+        when(request.getCookies()).thenReturn(new Cookie[] {
+                new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         SessionTrackerCookie.setIfNeeded(session, request, response);
 
-        verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME), eq(clusterKey));
+        verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME),
+                eq(clusterKey));
         verify(response, never()).addCookie(any());
     }
 
@@ -71,8 +72,8 @@ public class SessionTrackerCookieTest {
         HttpSession session = mock(HttpSession.class);
         when(session.getAttribute(anyString())).thenReturn("foo");
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getCookies()).thenReturn(
-                new Cookie[] { new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
+        when(request.getCookies()).thenReturn(new Cookie[] {
+                new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         SessionTrackerCookie.setIfNeeded(session, request, response);
@@ -117,8 +118,8 @@ public class SessionTrackerCookieTest {
         String clusterKey = UUID.randomUUID().toString();
 
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getCookies()).thenReturn(
-                new Cookie[] { new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
+        when(request.getCookies()).thenReturn(new Cookie[] {
+                new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
 
         Optional<String> value = SessionTrackerCookie.getValue(request);
 

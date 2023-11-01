@@ -37,7 +37,7 @@ public class SerializationProperties {
      *
      * @return configuration for transient fields handling.
      */
-    public TransientsProperties getTransients() {
+    TransientsProperties getTransients() {
         return transients;
     }
 

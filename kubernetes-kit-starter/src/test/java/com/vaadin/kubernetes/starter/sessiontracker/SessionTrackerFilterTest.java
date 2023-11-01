@@ -35,7 +35,8 @@ class SessionTrackerFilterTest {
             UUID.randomUUID().toString());
 
     @AfterEach
-    void assertFilterChainIsAlwaysExecuted() throws ServletException, IOException {
+    void assertFilterChainIsAlwaysExecuted()
+            throws ServletException, IOException {
         verify(filterChain).doFilter(request, response);
     }
 
@@ -102,7 +103,8 @@ class SessionTrackerFilterTest {
     }
 
     @Test
-    void invalidatedHttpSession_UIDLRequest_sessionNotSerialized() throws Exception {
+    void invalidatedHttpSession_UIDLRequest_sessionNotSerialized()
+            throws Exception {
         setupCookie();
         when(request.getParameter(ApplicationConstants.REQUEST_TYPE_PARAMETER))
                 .thenReturn(HandlerHelper.RequestType.UIDL.getIdentifier());

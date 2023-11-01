@@ -24,8 +24,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerCookie;
  * pushed to the client.
  *
  * It has the same scope of
- * {@link com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter} but for
- * PUSH communication.
+ * {@link com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter} but
+ * for PUSH communication.
  */
 public class PushSessionTracker implements PushSendListener {
 

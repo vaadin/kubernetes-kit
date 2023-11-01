@@ -271,8 +271,7 @@ class SessionSerializerTest {
     @Test
     void deserialize_sessionAttributesAreSet() {
         AtomicBoolean serializationCompleted = new AtomicBoolean();
-        doAnswer(i -> serializationCompleted.getAndSet(true))
-                .when(connector)
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
 
         List<SessionInfo> infoList = new ArrayList<>();

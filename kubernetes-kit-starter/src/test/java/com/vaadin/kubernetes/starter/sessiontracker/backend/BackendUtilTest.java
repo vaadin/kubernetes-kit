@@ -18,15 +18,15 @@ public class BackendUtilTest {
         assertEquals(1, byteMap.size());
 
         for (Map.Entry<byte[], byte[]> entry : byteMap.entrySet()) {
-            assertArrayEquals(new byte[] {'f','o','o'}, entry.getKey());
-            assertArrayEquals(new byte[] {'b','a','r'}, entry.getValue());
+            assertArrayEquals(new byte[] { 'f', 'o', 'o' }, entry.getKey());
+            assertArrayEquals(new byte[] { 'b', 'a', 'r' }, entry.getValue());
         }
     }
 
     @Test
     void fromByteMap_returnsCorrectMap() {
         Map<byte[], byte[]> data = new HashMap<>();
-        data.put(new byte[] {'f','o','o'}, new byte[] {'b','a','r'});
+        data.put(new byte[] { 'f', 'o', 'o' }, new byte[] { 'b', 'a', 'r' });
 
         Map<String, String> stringMap = BackendUtil.fromByteMap(data);
         assertEquals(1, stringMap.size());
@@ -39,11 +39,11 @@ public class BackendUtilTest {
 
     @Test
     void b_byteArrayReturned() {
-        assertArrayEquals(new byte[] {'f','o','o'}, BackendUtil.b("foo"));
+        assertArrayEquals(new byte[] { 'f', 'o', 'o' }, BackendUtil.b("foo"));
     }
 
     @Test
     void s_stringReturned() {
-        assertEquals("foo", BackendUtil.s(new byte[] {'f','o','o'})) ;
+        assertEquals("foo", BackendUtil.s(new byte[] { 'f', 'o', 'o' }));
     }
 }

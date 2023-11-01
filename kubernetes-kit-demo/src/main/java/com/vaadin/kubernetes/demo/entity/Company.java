@@ -36,7 +36,7 @@ public class Company extends AbstractEntity implements Serializable {
         this.employees = employees;
     }
 
-    public int getEmployeeCount(){
+    public int getEmployeeCount() {
         return employeeCount;
     }
 }

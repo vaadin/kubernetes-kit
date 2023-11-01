@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectInputStream;

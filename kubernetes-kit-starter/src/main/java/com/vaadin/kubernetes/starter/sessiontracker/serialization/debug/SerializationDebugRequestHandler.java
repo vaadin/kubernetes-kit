@@ -182,7 +182,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
     }
 
     public static void serializeAndDeserialize(WrappedSession session,
-                                               Consumer<Result> onComplete) {
+            Consumer<Result> onComplete) {
         // Work on a copy of the session to avoid overwriting attributes
         DebugHttpSession debugHttpSession = new DebugHttpSession(session);
         Job job = new Job(session.getId());
@@ -201,9 +201,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             Result result = job.complete();
             StringBuilder message = new StringBuilder(
                     "Session serialization attempt completed in ")
-                            .append(result.getDuration())
-                            .append(" ms with outcomes: ")
-                            .append(result.getOutcomes());
+                    .append(result.getDuration()).append(" ms with outcomes: ")
+                    .append(result.getOutcomes());
             List<String> errors = result.getErrors();
             if (!errors.isEmpty()) {
                 message.append(System.lineSeparator())
