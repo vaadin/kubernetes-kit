@@ -421,7 +421,7 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
 
     private static Logger getLogger() {
         return LoggerFactory
-                .getLogger(TransientInjectableObjectInputStream.class);
+                .getLogger(TransientInjectableObjectOutputStream.class);
     }
 
 }
