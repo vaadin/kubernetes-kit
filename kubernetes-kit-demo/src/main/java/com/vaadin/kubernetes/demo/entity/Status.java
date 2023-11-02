@@ -7,7 +7,8 @@ import java.io.Serializable;
 public class Status extends AbstractEntity implements Serializable {
     private String name;
 
-    public Status() { }
+    public Status() {
+    }
 
     public Status(String name) {
         this.name = name;

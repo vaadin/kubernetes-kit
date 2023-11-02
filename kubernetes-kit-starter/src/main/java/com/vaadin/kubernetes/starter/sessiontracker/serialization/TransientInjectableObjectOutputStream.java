@@ -171,7 +171,7 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
         inspected.clear();
         tracking.clear();
         if (inspector instanceof DebugMode) {
-            ((DebugMode)inspector).onSerializationStart();
+            ((DebugMode) inspector).onSerializationStart();
         }
         try {
             reset();

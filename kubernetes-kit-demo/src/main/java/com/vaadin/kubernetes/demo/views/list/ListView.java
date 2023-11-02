@@ -20,7 +20,7 @@ import com.vaadin.flow.router.Route;
 
 @Component
 @Scope("prototype")
-@Route(value="List", layout = MainLayout.class)
+@Route(value = "List", layout = MainLayout.class)
 @PageTitle("Contacts | Vaadin CRM")
 @PermitAll
 public class ListView extends VerticalLayout {
@@ -35,7 +35,8 @@ public class ListView extends VerticalLayout {
         setSizeFull();
         configureGrid();
 
-        form = new ContactForm(service.findAllCompanies(), service.findAllStatuses());
+        form = new ContactForm(service.findAllCompanies(),
+                service.findAllStatuses());
         form.setWidth("25em");
         form.addListener(ContactForm.SaveEvent.class, this::saveContact);
         form.addListener(ContactForm.DeleteEvent.class, this::deleteContact);
@@ -51,16 +52,18 @@ public class ListView extends VerticalLayout {
         add(getToolbar(), content);
         updateList();
         closeEditor();
-        grid.asSingleSelect().addValueChangeListener(event ->
-                editContact(event.getValue()));
+        grid.asSingleSelect()
+                .addValueChangeListener(event -> editContact(event.getValue()));
     }
 
     private void configureGrid() {
         grid.addClassNames("contact-grid");
         grid.setSizeFull();
         grid.setColumns("firstName", "lastName", "email");
-        grid.addColumn(contact -> contact.getStatus().getName()).setHeader("Status");
-        grid.addColumn(contact -> contact.getCompany().getName()).setHeader("Company");
+        grid.addColumn(contact -> contact.getStatus().getName())
+                .setHeader("Status");
+        grid.addColumn(contact -> contact.getCompany().getName())
+                .setHeader("Company");
         grid.getColumns().forEach(col -> col.setAutoWidth(true));
     }
 
@@ -73,7 +76,8 @@ public class ListView extends VerticalLayout {
         Button addContactButton = new Button("Add contact");
         addContactButton.addClickListener(click -> addContact());
 
-        HorizontalLayout toolbar = new HorizontalLayout(filterText, addContactButton);
+        HorizontalLayout toolbar = new HorizontalLayout(filterText,
+                addContactButton);
         toolbar.addClassName("toolbar");
         return toolbar;
     }
@@ -114,6 +118,5 @@ public class ListView extends VerticalLayout {
     private void updateList() {
         grid.setItems(service.findAllContacts(filterText.getValue()));
     }
-
 
 }

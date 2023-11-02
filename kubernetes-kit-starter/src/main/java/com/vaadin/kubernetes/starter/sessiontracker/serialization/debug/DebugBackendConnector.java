@@ -20,7 +20,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 /**
  * A dummy {@link BackendConnector} implementations that locally stores the
  * serialized data.
- * 
+ *
  * It is meant to only be used with the Kubernetes Kit Debug Tool.
  */
 class DebugBackendConnector implements BackendConnector {
@@ -65,7 +65,7 @@ class DebugBackendConnector implements BackendConnector {
     /**
      * Blocks the thread for up to 10 seconds, waiting for serialization to be
      * completed.
-     * 
+     *
      * @param logger
      *            the logger to add potential error information.
      * @return the serialized session holder.

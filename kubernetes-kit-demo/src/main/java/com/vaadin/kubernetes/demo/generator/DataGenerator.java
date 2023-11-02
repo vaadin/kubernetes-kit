@@ -25,7 +25,8 @@ import com.vaadin.kubernetes.demo.repository.StatusRepository;
 public class DataGenerator {
 
     @Bean
-    CommandLineRunner loadData(ContactRepository contactRepository, CompanyRepository companyRepository,
+    CommandLineRunner loadData(ContactRepository contactRepository,
+            CompanyRepository companyRepository,
             StatusRepository statusRepository) {
 
         return args -> {
@@ -43,11 +44,13 @@ public class DataGenerator {
                 company.setName(faker.company().name());
                 return company;
             };
-            List<Company> companies = companyRepository.saveAll(Stream.generate(companyGenerator).limit(5).toList());
+            List<Company> companies = companyRepository.saveAll(
+                    Stream.generate(companyGenerator).limit(5).toList());
 
-            List<Status> statuses = statusRepository
-                    .saveAll(Stream.of("Imported lead", "Not contacted", "Contacted", "Customer", "Closed (lost)")
-                            .map(Status::new).collect(Collectors.toList()));
+            List<Status> statuses = statusRepository.saveAll(Stream
+                    .of("Imported lead", "Not contacted", "Contacted",
+                            "Customer", "Closed (lost)")
+                    .map(Status::new).collect(Collectors.toList()));
 
             logger.info("... generating 50 Contact entities...");
             Supplier<Contact> contactGenerator = () -> {

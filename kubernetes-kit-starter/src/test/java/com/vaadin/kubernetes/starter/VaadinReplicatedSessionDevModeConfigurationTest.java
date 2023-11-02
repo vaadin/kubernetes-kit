@@ -87,7 +87,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                 .withSystemProperties(
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withConfiguration(AutoConfigurations.of(
-                KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
+                        KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
                         SerializationDebugRequestHandler.InitListener.class))
                         .isEmpty());

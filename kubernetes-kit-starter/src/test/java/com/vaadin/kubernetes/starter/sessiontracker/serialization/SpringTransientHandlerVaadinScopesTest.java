@@ -31,7 +31,6 @@ import com.vaadin.testbench.unit.mocks.MockSpringServlet;
 import com.vaadin.testbench.unit.mocks.MockedUI;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 
 @ContextConfiguration(classes = {
         SpringTransientHandlerVaadinScopesTest.TestConfig.class,
@@ -72,7 +71,7 @@ class SpringTransientHandlerVaadinScopesTest {
 
         List<TransientDescriptor> transients = handler.inspect(target);
 
-       assertThat(transients).containsExactlyInAnyOrder(
+        assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.TestView.class, "uiScoped",
                         TestConfig.UIScopedComponent.class,
                         TestConfig.UIScopedComponent.class.getName()),

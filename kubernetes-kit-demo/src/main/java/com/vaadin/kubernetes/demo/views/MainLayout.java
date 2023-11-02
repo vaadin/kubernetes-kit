@@ -33,14 +33,16 @@ public class MainLayout extends AppLayout {
         toggle.getElement().setAttribute("aria-label", "Menu toggle");
 
         viewTitle = new H2();
-        viewTitle.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.Margin.NONE);
+        viewTitle.addClassNames(LumoUtility.FontSize.LARGE,
+                LumoUtility.Margin.NONE);
 
         addToNavbar(true, toggle, viewTitle);
     }
 
     private void addDrawerContent() {
         H1 appName = new H1("Kubernetes Kit Demo");
-        appName.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.Margin.NONE);
+        appName.addClassNames(LumoUtility.FontSize.LARGE,
+                LumoUtility.Margin.NONE);
         Header header = new Header(appName);
 
         Scroller scroller = new Scroller(createNavigation());
@@ -57,8 +59,8 @@ public class MainLayout extends AppLayout {
                 "la la-plus-circle"));
         nav.addItem(new AppNavItem("PUSH Counter", PushCounterView.class,
                 "la la-plus-circle"));
-        nav.addItem(new AppNavItem("List", ListView.class,
-                "la la-plus-circle"));
+        nav.addItem(
+                new AppNavItem("List", ListView.class, "la la-plus-circle"));
 
         return nav;
     }
@@ -76,7 +78,8 @@ public class MainLayout extends AppLayout {
     }
 
     private String getCurrentPageTitle() {
-        PageTitle title = getContent().getClass().getAnnotation(PageTitle.class);
+        PageTitle title = getContent().getClass()
+                .getAnnotation(PageTitle.class);
         return title == null ? "" : title.value();
     }
 }
