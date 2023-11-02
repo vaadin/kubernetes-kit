@@ -44,7 +44,8 @@ public class DataGenerator {
                 company.setName(faker.company().name());
                 return company;
             };
-            List<Company> companies = companyRepository.saveAll(Stream.generate(companyGenerator).limit(5).toList());
+            List<Company> companies = companyRepository.saveAll(
+                    Stream.generate(companyGenerator).limit(5).toList());
 
             List<Status> statuses = statusRepository.saveAll(Stream
                     .of("Imported lead", "Not contacted", "Contacted",
