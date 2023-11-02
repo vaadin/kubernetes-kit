@@ -22,8 +22,8 @@ import java.util.Optional;
 public class AppNavItem extends Component {
 
     /**
-     * Creates a menu item which does not link to any view but only shows the given
-     * label.
+     * Creates a menu item which does not link to any view but only shows the
+     * given label.
      *
      * @param label
      *            the label for the item
@@ -33,7 +33,8 @@ public class AppNavItem extends Component {
     }
 
     /**
-     * Creates a new menu item using the given label that links to the given path.
+     * Creates a new menu item using the given label that links to the given
+     * path.
      *
      * @param label
      *            the label for the item
@@ -46,7 +47,8 @@ public class AppNavItem extends Component {
     }
 
     /**
-     * Creates a new menu item using the given label that links to the given view.
+     * Creates a new menu item using the given label that links to the given
+     * view.
      *
      * @param label
      *            the label for the item
@@ -76,7 +78,8 @@ public class AppNavItem extends Component {
     }
 
     /**
-     * Creates a new menu item using the given label that links to the given view.
+     * Creates a new menu item using the given label that links to the given
+     * view.
      *
      * @param label
      *            the label for the item
@@ -85,7 +88,8 @@ public class AppNavItem extends Component {
      * @param icon
      *            the icon for the item
      */
-    public AppNavItem(String label, Class<? extends Component> view, Icon icon) {
+    public AppNavItem(String label, Class<? extends Component> view,
+            Icon icon) {
         setPath(view);
         setLabel(label);
         setIcon(icon);
@@ -120,7 +124,8 @@ public class AppNavItem extends Component {
      * @param iconClass
      *            the CSS class to use for showing the icon
      */
-    public AppNavItem(String label, Class<? extends Component> view, String iconClass) {
+    public AppNavItem(String label, Class<? extends Component> view,
+            String iconClass) {
         setPath(view);
         setLabel(label);
 
@@ -195,7 +200,8 @@ public class AppNavItem extends Component {
     }
 
     private Optional<Element> getExistingLabelElement() {
-        return getElement().getChildren().filter(child -> !child.hasAttribute("slot")).findFirst();
+        return getElement().getChildren()
+                .filter(child -> !child.hasAttribute("slot")).findFirst();
     }
 
     private Element getLabelElement() {
@@ -226,7 +232,8 @@ public class AppNavItem extends Component {
      * @return this instance for chaining
      */
     public AppNavItem setPath(Class<? extends Component> view) {
-        String url = RouteConfiguration.forRegistry(getRouter().getRegistry()).getUrl(view);
+        String url = RouteConfiguration.forRegistry(getRouter().getRegistry())
+                .getUrl(view);
         setPath(url);
         return this;
     }
@@ -241,8 +248,9 @@ public class AppNavItem extends Component {
             router = VaadinService.getCurrent().getRouter();
         }
         if (router == null) {
-            throw new IllegalStateException("Implicit router instance is not available. "
-                    + "Use overloaded method with explicit router parameter.");
+            throw new IllegalStateException(
+                    "Implicit router instance is not available. "
+                            + "Use overloaded method with explicit router parameter.");
         }
         return router;
     }
@@ -253,7 +261,8 @@ public class AppNavItem extends Component {
 
     private int getIconElementIndex() {
         for (int i = 0; i < getElement().getChildCount(); i++) {
-            if ("prefix".equals(getElement().getChild(i).getAttribute("slot"))) {
+            if ("prefix"
+                    .equals(getElement().getChild(i).getAttribute("slot"))) {
                 return i;
             }
         }
@@ -263,7 +272,8 @@ public class AppNavItem extends Component {
     /**
      * Sets the icon for the item.
      * <p>
-     * Can also be used to set a custom component to be shown in front of the label.
+     * Can also be used to set a custom component to be shown in front of the
+     * label.
      *
      * @param icon
      *            the icon to show
@@ -283,7 +293,8 @@ public class AppNavItem extends Component {
     /**
      * Sets the icon using a CSS class for the item.
      * <p>
-     * Can also be used to set a custom component to be shown in front of the label.
+     * Can also be used to set a custom component to be shown in front of the
+     * label.
      *
      * @param iconClass
      *            the CSS class to use for showing the icon

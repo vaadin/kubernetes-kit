@@ -61,8 +61,8 @@ class LicenseCheckerServiceInitListenerTest {
 
         // Verify the license is checked
         BuildType buildType = null;
-        licenseChecker.verify(() -> LicenseChecker.checkLicense(
-                ProductUtils.PRODUCT_NAME, version, buildType));
+        licenseChecker.verify(() -> LicenseChecker
+                .checkLicense(ProductUtils.PRODUCT_NAME, version, buildType));
     }
 
     @Test

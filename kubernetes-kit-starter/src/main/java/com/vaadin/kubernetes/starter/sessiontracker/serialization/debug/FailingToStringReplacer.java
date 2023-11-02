@@ -20,12 +20,12 @@ import java.lang.invoke.MethodType;
 /**
  * A replacement for object with {@link #toString()} methods throwing
  * exceptions.
- * 
+ *
  * This class is used when {@literal sun.io.serialization.extendedDebugInfo}
  * system property is set, to prevent serialization process to be stopped by
  * exceptions thrown by {@link #toString()} methods when computing serialization
  * stack.
- * 
+ *
  * The original object can be replaced by an instance of this class, that during
  * serialization tries to write the fields of the original object (respecting
  * serialization hook methods). On deserialization, it creates new instance of
@@ -34,7 +34,7 @@ import java.lang.invoke.MethodType;
  *
  * The class needs reflection to be allowed on {@code java.io} package, so the
  * JVM must be started with the needed add-opens flag.
- * 
+ *
  * <pre>
  * --add-opens` flag (e.g. '--add-opens java.base/java.io=ALL-UNNAMED')
  * </pre>

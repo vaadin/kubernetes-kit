@@ -48,7 +48,8 @@ public class CrmService {
 
     public void saveContact(Contact contact) {
         if (contact == null) {
-            System.err.println("Contact is null. Are you sure you have connected your form to the application?");
+            System.err.println(
+                    "Contact is null. Are you sure you have connected your form to the application?");
             return;
         }
         contactRepository.save(contact);
@@ -58,7 +59,7 @@ public class CrmService {
         return companyRepository.findAll();
     }
 
-    public List<Status> findAllStatuses(){
+    public List<Status> findAllStatuses() {
         return statusRepository.findAll();
     }
 }

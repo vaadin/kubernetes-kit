@@ -22,7 +22,7 @@ public class Contact extends AbstractEntity implements Serializable {
     @ManyToOne
     @JoinColumn(name = "company_id")
     @NotNull
-    @JsonIgnoreProperties({"employees"})
+    @JsonIgnoreProperties({ "employees" })
     private Company company;
 
     @NotNull

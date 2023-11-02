@@ -137,8 +137,7 @@ public class SpringTransientHandler implements TransientHandler {
     }
 
     private static Logger getLogger() {
-        return LoggerFactory
-                .getLogger(TransientInjectableObjectInputStream.class);
+        return LoggerFactory.getLogger(SpringTransientHandler.class);
     }
 
 }

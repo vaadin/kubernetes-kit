@@ -10,7 +10,7 @@ public class SessionInfoTest {
     @Test
     void construct_attributesAreSet() {
         String clusterKey = UUID.randomUUID().toString();
-        byte[] data = new byte[] {'f','o','o'};
+        byte[] data = new byte[] { 'f', 'o', 'o' };
 
         SessionInfo sessionInfo = new SessionInfo(clusterKey, data);
 
