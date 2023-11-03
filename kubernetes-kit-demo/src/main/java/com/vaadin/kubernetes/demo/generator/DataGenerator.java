@@ -25,7 +25,7 @@ import com.vaadin.kubernetes.demo.repository.StatusRepository;
 public class DataGenerator {
 
     @Bean
-    public CommandLineRunner loadData(ContactRepository contactRepository,
+    CommandLineRunner loadData(ContactRepository contactRepository,
             CompanyRepository companyRepository,
             StatusRepository statusRepository) {
 
