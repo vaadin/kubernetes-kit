@@ -76,9 +76,6 @@ public class SpringTransientHandler implements TransientHandler {
 
         if (value != null) {
             Class<?> valueType = value.getClass();
-            if (valueType == Object.class) {
-                return null;
-            }
             getLogger().trace(
                     "Inspecting field {} of class {} for injected beans",
                     field.getName(), target.getClass());
@@ -107,7 +104,8 @@ public class SpringTransientHandler implements TransientHandler {
 
     private boolean matchesPrototype(String beanName, Object beanDefinition,
             Class<?> fieldValueType) {
-        return appCtx.isPrototype(beanName)
+        return appCtx.containsBeanDefinition(beanName)
+                && appCtx.isPrototype(beanName)
                 && beanDefinition.getClass() == fieldValueType;
     }
 
