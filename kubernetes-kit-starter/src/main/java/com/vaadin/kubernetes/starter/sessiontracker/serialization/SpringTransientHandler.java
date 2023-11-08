@@ -104,7 +104,8 @@ public class SpringTransientHandler implements TransientHandler {
 
     private boolean matchesPrototype(String beanName, Object beanDefinition,
             Class<?> fieldValueType) {
-        return appCtx.isPrototype(beanName)
+        return appCtx.containsBeanDefinition(beanName)
+                && appCtx.isPrototype(beanName)
                 && beanDefinition.getClass() == fieldValueType;
     }
 
