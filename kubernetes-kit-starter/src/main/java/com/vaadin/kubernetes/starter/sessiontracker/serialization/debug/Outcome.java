@@ -26,6 +26,10 @@ public enum Outcome {
      */
     SERIALIZATION_FAILED,
     /**
+     * Serialization did not complete in time
+     */
+    SERIALIZATION_TIMEOUT,
+    /**
      * Process failed during deserialization phase
      */
     DESERIALIZATION_FAILED,
