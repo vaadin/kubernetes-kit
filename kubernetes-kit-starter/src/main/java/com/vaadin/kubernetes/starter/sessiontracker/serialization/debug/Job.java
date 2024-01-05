@@ -131,6 +131,11 @@ class Job {
                 Outcome.SERIALIZATION_FAILED.name() + ": " + ex.getMessage());
     }
 
+    void timeout() {
+        outcome.remove(Outcome.SERIALIZATION_FAILED);
+        outcome.add(Outcome.SERIALIZATION_TIMEOUT);
+    }
+
     void deserialized() {
         outcome.remove(Outcome.DESERIALIZATION_FAILED);
     }
