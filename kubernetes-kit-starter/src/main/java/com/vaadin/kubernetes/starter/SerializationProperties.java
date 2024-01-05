@@ -29,7 +29,7 @@ public class SerializationProperties {
 
     public static final String PREFIX = "vaadin.serialization";
 
-    public static final int DEFAULT_SERIALIZATION_TIMEOUT_MS = 5000;
+    public static final int DEFAULT_SERIALIZATION_TIMEOUT_MS = 30000;
 
     private int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
 
