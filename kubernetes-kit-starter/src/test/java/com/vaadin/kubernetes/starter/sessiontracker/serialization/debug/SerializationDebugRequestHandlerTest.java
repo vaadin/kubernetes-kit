@@ -297,6 +297,21 @@ class SerializationDebugRequestHandlerTest {
     }
 
     @Test
+    void handleRequest_serializationTimeout_timeoutReported() {
+        SerializationProperties properties = new SerializationProperties();
+        properties.setTimeout(1);
+        handler = new SerializationDebugRequestHandler(properties);
+
+        httpSession.setAttribute("OBJ1", new DeepNested());
+
+        runDebugTool();
+        Result result = resultHolder.get();
+        assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
+        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
+                Outcome.NOT_SERIALIZABLE_CLASSES, Outcome.SERIALIZATION_TIMEOUT);
+    }
+
+    @Test
     @Disabled("Find a way to simulate SerializedLambda ClassCastException")
     void handleRequest_lambdaSelfReferenceClassCast_errorCaught() {
     }
