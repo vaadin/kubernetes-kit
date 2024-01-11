@@ -12,6 +12,7 @@ package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +37,7 @@ public class Result implements Serializable {
         this.storageKey = storageKey;
         this.outcomes = new LinkedHashSet<>(outcomes);
         this.duration = duration;
-        this.messages = messages;
+        this.messages = new LinkedHashMap<>(messages);
     }
 
     /**

@@ -13,11 +13,9 @@ vaadin:
     hazelcast:
       service-name: kubernetes-kit-hazelcast-service
   serialization:
+    timeout: 10000
     transients:
       include-packages: com.vaadin.kubernetes.demo
   devmode:
     sessionSerialization:
       enabled: true
-
-
-

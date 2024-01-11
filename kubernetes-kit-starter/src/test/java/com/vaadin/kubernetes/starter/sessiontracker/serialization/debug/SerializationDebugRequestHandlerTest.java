@@ -1,7 +1,5 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -10,13 +8,14 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import org.assertj.core.api.SoftAssertions;
 import org.assertj.core.data.Index;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.mockito.Mockito;
 import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.component.PushConfiguration;
@@ -34,6 +33,7 @@ import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
 import com.vaadin.flow.shared.ApplicationConstants;
 import com.vaadin.flow.shared.communication.PushMode;
+import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler.Runner;
 import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
@@ -49,7 +49,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 @EnableOnJavaIOReflection
-@EnabledIfSystemProperty(named = "sun.io.serialization.extendedDebugInfo", matches = "true", //
+@EnabledIfSystemProperty(named = "sun.io.serialization.extendedDebugInfo", matches = "true",
         disabledReason = "Tests need system property sun.io.serialization.extendedDebugInfo to be enabled")
 class SerializationDebugRequestHandlerTest {
 
@@ -66,7 +66,9 @@ class SerializationDebugRequestHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new SerializationDebugRequestHandler();
+        SerializationProperties serializationProperties = new SerializationProperties();
+        serializationProperties.setTimeout(30000);
+        handler = new SerializationDebugRequestHandler(serializationProperties);
         httpSession = new MockHttpSession();
         VaadinService vaadinService = mock(VaadinService.class);
         VaadinContext vaadinContext = mock(VaadinContext.class);
@@ -81,11 +83,9 @@ class SerializationDebugRequestHandlerTest {
                 resultHolder.set(result);
             }
         });
-        doAnswer(i -> {
-            SerializableConsumer<Result> consumer = resultHolder::set;
-            return consumer;
-        }).when(ui).accessLater(any(SerializableConsumer.class),
-                any(SerializableRunnable.class));
+        doAnswer(i -> (SerializableConsumer<Result>) resultHolder::set)
+                .when(ui).accessLater(any(SerializableConsumer.class),
+                        any(SerializableRunnable.class));
         when(ui.getPushConfiguration()).thenReturn(pushConfiguration);
         when(vaadinService.findUI(any())).thenReturn(ui);
 
@@ -120,7 +120,6 @@ class SerializationDebugRequestHandlerTest {
         when(httpRequest.isRequestedSessionIdValid()).thenReturn(true);
         resultHolder = new AtomicReference<>();
         response = mock(VaadinResponse.class);
-
     }
 
     @Test
@@ -138,7 +137,7 @@ class SerializationDebugRequestHandlerTest {
     }
 
     @Test
-    void handleRequest_notUIDLrequest_skip() {
+    void handleRequest_notUIDLRequest_skip() {
         reset(request);
         when(request.getParameter(ApplicationConstants.REQUEST_TYPE_PARAMETER))
                 .thenReturn(HandlerHelper.RequestType.INIT.getIdentifier());
@@ -150,7 +149,7 @@ class SerializationDebugRequestHandlerTest {
 
     @Test
     void handleRequest_productionMode_skip() {
-        Mockito.reset(appConfig);
+        reset(appConfig);
         when(appConfig.isProductionMode()).thenReturn(true);
         when(appConfig.isDevModeSessionSerializationEnabled()).thenReturn(true);
 
@@ -161,7 +160,7 @@ class SerializationDebugRequestHandlerTest {
 
     @Test
     void handleRequest_serializationDebugDisabled_skip() {
-        Mockito.reset(appConfig);
+        reset(appConfig);
         when(appConfig.isProductionMode()).thenReturn(false);
         when(appConfig.isDevModeSessionSerializationEnabled())
                 .thenReturn(false);
@@ -295,6 +294,21 @@ class SerializationDebugRequestHandlerTest {
                 Outcome.SERIALIZATION_FAILED, Outcome.NOT_SERIALIZABLE_CLASSES);
         assertThat(result.getStorageKey()).isNotNull()
                 .contains("_SOURCE:" + httpSession.getId());
+    }
+
+    @Test
+    void handleRequest_serializationTimeout_timeoutReported() {
+        SerializationProperties properties = new SerializationProperties();
+        properties.setTimeout(1);
+        handler = new SerializationDebugRequestHandler(properties);
+
+        httpSession.setAttribute("OBJ1", new DeepNested());
+
+        runDebugTool();
+        Result result = resultHolder.get();
+        assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
+        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
+                Outcome.NOT_SERIALIZABLE_CLASSES, Outcome.SERIALIZATION_TIMEOUT);
     }
 
     @Test
