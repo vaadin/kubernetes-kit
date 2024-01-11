@@ -19,6 +19,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues("vaadin.productionMode=true",
                         "vaadin.devmode.sessionSerialization.enabled=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -33,6 +34,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues("vaadin.productionMode=true",
                         "vaadin.devmode.sessionSerialization.enabled=false")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -46,6 +48,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                 .withSystemProperties(
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues("vaadin.productionMode=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -60,6 +63,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues(
                         "vaadin.devmode.sessionSerialization.enabled=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -74,6 +78,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues(
                         "vaadin.devmode.sessionSerialization.enabled=false")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -86,6 +91,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
         new ApplicationContextRunner()
                 .withSystemProperties(
                         "sun.io.serialization.extendedDebugInfo=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -100,6 +106,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues("vaadin.productionMode=false",
                         "vaadin.devmode.sessionSerialization.enabled=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -114,6 +121,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues("vaadin.productionMode=false",
                         "vaadin.devmode.sessionSerialization.enabled=false")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -127,6 +135,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                 .withSystemProperties(
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues("vaadin.productionMode=false")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -141,6 +150,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues(
                         "vaadin.devmode.sessionSerialization.enabled=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -155,6 +165,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=false")
                 .withPropertyValues(
                         "vaadin.devmode.sessionSerialization.enabled=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(
@@ -170,6 +181,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
                         "sun.io.serialization.extendedDebugInfo=true")
                 .withPropertyValues(
                         "vaadin.devmode.sessionSerialization.enabled=true")
+                .withBean(SerializationProperties.class)
                 .withConfiguration(AutoConfigurations.of(
                         KubernetesKitConfiguration.VaadinReplicatedSessionDevModeConfiguration.class))
                 .run(appCtx -> Assertions.assertThat(appCtx.getBeanNamesForType(

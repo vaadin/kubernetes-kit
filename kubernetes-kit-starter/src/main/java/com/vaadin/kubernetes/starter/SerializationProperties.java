@@ -29,8 +29,35 @@ public class SerializationProperties {
 
     public static final String PREFIX = "vaadin.serialization";
 
+    public static final int DEFAULT_SERIALIZATION_TIMEOUT_MS = 30000;
+
+    private int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
+
     @NestedConfigurationProperty
     private final TransientsProperties transients = new TransientsProperties();
+
+    /**
+     * Gets the timeout in milliseconds to wait for the serialization
+     * to be completed.
+     *
+     * @return the timeout in milliseconds to wait for the serialization
+     * to be completed, defaults to 30000 ms
+     */
+    public int getTimeout() {
+        return timeout;
+    }
+
+    /**
+     * Sets the timeout in milliseconds to wait for the serialization
+     * to be completed.
+     *
+     * @param timeout
+     *            the timeout in milliseconds to wait for the serialization
+     *            to be completed, defaults to 30000 ms
+     */
+    public void setTimeout(int timeout) {
+        this.timeout = timeout;
+    }
 
     /**
      * Gets configuration for transient fields handling during serialization.

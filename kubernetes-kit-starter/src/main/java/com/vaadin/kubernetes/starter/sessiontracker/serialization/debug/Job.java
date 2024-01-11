@@ -131,6 +131,11 @@ class Job {
                 Outcome.SERIALIZATION_FAILED.name() + ": " + ex.getMessage());
     }
 
+    void timeout() {
+        outcome.remove(Outcome.SERIALIZATION_FAILED);
+        outcome.add(Outcome.SERIALIZATION_TIMEOUT);
+    }
+
     void deserialized() {
         outcome.remove(Outcome.DESERIALIZATION_FAILED);
     }
@@ -238,15 +243,17 @@ class Job {
         }
         long duration = TimeUnit.NANOSECONDS
                 .toMillis(System.nanoTime() - this.startTimeNanos);
-        messages.computeIfPresent(Outcome.NOT_SERIALIZABLE_CLASSES.name(),
-                (unused, info) -> info.stream()
-                        .flatMap(className -> Stream.concat(
-                                Stream.of(className),
-                                unserializableDetails
-                                        .getOrDefault(className,
-                                                Collections.emptyList())
-                                        .stream().map(entry -> "\t" + entry)))
-                        .collect(Collectors.toList()));
+        if (!outcome.contains(Outcome.SERIALIZATION_TIMEOUT)) {
+            messages.computeIfPresent(Outcome.NOT_SERIALIZABLE_CLASSES.name(),
+                    (unused, info) -> info.stream()
+                            .flatMap(className -> Stream.concat(
+                                    Stream.of(className),
+                                    unserializableDetails
+                                            .getOrDefault(className,
+                                                    Collections.emptyList())
+                                            .stream().map(entry -> "\t" + entry)))
+                            .collect(Collectors.toList()));
+        }
         return new Result(sessionId, storageKey, outcome, duration, messages);
     }
 

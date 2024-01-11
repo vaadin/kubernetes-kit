@@ -162,10 +162,12 @@ public class KubernetesKitConfiguration {
     @AutoConfiguration
     @Conditional(VaadinReplicatedSessionDevModeConfiguration.OnSessionSerializationDebug.class)
     public static class VaadinReplicatedSessionDevModeConfiguration {
+
         @Bean
         @ConditionalOnMissingBean
-        SerializationDebugRequestHandler.InitListener sessionSerializationDebugToolInstaller() {
-            return new SerializationDebugRequestHandler.InitListener();
+        SerializationDebugRequestHandler.InitListener sessionSerializationDebugToolInstaller(
+                SerializationProperties serializationProperties) {
+            return new SerializationDebugRequestHandler.InitListener(serializationProperties);
         }
 
         @Bean
