@@ -31,7 +31,7 @@ public class SessionTrackerCookieTest {
     private ArgumentCaptor<Cookie> cookieArgumentCaptor;
 
     @Test
-    void setIfNeeded_nullCookies_attributeIsSetAndConfigured() {
+    void setIfNeeded_nullCookies_attributeIsSetAndCookieIsConfigured() {
         HttpSession session = mock(HttpSession.class);
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getCookies()).thenReturn(null);
@@ -49,7 +49,7 @@ public class SessionTrackerCookieTest {
     }
 
     @Test
-    void setIfNeeded_emptyCookies_attributeIsSetAndConfigured() {
+    void setIfNeeded_emptyCookies_attributeIsSetAndCookieIsConfigured() {
         HttpSession session = mock(HttpSession.class);
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getCookies()).thenReturn(new Cookie[0]);
