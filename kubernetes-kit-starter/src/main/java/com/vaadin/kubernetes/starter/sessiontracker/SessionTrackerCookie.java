@@ -46,6 +46,7 @@ public final class SessionTrackerCookie {
             session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
             Cookie cookie = new Cookie(CurrentKey.COOKIE_NAME, clusterKey);
             cookie.setHttpOnly(true);
+            cookie.setPath("/"); // TODO verify path
             response.addCookie(cookie);
         } else if (session.getAttribute(CurrentKey.COOKIE_NAME) == null) {
             String clusterKey = clusterKeyCookie.get().getValue();
