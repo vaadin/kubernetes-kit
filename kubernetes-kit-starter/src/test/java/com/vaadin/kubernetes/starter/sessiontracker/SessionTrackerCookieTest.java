@@ -9,6 +9,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -20,9 +24,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+@ExtendWith({ MockitoExtension.class })
 public class SessionTrackerCookieTest {
+
+    @Captor
+    private ArgumentCaptor<Cookie> cookieArgumentCaptor;
+
     @Test
-    void setIfNeeded_nullCookies_attributeIsSet() {
+    void setIfNeeded_nullCookies_attributeIsSetAndConfigured() {
         HttpSession session = mock(HttpSession.class);
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getCookies()).thenReturn(null);
@@ -31,11 +40,16 @@ public class SessionTrackerCookieTest {
         SessionTrackerCookie.setIfNeeded(session, request, response);
 
         verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME), anyString());
-        verify(response).addCookie(any());
+        verify(response).addCookie(cookieArgumentCaptor.capture());
+
+        Cookie cookie = cookieArgumentCaptor.getValue();
+        assertTrue(cookie.isHttpOnly());
+        assertEquals("/", cookie.getPath());
+        assertEquals("Strict", cookie.getAttribute("SameSite"));
     }
 
     @Test
-    void setIfNeeded_emptyCookies_attributeIsSet() {
+    void setIfNeeded_emptyCookies_attributeIsSetAndConfigured() {
         HttpSession session = mock(HttpSession.class);
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getCookies()).thenReturn(new Cookie[0]);
@@ -44,7 +58,12 @@ public class SessionTrackerCookieTest {
         SessionTrackerCookie.setIfNeeded(session, request, response);
 
         verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME), anyString());
-        verify(response).addCookie(any());
+        verify(response).addCookie(cookieArgumentCaptor.capture());
+
+        Cookie cookie = cookieArgumentCaptor.getValue();
+        assertTrue(cookie.isHttpOnly());
+        assertEquals("/", cookie.getPath());
+        assertEquals("Strict", cookie.getAttribute("SameSite"));
     }
 
     @Test

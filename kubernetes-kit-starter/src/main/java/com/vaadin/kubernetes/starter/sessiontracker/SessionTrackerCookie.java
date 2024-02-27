@@ -53,7 +53,6 @@ public final class SessionTrackerCookie {
             String clusterKey = clusterKeyCookie.get().getValue();
             session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
         }
-
     }
 
     /**
