@@ -41,10 +41,12 @@ public final class SessionTrackerCookie {
     public static void setIfNeeded(HttpSession session,
             HttpServletRequest request, HttpServletResponse response) {
         Optional<Cookie> clusterKeyCookie = getCookie(request);
-        if (!clusterKeyCookie.isPresent()) {
+        if (clusterKeyCookie.isEmpty()) {
             String clusterKey = UUID.randomUUID().toString();
             session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
-            response.addCookie(new Cookie(CurrentKey.COOKIE_NAME, clusterKey));
+            Cookie cookie = new Cookie(CurrentKey.COOKIE_NAME, clusterKey);
+            cookie.setHttpOnly(true);
+            response.addCookie(cookie);
         } else if (session.getAttribute(CurrentKey.COOKIE_NAME) == null) {
             String clusterKey = clusterKeyCookie.get().getValue();
             session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
