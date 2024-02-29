@@ -118,7 +118,7 @@ public class SpringTransientHandler implements TransientHandler {
             // when inspecting Vaadin NodeMap$HashMapValues that extends HashMap
             // Should we exclude some packages by default?
             // Should we throw or ignore the error?
-            getLogger().debug("Cannot access field {} of class {}",
+            getLogger().trace("Cannot access field {} of class {}",
                     field.getName(), target.getClass(), e);
         }
         return null;
