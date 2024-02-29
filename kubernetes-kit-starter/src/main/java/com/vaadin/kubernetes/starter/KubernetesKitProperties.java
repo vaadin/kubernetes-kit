@@ -11,6 +11,8 @@ package com.vaadin.kubernetes.starter;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import com.vaadin.kubernetes.starter.sessiontracker.SameSite;
+
 /**
  * Definition of configuration properties for the Kubernetes Kit starter.
  *
@@ -29,6 +31,11 @@ public class KubernetesKitProperties {
      * Enables (or disables) auto-configuration.
      */
     private boolean autoConfigure = true;
+
+    /**
+     * Value of the distributed storage session key cookie's SameSite attribute.
+     */
+    private SameSite clusterKeyCookieSameSite = SameSite.STRICT;
 
     /**
      * Hazelcast configuration properties.
@@ -55,6 +62,28 @@ public class KubernetesKitProperties {
      */
     public void setAutoConfigure(boolean autoConfigure) {
         this.autoConfigure = autoConfigure;
+    }
+
+    /**
+     * Gets the distributed storage session key cookie's SameSite attribute.
+     * value.
+     *
+     * @return the distributed storage session key cookie's SameSite attribute
+     * value
+     */
+    public SameSite getClusterKeyCookieSameSite() {
+        return clusterKeyCookieSameSite;
+    }
+
+    /**
+     * Sets the distributed storage session key cookie's SameSite attribute.
+     *
+     * @param sameSite
+     *            value of the distributed storage session key cookie's
+     *            SameSite attribute
+     */
+    public void setClusterKeyCookieSameSite(SameSite sameSite) {
+        this.clusterKeyCookieSameSite = sameSite;
     }
 
     /**

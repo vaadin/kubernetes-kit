@@ -74,9 +74,16 @@ public class KubernetesKitConfiguration {
         private static final Predicate<Class<?>> TRANSIENT_INJECTABLE_VAADIN_EXCLUSIONS = type -> !type
                 .getPackageName().startsWith("com.vaadin.flow.internal");
 
+        final KubernetesKitProperties properties;
+
+        public VaadinReplicatedSessionConfiguration(
+                KubernetesKitProperties properties) {
+            this.properties = properties;
+        }
+
         SessionTrackerFilter sessionTrackerFilter(
                 SessionSerializer sessionSerializer) {
-            return new SessionTrackerFilter(sessionSerializer);
+            return new SessionTrackerFilter(sessionSerializer, properties);
         }
 
         SessionListener sessionListener(BackendConnector backendConnector,

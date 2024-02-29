@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import com.vaadin.flow.server.HandlerHelper.RequestType;
 import com.vaadin.flow.shared.ApplicationConstants;
+import com.vaadin.kubernetes.starter.KubernetesKitProperties;
 
 /**
  * An HTTP filter implementation that serializes and persists HTTP session on a
@@ -45,9 +46,12 @@ import com.vaadin.flow.shared.ApplicationConstants;
 public class SessionTrackerFilter extends HttpFilter {
 
     private final transient SessionSerializer sessionSerializer;
+    private final transient KubernetesKitProperties properties;
 
-    public SessionTrackerFilter(SessionSerializer sessionSerializer) {
+    public SessionTrackerFilter(SessionSerializer sessionSerializer,
+            KubernetesKitProperties properties) {
         this.sessionSerializer = sessionSerializer;
+        this.properties = properties;
     }
 
     @Override
@@ -67,7 +71,8 @@ public class SessionTrackerFilter extends HttpFilter {
             HttpSession session = request.getSession(false);
 
             if (session != null) {
-                SessionTrackerCookie.setIfNeeded(session, request, response);
+                SessionTrackerCookie.setIfNeeded(session, request, response,
+                        properties.getClusterKeyCookieSameSite());
             }
             super.doFilter(request, response, chain);
 

@@ -37,7 +37,8 @@ public class SessionTrackerCookieTest {
         when(request.getCookies()).thenReturn(null);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        SessionTrackerCookie.setIfNeeded(session, request, response);
+        SessionTrackerCookie.setIfNeeded(session, request, response,
+                SameSite.STRICT);
 
         verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME), anyString());
         verify(response).addCookie(cookieArgumentCaptor.capture());
@@ -45,7 +46,8 @@ public class SessionTrackerCookieTest {
         Cookie cookie = cookieArgumentCaptor.getValue();
         assertTrue(cookie.isHttpOnly());
         assertEquals("/", cookie.getPath());
-        assertEquals("Strict", cookie.getAttribute("SameSite"));
+        assertEquals(SameSite.STRICT.attributeValue(),
+                cookie.getAttribute("SameSite"));
     }
 
     @Test
@@ -55,7 +57,8 @@ public class SessionTrackerCookieTest {
         when(request.getCookies()).thenReturn(new Cookie[0]);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        SessionTrackerCookie.setIfNeeded(session, request, response);
+        SessionTrackerCookie.setIfNeeded(session, request, response,
+                SameSite.STRICT);
 
         verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME), anyString());
         verify(response).addCookie(cookieArgumentCaptor.capture());
@@ -63,7 +66,8 @@ public class SessionTrackerCookieTest {
         Cookie cookie = cookieArgumentCaptor.getValue();
         assertTrue(cookie.isHttpOnly());
         assertEquals("/", cookie.getPath());
-        assertEquals("Strict", cookie.getAttribute("SameSite"));
+        assertEquals(SameSite.STRICT.attributeValue(),
+                cookie.getAttribute("SameSite"));
     }
 
     @Test
@@ -77,7 +81,8 @@ public class SessionTrackerCookieTest {
                 new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        SessionTrackerCookie.setIfNeeded(session, request, response);
+        SessionTrackerCookie.setIfNeeded(session, request, response,
+                SameSite.STRICT);
 
         verify(session).setAttribute(eq(CurrentKey.COOKIE_NAME),
                 eq(clusterKey));
@@ -95,7 +100,8 @@ public class SessionTrackerCookieTest {
                 new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
         HttpServletResponse response = mock(HttpServletResponse.class);
 
-        SessionTrackerCookie.setIfNeeded(session, request, response);
+        SessionTrackerCookie.setIfNeeded(session, request, response,
+                SameSite.STRICT);
 
         verify(session, never()).setAttribute(any(), any());
         verify(response, never()).addCookie(any());

@@ -14,6 +14,7 @@ import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.server.HandlerHelper;
 import com.vaadin.flow.shared.ApplicationConstants;
+import com.vaadin.kubernetes.starter.KubernetesKitProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -24,7 +25,8 @@ import static org.mockito.Mockito.when;
 class SessionTrackerFilterTest {
 
     SessionSerializer serializer = mock(SessionSerializer.class);
-    SessionTrackerFilter filter = new SessionTrackerFilter(serializer);
+    SessionTrackerFilter filter = new SessionTrackerFilter(serializer,
+            new KubernetesKitProperties());
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);

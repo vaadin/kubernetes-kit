@@ -39,7 +39,8 @@ public final class SessionTrackerCookie {
      *            the HTTP response.
      */
     public static void setIfNeeded(HttpSession session,
-            HttpServletRequest request, HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response,
+            SameSite sameSite) {
         Optional<Cookie> clusterKeyCookie = getCookie(request);
         if (clusterKeyCookie.isEmpty()) {
             String clusterKey = UUID.randomUUID().toString();
@@ -47,7 +48,7 @@ public final class SessionTrackerCookie {
             Cookie cookie = new Cookie(CurrentKey.COOKIE_NAME, clusterKey);
             cookie.setHttpOnly(true);
             cookie.setPath("/");
-            cookie.setAttribute("SameSite", "Strict");
+            cookie.setAttribute("SameSite", sameSite.attributeValue());
             response.addCookie(cookie);
         } else if (session.getAttribute(CurrentKey.COOKIE_NAME) == null) {
             String clusterKey = clusterKeyCookie.get().getValue();
