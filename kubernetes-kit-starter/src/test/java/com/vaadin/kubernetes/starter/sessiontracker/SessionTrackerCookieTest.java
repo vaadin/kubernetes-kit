@@ -34,6 +34,7 @@ public class SessionTrackerCookieTest {
     void setIfNeeded_nullCookies_attributeIsSetAndCookieIsConfigured() {
         HttpSession session = mock(HttpSession.class);
         HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getContextPath()).thenReturn("/contextpath");
         when(request.getCookies()).thenReturn(null);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
@@ -45,7 +46,7 @@ public class SessionTrackerCookieTest {
 
         Cookie cookie = cookieArgumentCaptor.getValue();
         assertTrue(cookie.isHttpOnly());
-        assertEquals("/", cookie.getPath());
+        assertEquals("/contextpath", cookie.getPath());
         assertEquals(SameSite.STRICT.attributeValue(),
                 cookie.getAttribute("SameSite"));
     }
@@ -54,6 +55,7 @@ public class SessionTrackerCookieTest {
     void setIfNeeded_emptyCookies_attributeIsSetAndCookieIsConfigured() {
         HttpSession session = mock(HttpSession.class);
         HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getContextPath()).thenReturn("/contextpath");
         when(request.getCookies()).thenReturn(new Cookie[0]);
         HttpServletResponse response = mock(HttpServletResponse.class);
 
@@ -65,7 +67,7 @@ public class SessionTrackerCookieTest {
 
         Cookie cookie = cookieArgumentCaptor.getValue();
         assertTrue(cookie.isHttpOnly());
-        assertEquals("/", cookie.getPath());
+        assertEquals("/contextpath", cookie.getPath());
         assertEquals(SameSite.STRICT.attributeValue(),
                 cookie.getAttribute("SameSite"));
     }
