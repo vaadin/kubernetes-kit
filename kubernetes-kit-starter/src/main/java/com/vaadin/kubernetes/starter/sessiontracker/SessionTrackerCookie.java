@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
@@ -40,15 +41,13 @@ public final class SessionTrackerCookie {
      */
     public static void setIfNeeded(HttpSession session,
             HttpServletRequest request, HttpServletResponse response,
-            SameSite sameSite) {
+            Consumer<Cookie> cookieConsumer) {
         Optional<Cookie> clusterKeyCookie = getCookie(request);
         if (clusterKeyCookie.isEmpty()) {
             String clusterKey = UUID.randomUUID().toString();
             session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
             Cookie cookie = new Cookie(CurrentKey.COOKIE_NAME, clusterKey);
-            cookie.setHttpOnly(true);
-            cookie.setPath(request.getContextPath());
-            cookie.setAttribute("SameSite", sameSite.attributeValue());
+            cookieConsumer.accept(cookie);
             response.addCookie(cookie);
         } else if (session.getAttribute(CurrentKey.COOKIE_NAME) == null) {
             String clusterKey = clusterKeyCookie.get().getValue();

@@ -11,11 +11,13 @@ package com.vaadin.kubernetes.starter.sessiontracker;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +74,7 @@ public class SessionTrackerFilter extends HttpFilter {
 
             if (session != null) {
                 SessionTrackerCookie.setIfNeeded(session, request, response,
-                        properties.getClusterKeyCookieSameSite());
+                        cookieConsumer(request));
             }
             super.doFilter(request, response, chain);
 
@@ -85,6 +87,20 @@ public class SessionTrackerFilter extends HttpFilter {
         } finally {
             CurrentKey.clear();
         }
+    }
+
+    private Consumer<Cookie> cookieConsumer(HttpServletRequest request) {
+        return (Cookie cookie) -> {
+            cookie.setHttpOnly(true);
+
+            String path = request.getContextPath().isEmpty() ? "/" : request.getContextPath();
+            cookie.setPath(path);
+
+            SameSite sameSite = properties.getClusterKeyCookieSameSite();
+            if (sameSite != null && !sameSite.attributeValue().isEmpty()) {
+                cookie.setAttribute("SameSite", sameSite.attributeValue());
+            }
+        };
     }
 
     private Logger getLogger() {
