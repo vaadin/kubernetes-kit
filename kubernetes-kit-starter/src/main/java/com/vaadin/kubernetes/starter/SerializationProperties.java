@@ -37,23 +37,23 @@ public class SerializationProperties {
     private final TransientsProperties transients = new TransientsProperties();
 
     /**
-     * Gets the timeout in milliseconds to wait for the serialization
-     * to be completed.
+     * Gets the timeout in milliseconds to wait for the serialization to be
+     * completed.
      *
-     * @return the timeout in milliseconds to wait for the serialization
-     * to be completed, defaults to 30000 ms
+     * @return the timeout in milliseconds to wait for the serialization to be
+     *         completed, defaults to 30000 ms
      */
     public int getTimeout() {
         return timeout;
     }
 
     /**
-     * Sets the timeout in milliseconds to wait for the serialization
-     * to be completed.
+     * Sets the timeout in milliseconds to wait for the serialization to be
+     * completed.
      *
      * @param timeout
-     *            the timeout in milliseconds to wait for the serialization
-     *            to be completed, defaults to 30000 ms
+     *            the timeout in milliseconds to wait for the serialization to
+     *            be completed, defaults to 30000 ms
      */
     public void setTimeout(int timeout) {
         this.timeout = timeout;

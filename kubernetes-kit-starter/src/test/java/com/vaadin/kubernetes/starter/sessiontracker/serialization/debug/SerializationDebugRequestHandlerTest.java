@@ -49,8 +49,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 @EnableOnJavaIOReflection
-@EnabledIfSystemProperty(named = "sun.io.serialization.extendedDebugInfo", matches = "true",
-        disabledReason = "Tests need system property sun.io.serialization.extendedDebugInfo to be enabled")
+@EnabledIfSystemProperty(named = "sun.io.serialization.extendedDebugInfo", matches = "true", disabledReason = "Tests need system property sun.io.serialization.extendedDebugInfo to be enabled")
 class SerializationDebugRequestHandlerTest {
 
     SerializationDebugRequestHandler handler;
@@ -83,8 +82,8 @@ class SerializationDebugRequestHandlerTest {
                 resultHolder.set(result);
             }
         });
-        doAnswer(i -> (SerializableConsumer<Result>) resultHolder::set)
-                .when(ui).accessLater(any(SerializableConsumer.class),
+        doAnswer(i -> (SerializableConsumer<Result>) resultHolder::set).when(ui)
+                .accessLater(any(SerializableConsumer.class),
                         any(SerializableRunnable.class));
         when(ui.getPushConfiguration()).thenReturn(pushConfiguration);
         when(vaadinService.findUI(any())).thenReturn(ui);
@@ -308,7 +307,8 @@ class SerializationDebugRequestHandlerTest {
         Result result = resultHolder.get();
         assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
         assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                Outcome.NOT_SERIALIZABLE_CLASSES, Outcome.SERIALIZATION_TIMEOUT);
+                Outcome.NOT_SERIALIZABLE_CLASSES,
+                Outcome.SERIALIZATION_TIMEOUT);
     }
 
     @Test

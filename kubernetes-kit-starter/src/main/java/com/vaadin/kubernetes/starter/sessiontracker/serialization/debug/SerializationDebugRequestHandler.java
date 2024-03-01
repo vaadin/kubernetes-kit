@@ -89,7 +89,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
 
     private final SerializationProperties serializationProperties;
 
-    public SerializationDebugRequestHandler(SerializationProperties serializationProperties) {
+    public SerializationDebugRequestHandler(
+            SerializationProperties serializationProperties) {
         this.serializationProperties = serializationProperties;
     }
 
@@ -133,7 +134,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
                                     });
                         }
                     }
-                    int serializationTimeout = getSerializationTimeout(serializationProperties);
+                    int serializationTimeout = getSerializationTimeout(
+                            serializationProperties);
                     vaadinRequest.setAttribute(
                             SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY,
                             new Runner(onSuccess, serializationTimeout));
@@ -205,7 +207,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
                 new DebugTransientHandler(job));
         try {
             trySerialize(serializer, debugHttpSession, job);
-            SessionInfo info = connector.waitForCompletion(serializationTimeout, LOGGER);
+            SessionInfo info = connector.waitForCompletion(serializationTimeout,
+                    LOGGER);
             if (info != null) {
                 debugHttpSession = new DebugHttpSession(
                         "DEBUG-DESERIALIZE-" + session.getId());
@@ -252,7 +255,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         if (properties != null && properties.getTimeout() > 0) {
             timeout = properties.getTimeout();
         } else {
-            String timeoutStr = System.getProperty(SERIALIZATION_TIMEOUT_PROPERTY);
+            String timeoutStr = System
+                    .getProperty(SERIALIZATION_TIMEOUT_PROPERTY);
             if (timeoutStr != null) {
                 timeout = Integer.parseInt(timeoutStr);
             }
@@ -326,8 +330,9 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             } else {
                 logger.info(
                         "Installing SerializationDebugRequestHandler for session serialization debug");
-                serviceInitEvent.addRequestHandler(
-                        new SerializationDebugRequestHandler(serializationProperties));
+                serviceInitEvent
+                        .addRequestHandler(new SerializationDebugRequestHandler(
+                                serializationProperties));
             }
         }
     }
