@@ -65,7 +65,7 @@ public class KubernetesKitProperties {
     }
 
     /**
-     * Gets the distributed storage session key cookie's SameSite attribute.
+     * Gets the distributed storage session key cookie's SameSite attribute
      * value.
      *
      * @return the distributed storage session key cookie's SameSite attribute
