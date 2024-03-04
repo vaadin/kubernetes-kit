@@ -41,6 +41,7 @@ import org.springframework.util.StringUtils;
 
 import com.vaadin.flow.spring.SpringBootAutoConfiguration;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionListener;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
@@ -105,11 +106,18 @@ public class KubernetesKitConfiguration {
         }
 
         @Bean
+        @ConditionalOnMissingBean
+        SessionSerializationCallback sessionSerializationCallback() {
+            return new DefaultSessionSerializationCallback();
+        }
+
+        @Bean
         SessionSerializer sessionSerializer(BackendConnector backendConnector,
                 TransientHandler transientInjector,
+                SessionSerializationCallback sessionSerializationCallback,
                 @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter) {
             SessionSerializer sessionSerializer = new SessionSerializer(
-                    backendConnector, transientInjector);
+                    backendConnector, transientInjector, sessionSerializationCallback);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }

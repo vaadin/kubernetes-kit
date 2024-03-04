@@ -15,6 +15,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.NotSerializableException;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -118,6 +119,8 @@ public class SessionSerializer
 
     private final long optimisticSerializationTimeoutMs;
 
+    private final SessionSerializationCallback sessionSerializationCallback;
+
     private Predicate<Class<?>> injectableFilter = type -> true;
 
     /**
@@ -128,20 +131,26 @@ public class SessionSerializer
      *            storage.
      * @param transientHandler
      *            handler to inspect and inject transient fields.
+     * @param sessionSerializationCallback
+     *            callback to call after serialization or deserialization error
      */
     public SessionSerializer(BackendConnector backendConnector,
-            TransientHandler transientHandler) {
+                             TransientHandler transientHandler,
+                             SessionSerializationCallback sessionSerializationCallback) {
         this.backendConnector = backendConnector;
         this.handler = transientHandler;
+        this.sessionSerializationCallback = sessionSerializationCallback;
         optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
     }
 
     // Visible for test
     SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
+            SessionSerializationCallback sessionSerializationCallback,
             long optimisticSerializationTimeoutMs) {
         this.backendConnector = backendConnector;
         this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
+        this.sessionSerializationCallback = sessionSerializationCallback;
         this.handler = transientHandler;
     }
 
@@ -194,13 +203,11 @@ public class SessionSerializer
      * @param session
      *            the HTTP session
      *
-     * @throws ClassNotFoundException
-     *             if class of a serialized object cannot be found.
-     * @throws IOException
-     *             any of the usual Input/Output related exceptions.
+     * @throws Exception
+     *             any of the deserialization related exceptions.
      */
     public void deserialize(SessionInfo sessionInfo, HttpSession session)
-            throws ClassNotFoundException, IOException {
+            throws Exception {
         Map<String, Object> values = doDeserialize(sessionInfo,
                 session.getId());
 
@@ -425,6 +432,8 @@ public class SessionSerializer
         try (TransientInjectableObjectOutputStream outStream = TransientInjectableObjectOutputStream
                 .newInstance(out, handler, injectableFilter)) {
             outStream.writeWithTransients(attributes);
+        } catch (Exception ex) {
+            sessionSerializationCallback.onSerializationError(ex);
         }
 
         SessionInfo info = new SessionInfo(getClusterKey(attributes),
@@ -442,7 +451,7 @@ public class SessionSerializer
     }
 
     private Map<String, Object> doDeserialize(SessionInfo sessionInfo,
-            String sessionId) throws IOException, ClassNotFoundException {
+            String sessionId) throws Exception {
         byte[] data = sessionInfo.getData();
         long start = System.currentTimeMillis();
 
@@ -450,10 +459,12 @@ public class SessionSerializer
         ClassLoader contextLoader = Thread.currentThread()
                 .getContextClassLoader();
         ByteArrayInputStream in = new ByteArrayInputStream(data);
-        Map<String, Object> attributes;
+        Map<String, Object> attributes = new HashMap<>();
         try (TransientInjectableObjectInputStream inStream = new TransientInjectableObjectInputStream(
                 in, handler)) {
             attributes = inStream.readWithTransients();
+        } catch (Exception ex) {
+            sessionSerializationCallback.onDeserializationError(ex);
         } finally {
             Thread.currentThread().setContextClassLoader(contextLoader);
         }
