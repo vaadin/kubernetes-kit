@@ -434,6 +434,7 @@ public class SessionSerializer
             outStream.writeWithTransients(attributes);
         } catch (Exception ex) {
             sessionSerializationCallback.onSerializationError(ex);
+            throw ex;
         }
 
         SessionInfo info = new SessionInfo(getClusterKey(attributes),
@@ -465,6 +466,7 @@ public class SessionSerializer
             attributes = inStream.readWithTransients();
         } catch (Exception ex) {
             sessionSerializationCallback.onDeserializationError(ex);
+            throw ex;
         } finally {
             Thread.currentThread().setContextClassLoader(contextLoader);
         }

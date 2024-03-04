@@ -27,12 +27,12 @@ import com.vaadin.flow.server.VaadinServletService;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
-import com.vaadin.kubernetes.starter.DefaultSessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -41,7 +41,6 @@ import static org.mockito.ArgumentMatchers.isNotNull;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -244,11 +243,10 @@ class SessionSerializerTest {
     }
 
     @Test
-    void serialize_notSerializableException_notFallbackToPessimistic() throws Exception {
+    void serialize_notSerializableException_notFallbackToPessimistic() {
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
-        doThrow(new NotSerializableException()).when(serializationCallback).onSerializationError(any());
 
         vaadinSession.setLockTimestamps(10, 20);
         httpSession.setAttribute("UNSERIALIZABLE", new Unserializable());
@@ -317,7 +315,8 @@ class SessionSerializerTest {
     @Test
     void serialize_notSerializableException_onDeserializationError_called() throws Exception {
         SessionInfo sessionInfo = new SessionInfo("clusterKey", new byte[0]);
-        serializer.deserialize(sessionInfo, httpSession);
+
+        assertThrows(Exception.class, () -> serializer.deserialize(sessionInfo, httpSession));
 
         verify(serializationCallback).onDeserializationError(any());
     }

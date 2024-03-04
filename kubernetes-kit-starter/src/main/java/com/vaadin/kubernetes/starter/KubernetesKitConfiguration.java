@@ -40,6 +40,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.util.StringUtils;
 
 import com.vaadin.flow.spring.SpringBootAutoConfiguration;
+import com.vaadin.kubernetes.starter.sessiontracker.DefaultSessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionListener;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;

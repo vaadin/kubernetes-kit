@@ -41,7 +41,7 @@ import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
-import com.vaadin.kubernetes.starter.DefaultSessionSerializationCallback;
+import com.vaadin.kubernetes.starter.sessiontracker.DefaultSessionSerializationCallback;
 import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
