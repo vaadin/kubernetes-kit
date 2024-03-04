@@ -1,7 +1,8 @@
 package com.vaadin.kubernetes.demo.views;
 
-import com.vaadin.kubernetes.demo.components.appnav.AppNav;
-import com.vaadin.kubernetes.demo.components.appnav.AppNavItem;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.sidenav.SideNav;
+import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.kubernetes.demo.views.counter.CounterView;
 import com.vaadin.kubernetes.demo.views.counter.PushCounterView;
 import com.vaadin.kubernetes.demo.views.list.ListView;
@@ -47,28 +48,20 @@ public class MainLayout extends AppLayout {
 
         Scroller scroller = new Scroller(createNavigation());
 
-        addToDrawer(header, scroller, createFooter());
+        addToDrawer(header, scroller, new Footer());
     }
 
-    private AppNav createNavigation() {
-        // AppNav is not yet an official component.
-        // For documentation, visit https://github.com/vaadin/vcf-nav#readme
-        AppNav nav = new AppNav();
+    private SideNav createNavigation() {
+        SideNav nav = new SideNav();
 
-        nav.addItem(new AppNavItem("Counter", CounterView.class,
-                "la la-plus-circle"));
-        nav.addItem(new AppNavItem("PUSH Counter", PushCounterView.class,
-                "la la-plus-circle"));
-        nav.addItem(
-                new AppNavItem("List", ListView.class, "la la-plus-circle"));
+        nav.addItem(new SideNavItem("Counter", CounterView.class,
+                new Icon("la", "la-plus-circle")));
+        nav.addItem(new SideNavItem("PUSH Counter", PushCounterView.class,
+                new Icon("la", "la-plus-circle")));
+        nav.addItem(new SideNavItem("List", ListView.class,
+                new Icon("la", "la-plus-circle")));
 
         return nav;
-    }
-
-    private Footer createFooter() {
-        Footer layout = new Footer();
-
-        return layout;
     }
 
     @Override
@@ -81,5 +74,11 @@ public class MainLayout extends AppLayout {
         PageTitle title = getContent().getClass()
                 .getAnnotation(PageTitle.class);
         return title == null ? "" : title.value();
+    }
+
+    static class Icon extends Span {
+        Icon(String... classNames) {
+            addClassNames(classNames);
+        }
     }
 }
