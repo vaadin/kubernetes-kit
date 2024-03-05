@@ -300,7 +300,7 @@ class SessionSerializerTest {
     }
 
     @Test
-    void serialize_notSerializableException_onSerializationError_called() throws Exception {
+    void serialize_notSerializableException_onSerializationError_called() {
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
@@ -313,10 +313,11 @@ class SessionSerializerTest {
     }
 
     @Test
-    void serialize_notSerializableException_onDeserializationError_called() throws Exception {
+    void serialize_notSerializableException_onDeserializationError_called() {
         SessionInfo sessionInfo = new SessionInfo("clusterKey", new byte[0]);
 
-        assertThrows(Exception.class, () -> serializer.deserialize(sessionInfo, httpSession));
+        assertThrows(Exception.class,
+                () -> serializer.deserialize(sessionInfo, httpSession));
 
         verify(serializationCallback).onDeserializationError(any());
     }

@@ -135,8 +135,8 @@ public class SessionSerializer
      *            callback to call after serialization or deserialization error
      */
     public SessionSerializer(BackendConnector backendConnector,
-                             TransientHandler transientHandler,
-                             SessionSerializationCallback sessionSerializationCallback) {
+            TransientHandler transientHandler,
+            SessionSerializationCallback sessionSerializationCallback) {
         this.backendConnector = backendConnector;
         this.handler = transientHandler;
         this.sessionSerializationCallback = sessionSerializationCallback;

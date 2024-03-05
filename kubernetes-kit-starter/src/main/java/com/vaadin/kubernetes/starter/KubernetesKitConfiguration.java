@@ -118,7 +118,8 @@ public class KubernetesKitConfiguration {
                 SessionSerializationCallback sessionSerializationCallback,
                 @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter) {
             SessionSerializer sessionSerializer = new SessionSerializer(
-                    backendConnector, transientInjector, sessionSerializationCallback);
+                    backendConnector, transientInjector,
+                    sessionSerializationCallback);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }
