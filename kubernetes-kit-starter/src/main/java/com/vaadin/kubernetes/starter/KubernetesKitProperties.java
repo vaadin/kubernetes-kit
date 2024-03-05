@@ -69,7 +69,7 @@ public class KubernetesKitProperties {
      * value.
      *
      * @return the distributed storage session key cookie's SameSite attribute
-     * value
+     *         value
      */
     public SameSite getClusterKeyCookieSameSite() {
         return clusterKeyCookieSameSite;
@@ -79,8 +79,8 @@ public class KubernetesKitProperties {
      * Sets the distributed storage session key cookie's SameSite attribute.
      *
      * @param sameSite
-     *            value of the distributed storage session key cookie's
-     *            SameSite attribute
+     *            value of the distributed storage session key cookie's SameSite
+     *            attribute
      */
     public void setClusterKeyCookieSameSite(SameSite sameSite) {
         this.clusterKeyCookieSameSite = sameSite;

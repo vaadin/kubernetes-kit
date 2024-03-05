@@ -29,7 +29,8 @@ public class SessionTrackerCookieTest {
         when(request.getCookies()).thenReturn(null);
         HttpServletResponse response = mock(HttpServletResponse.class);
         @SuppressWarnings("unchecked")
-        Consumer<Cookie> cookieConsumer = (Consumer<Cookie>) mock(Consumer.class);
+        Consumer<Cookie> cookieConsumer = (Consumer<Cookie>) mock(
+                Consumer.class);
 
         SessionTrackerCookie.setIfNeeded(session, request, response,
                 cookieConsumer);
@@ -46,7 +47,8 @@ public class SessionTrackerCookieTest {
         when(request.getCookies()).thenReturn(new Cookie[0]);
         HttpServletResponse response = mock(HttpServletResponse.class);
         @SuppressWarnings("unchecked")
-        Consumer<Cookie> cookieConsumer = (Consumer<Cookie>) mock(Consumer.class);
+        Consumer<Cookie> cookieConsumer = (Consumer<Cookie>) mock(
+                Consumer.class);
 
         SessionTrackerCookie.setIfNeeded(session, request, response,
                 cookieConsumer);
@@ -66,7 +68,8 @@ public class SessionTrackerCookieTest {
         when(request.getCookies()).thenReturn(new Cookie[] {
                 new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
         HttpServletResponse response = mock(HttpServletResponse.class);
-        Consumer<Cookie> cookieConsumer = (Cookie cookie) -> {};
+        Consumer<Cookie> cookieConsumer = (Cookie cookie) -> {
+        };
 
         SessionTrackerCookie.setIfNeeded(session, request, response,
                 cookieConsumer);
@@ -86,7 +89,8 @@ public class SessionTrackerCookieTest {
         when(request.getCookies()).thenReturn(new Cookie[] {
                 new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
         HttpServletResponse response = mock(HttpServletResponse.class);
-        Consumer<Cookie> cookieConsumer = (Cookie cookie) -> {};
+        Consumer<Cookie> cookieConsumer = (Cookie cookie) -> {
+        };
 
         SessionTrackerCookie.setIfNeeded(session, request, response,
                 cookieConsumer);

@@ -139,11 +139,13 @@ class SessionTrackerFilterTest {
         setupHttpSession();
         when(request.getContextPath()).thenReturn("contextpath");
 
-        try (MockedStatic<SessionTrackerCookie> mockedStatic = mockStatic(SessionTrackerCookie.class)) {
+        try (MockedStatic<SessionTrackerCookie> mockedStatic = mockStatic(
+                SessionTrackerCookie.class)) {
             filter.doFilter(request, response, filterChain);
-            mockedStatic.verify(() -> SessionTrackerCookie.setIfNeeded(any(), any(), any(),
-                    cookieConsumerArgumentCaptor.capture()));
-            Consumer<Cookie> cookieConsumer = cookieConsumerArgumentCaptor.getValue();
+            mockedStatic.verify(() -> SessionTrackerCookie.setIfNeeded(any(),
+                    any(), any(), cookieConsumerArgumentCaptor.capture()));
+            Consumer<Cookie> cookieConsumer = cookieConsumerArgumentCaptor
+                    .getValue();
             cookieConsumer.accept(cookie);
         }
 

@@ -93,7 +93,8 @@ public class SessionTrackerFilter extends HttpFilter {
         return (Cookie cookie) -> {
             cookie.setHttpOnly(true);
 
-            String path = request.getContextPath().isEmpty() ? "/" : request.getContextPath();
+            String path = request.getContextPath().isEmpty() ? "/"
+                    : request.getContextPath();
             cookie.setPath(path);
 
             SameSite sameSite = properties.getClusterKeyCookieSameSite();
