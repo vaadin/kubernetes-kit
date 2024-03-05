@@ -183,7 +183,8 @@ public class KubernetesKitConfiguration {
         @ConditionalOnMissingBean
         SerializationDebugRequestHandler.InitListener sessionSerializationDebugToolInstaller(
                 SerializationProperties serializationProperties) {
-            return new SerializationDebugRequestHandler.InitListener(serializationProperties);
+            return new SerializationDebugRequestHandler.InitListener(
+                    serializationProperties);
         }
 
         @Bean

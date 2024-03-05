@@ -244,14 +244,14 @@ class Job {
         long duration = TimeUnit.NANOSECONDS
                 .toMillis(System.nanoTime() - this.startTimeNanos);
         if (!outcome.contains(Outcome.SERIALIZATION_TIMEOUT)) {
-            messages.computeIfPresent(Outcome.NOT_SERIALIZABLE_CLASSES.name(),
-                    (unused, info) -> info.stream()
-                            .flatMap(className -> Stream.concat(
-                                    Stream.of(className),
-                                    unserializableDetails
-                                            .getOrDefault(className,
-                                                    Collections.emptyList())
-                                            .stream().map(entry -> "\t" + entry)))
+            messages.computeIfPresent(Outcome.NOT_SERIALIZABLE_CLASSES.name(), (
+                    unused,
+                    info) -> info.stream().flatMap(className -> Stream.concat(
+                            Stream.of(className),
+                            unserializableDetails
+                                    .getOrDefault(className,
+                                            Collections.emptyList())
+                                    .stream().map(entry -> "\t" + entry)))
                             .collect(Collectors.toList()));
         }
         return new Result(sessionId, storageKey, outcome, duration, messages);

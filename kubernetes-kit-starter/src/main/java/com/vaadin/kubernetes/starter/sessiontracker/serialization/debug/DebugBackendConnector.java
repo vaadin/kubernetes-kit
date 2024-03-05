@@ -63,12 +63,12 @@ class DebugBackendConnector implements BackendConnector {
     }
 
     /**
-     * Blocks the thread for up to the defined timeout in milliseconds,
-     * waiting for serialization to be completed.
+     * Blocks the thread for up to the defined timeout in milliseconds, waiting
+     * for serialization to be completed.
      *
      * @param timeout
-     *            the timeout in milliseconds to wait for the serialization
-     *            to be completed.
+     *            the timeout in milliseconds to wait for the serialization to
+     *            be completed.
      * @param logger
      *            the logger to add potential error information.
      * @return the serialized session holder.
@@ -78,9 +78,9 @@ class DebugBackendConnector implements BackendConnector {
             if (!latch.await(timeout, TimeUnit.MILLISECONDS)) {
                 job.timeout();
                 logger.error(
-                        "Session serialization timed out because did not complete in {} ms. " +
-                                "Increase the serialization timeout (in milliseconds) by the " +
-                                "'vaadin.serialization.timeout' application or system property.",
+                        "Session serialization timed out because did not complete in {} ms. "
+                                + "Increase the serialization timeout (in milliseconds) by the "
+                                + "'vaadin.serialization.timeout' application or system property.",
                         timeout);
             }
         } catch (Exception e) { // NOSONAR
