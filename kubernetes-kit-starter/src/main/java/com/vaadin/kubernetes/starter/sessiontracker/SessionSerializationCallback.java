@@ -4,7 +4,7 @@ package com.vaadin.kubernetes.starter.sessiontracker;
  * Callbacks that are called after a successful serialization and
  * deserialization or when an error happens during the serialization or
  * deserialization. Each callback has a default method implementation. A bean
- * needs to be crated from a class implementing this interface.
+ * needs to be created from a class implementing this interface.
  */
 public interface SessionSerializationCallback {
 
@@ -38,7 +38,7 @@ public interface SessionSerializationCallback {
     }
 
     /**
-     * Callback that is called when a deserialization error happens.Should not
+     * Callback that is called when a deserialization error happens. Should not
      * throw any exception.
      *
      * @param exception
