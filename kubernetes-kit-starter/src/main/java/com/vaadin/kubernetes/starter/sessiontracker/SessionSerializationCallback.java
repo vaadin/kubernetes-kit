@@ -1,20 +1,49 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
 /**
- * Error callbacks that are called after a serialization or deserialization
- * error happens.
+ * Callbacks that are called after a successful serialization and
+ * deserialization or when an error happens during the serialization or
+ * deserialization. Each callback has a default method implementation. A bean
+ * needs to be crated from a class implementing this interface.
  */
 public interface SessionSerializationCallback {
 
     /**
-     * Error callback that is called after a serialization error happens.
+     * The default implementation of this interface, which is used when there is
+     * no bean provided from other implementation.
      */
-    default void onSerializationError(Exception ex) {
+    SessionSerializationCallback DEFAULT = new SessionSerializationCallback() {
+    };
+
+    /**
+     * Callback that is called after a successful serialization.
+     */
+    default void onSerializationSuccess() {
     }
 
     /**
-     * Error callback that is called after a deserialization error happens.
+     * Callback that is called when a serialization error happens. Should not
+     * throw any exception.
+     *
+     * @param exception
+     *            the exception that is the cause of the serialization error
      */
-    default void onDeserializationError(Exception ex) {
+    default void onSerializationError(Exception exception) {
+    }
+
+    /**
+     * Callback that is called after a successful deserialization.
+     */
+    default void onDeserializationSuccess() {
+    }
+
+    /**
+     * Callback that is called when a deserialization error happens.Should not
+     * throw any exception.
+     *
+     * @param exception
+     *            the exception that is the cause of the deserialization error.
+     */
+    default void onDeserializationError(Exception exception) {
     }
 }
