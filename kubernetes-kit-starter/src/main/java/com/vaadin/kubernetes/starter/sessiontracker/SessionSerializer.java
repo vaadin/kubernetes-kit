@@ -15,7 +15,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.NotSerializableException;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -432,6 +431,7 @@ public class SessionSerializer
         try (TransientInjectableObjectOutputStream outStream = TransientInjectableObjectOutputStream
                 .newInstance(out, handler, injectableFilter)) {
             outStream.writeWithTransients(attributes);
+            sessionSerializationCallback.onSerializationSuccess();
         } catch (Exception ex) {
             sessionSerializationCallback.onSerializationError(ex);
             throw ex;
@@ -460,10 +460,11 @@ public class SessionSerializer
         ClassLoader contextLoader = Thread.currentThread()
                 .getContextClassLoader();
         ByteArrayInputStream in = new ByteArrayInputStream(data);
-        Map<String, Object> attributes = new HashMap<>();
+        Map<String, Object> attributes;
         try (TransientInjectableObjectInputStream inStream = new TransientInjectableObjectInputStream(
                 in, handler)) {
             attributes = inStream.readWithTransients();
+            sessionSerializationCallback.onDeserializationSuccess();
         } catch (Exception ex) {
             sessionSerializationCallback.onDeserializationError(ex);
             throw ex;

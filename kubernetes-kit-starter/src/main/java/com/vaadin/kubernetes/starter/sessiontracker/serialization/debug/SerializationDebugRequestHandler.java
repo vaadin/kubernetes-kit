@@ -41,9 +41,9 @@ import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
-import com.vaadin.kubernetes.starter.sessiontracker.DefaultSessionSerializationCallback;
 import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
@@ -165,7 +165,8 @@ public class SerializationDebugRequestHandler implements RequestHandler {
                     onComplete.accept(result);
                 } catch (Exception ex) {
                     // Do not interrupt the request
-                    ex.printStackTrace();
+                    LoggerFactory.getLogger(Runner.class).error(
+                            "Error during executing on complete task", ex);
                 }
             }
         }
@@ -206,7 +207,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         DebugBackendConnector connector = new DebugBackendConnector(job);
         SessionSerializer serializer = new SessionSerializer(connector,
                 new DebugTransientHandler(job),
-                new DefaultSessionSerializationCallback());
+                SessionSerializationCallback.DEFAULT);
         try {
             trySerialize(serializer, debugHttpSession, job);
             SessionInfo info = connector.waitForCompletion(serializationTimeout,
