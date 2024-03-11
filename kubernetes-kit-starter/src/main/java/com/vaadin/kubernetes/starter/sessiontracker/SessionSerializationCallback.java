@@ -9,8 +9,9 @@ package com.vaadin.kubernetes.starter.sessiontracker;
 public interface SessionSerializationCallback {
 
     /**
-     * The default implementation of this interface, which is used when there is
-     * no bean provided from other implementation.
+     * The default no-op implementation of this interface, which is used when
+     * there is no bean provided from other implementation. It does not perform
+     * any operation.
      */
     SessionSerializationCallback DEFAULT = new SessionSerializationCallback() {
     };
