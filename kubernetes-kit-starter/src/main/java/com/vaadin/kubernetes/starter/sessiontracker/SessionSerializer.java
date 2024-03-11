@@ -131,7 +131,8 @@ public class SessionSerializer
      * @param transientHandler
      *            handler to inspect and inject transient fields.
      * @param sessionSerializationCallback
-     *            callback to call after serialization or deserialization error
+     *            callbacks for successful serialization and deserialization or
+     *            when an error happens
      */
     public SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
