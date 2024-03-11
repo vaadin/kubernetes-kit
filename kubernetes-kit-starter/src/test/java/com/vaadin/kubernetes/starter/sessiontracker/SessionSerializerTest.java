@@ -291,8 +291,7 @@ class SessionSerializerTest {
         try {
             serializer.deserialize(infoList.get(0), deserializedSession);
         } catch (Exception e) {
-            e.printStackTrace();
-            fail();
+            fail(e);
         }
 
         verify(deserializedSession, times(3)).setAttribute(any(), any());
@@ -342,8 +341,7 @@ class SessionSerializerTest {
         try {
             serializer.deserialize(infoList.get(0), httpSession);
         } catch (Exception e) {
-            e.printStackTrace();
-            fail();
+            fail(e);
         }
 
         verify(serializationCallback).onDeserializationSuccess();
