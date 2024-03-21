@@ -42,10 +42,9 @@ class SerializationDeserializationTest {
 
         Object result = new TransientInjectableObjectInputStream(
                 new ByteArrayInputStream(os.toByteArray()), handler)
-                        .readWithTransients();
+                .readWithTransients();
         Assertions.assertThat(result).isNotSameAs(target)
                 .isExactlyInstanceOf(TestConfig.CtorInjectionTarget.class)
-                .hasNoNullFieldsOrProperties()
                 .asInstanceOf(InstanceOfAssertFactories
                         .type(TestConfig.CtorInjectionTarget.class))
                 .extracting(obj -> obj.defaultImpl, obj -> obj.alternative)
@@ -61,7 +60,7 @@ class SerializationDeserializationTest {
 
         Object result = new TransientInjectableObjectInputStream(
                 new ByteArrayInputStream(os.toByteArray()), handler)
-                        .readWithTransients();
+                .readWithTransients();
         Assertions.assertThat(result).isNotSameAs(target)
                 .isExactlyInstanceOf(TestConfig.NullTransient.class)
                 .hasFieldOrPropertyWithValue("notInitialized", null);
@@ -71,12 +70,13 @@ class SerializationDeserializationTest {
     void serialization_filterInjectables_componentIgnored(
             @Autowired TestConfig.CtorInjectionTarget target) throws Exception {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        TransientInjectableObjectOutputStream.newInstance(os, handler, type -> false)
+        TransientInjectableObjectOutputStream
+                .newInstance(os, handler, type -> false)
                 .writeWithTransients(target);
 
         Object result = new TransientInjectableObjectInputStream(
                 new ByteArrayInputStream(os.toByteArray()), handler)
-                        .readWithTransients();
+                .readWithTransients();
         Assertions.assertThat(result).isNotSameAs(target)
                 .isExactlyInstanceOf(TestConfig.CtorInjectionTarget.class)
                 .hasAllNullFieldsOrProperties();

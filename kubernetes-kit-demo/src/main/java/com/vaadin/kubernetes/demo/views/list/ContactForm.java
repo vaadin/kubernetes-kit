@@ -42,12 +42,7 @@ public class ContactForm extends FormLayout {
         company.setItemLabelGenerator(Company::getName);
         status.setItems(statuses);
         status.setItemLabelGenerator(Status::getName);
-        add(firstName,
-                lastName,
-                email,
-                company,
-                status,
-                createButtonsLayout());
+        add(firstName, lastName, email, company, status, createButtonsLayout());
     }
 
     private HorizontalLayout createButtonsLayout() {
@@ -59,9 +54,9 @@ public class ContactForm extends FormLayout {
         close.addClickShortcut(Key.ESCAPE);
 
         save.addClickListener(event -> validateAndSave());
-        delete.addClickListener(event -> fireEvent(new DeleteEvent(this, contact)));
+        delete.addClickListener(
+                event -> fireEvent(new DeleteEvent(this, contact)));
         close.addClickListener(event -> fireEvent(new CloseEvent(this)));
-
 
         binder.addStatusChangeListener(e -> save.setEnabled(binder.isValid()));
 
@@ -83,7 +78,8 @@ public class ContactForm extends FormLayout {
     }
 
     // Events
-    public static abstract class ContactFormEvent extends ComponentEvent<ContactForm> {
+    public static abstract class ContactFormEvent
+            extends ComponentEvent<ContactForm> {
         private Contact contact;
 
         protected ContactFormEvent(ContactForm source, Contact contact) {
@@ -115,8 +111,8 @@ public class ContactForm extends FormLayout {
         }
     }
 
-    public <T extends ComponentEvent<?>> Registration addListener(Class<T> eventType,
-            ComponentEventListener<T> listener) {
+    public <T extends ComponentEvent<?>> Registration addListener(
+            Class<T> eventType, ComponentEventListener<T> listener) {
         return getEventBus().addListener(eventType, listener);
     }
 }

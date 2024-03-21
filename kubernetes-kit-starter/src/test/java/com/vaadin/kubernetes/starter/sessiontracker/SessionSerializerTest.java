@@ -31,6 +31,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -50,6 +51,7 @@ import static org.mockito.Mockito.withSettings;
 class SessionSerializerTest {
 
     public static final int TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 3000;
+    SessionSerializationCallback serializationCallback;
     BackendConnector connector;
     SessionSerializer serializer;
     private MockVaadinSession vaadinSession;
@@ -59,9 +61,10 @@ class SessionSerializerTest {
 
     @BeforeEach
     void setUp() {
+        serializationCallback = mock(SessionSerializationCallback.class);
         connector = mock(BackendConnector.class);
         serializer = new SessionSerializer(connector,
-                mock(TransientHandler.class),
+                mock(TransientHandler.class), serializationCallback,
                 TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS);
 
         clusterSID = UUID.randomUUID().toString();
@@ -271,8 +274,7 @@ class SessionSerializerTest {
     @Test
     void deserialize_sessionAttributesAreSet() {
         AtomicBoolean serializationCompleted = new AtomicBoolean();
-        doAnswer(i -> serializationCompleted.getAndSet(true))
-                .when(connector)
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
 
         List<SessionInfo> infoList = new ArrayList<>();
@@ -289,11 +291,70 @@ class SessionSerializerTest {
         try {
             serializer.deserialize(infoList.get(0), deserializedSession);
         } catch (Exception e) {
-            e.printStackTrace();
-            fail();
+            fail(e);
         }
 
         verify(deserializedSession, times(3)).setAttribute(any(), any());
+    }
+
+    @Test
+    void serialize_onSerializationSuccess_called() {
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        serializer.serialize(httpSession);
+        await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
+
+        verify(serializationCallback).onSerializationSuccess();
+    }
+
+    @Test
+    void serialize_notSerializableException_onSerializationError_called() {
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+        httpSession.setAttribute("UNSERIALIZABLE", new Unserializable());
+
+        serializer.serialize(httpSession);
+        await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
+
+        verify(serializationCallback).onSerializationError(any());
+    }
+
+    @Test
+    void deserialize_onDeserializationSuccess_called() {
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        List<SessionInfo> infoList = new ArrayList<>();
+        doAnswer(i -> infoList.add(i.getArgument(0))).when(connector)
+                .sendSession(any());
+
+        vaadinSession.setLockTimestamps(10, 20);
+
+        serializer.serialize(httpSession);
+
+        await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+
+        try {
+            serializer.deserialize(infoList.get(0), httpSession);
+        } catch (Exception e) {
+            fail(e);
+        }
+
+        verify(serializationCallback).onDeserializationSuccess();
+    }
+
+    @Test
+    void deserialize_notSerializableException_onDeserializationError_called() {
+        SessionInfo sessionInfo = new SessionInfo("clusterKey", new byte[0]);
+
+        assertThrows(Exception.class,
+                () -> serializer.deserialize(sessionInfo, httpSession));
+
+        verify(serializationCallback).onDeserializationError(any());
     }
 
     private static ConditionFactory await() {

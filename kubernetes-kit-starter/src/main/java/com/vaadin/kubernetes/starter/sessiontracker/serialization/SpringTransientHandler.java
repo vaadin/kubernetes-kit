@@ -104,7 +104,8 @@ public class SpringTransientHandler implements TransientHandler {
 
     private boolean matchesPrototype(String beanName, Object beanDefinition,
             Class<?> fieldValueType) {
-        return appCtx.isPrototype(beanName)
+        return appCtx.containsBeanDefinition(beanName)
+                && appCtx.isPrototype(beanName)
                 && beanDefinition.getClass() == fieldValueType;
     }
 
@@ -117,7 +118,7 @@ public class SpringTransientHandler implements TransientHandler {
             // when inspecting Vaadin NodeMap$HashMapValues that extends HashMap
             // Should we exclude some packages by default?
             // Should we throw or ignore the error?
-            getLogger().debug("Cannot access field {} of class {}",
+            getLogger().trace("Cannot access field {} of class {}",
                     field.getName(), target.getClass(), e);
         }
         return null;
@@ -137,8 +138,7 @@ public class SpringTransientHandler implements TransientHandler {
     }
 
     private static Logger getLogger() {
-        return LoggerFactory
-                .getLogger(TransientInjectableObjectInputStream.class);
+        return LoggerFactory.getLogger(SpringTransientHandler.class);
     }
 
 }

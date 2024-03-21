@@ -118,6 +118,8 @@ public class SessionSerializer
 
     private final long optimisticSerializationTimeoutMs;
 
+    private final SessionSerializationCallback sessionSerializationCallback;
+
     private Predicate<Class<?>> injectableFilter = type -> true;
 
     /**
@@ -128,20 +130,27 @@ public class SessionSerializer
      *            storage.
      * @param transientHandler
      *            handler to inspect and inject transient fields.
+     * @param sessionSerializationCallback
+     *            callbacks for successful serialization and deserialization or
+     *            when an error happens
      */
     public SessionSerializer(BackendConnector backendConnector,
-            TransientHandler transientHandler) {
+            TransientHandler transientHandler,
+            SessionSerializationCallback sessionSerializationCallback) {
         this.backendConnector = backendConnector;
         this.handler = transientHandler;
+        this.sessionSerializationCallback = sessionSerializationCallback;
         optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
     }
 
     // Visible for test
     SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
+            SessionSerializationCallback sessionSerializationCallback,
             long optimisticSerializationTimeoutMs) {
         this.backendConnector = backendConnector;
         this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
+        this.sessionSerializationCallback = sessionSerializationCallback;
         this.handler = transientHandler;
     }
 
@@ -194,13 +203,11 @@ public class SessionSerializer
      * @param session
      *            the HTTP session
      *
-     * @throws ClassNotFoundException
-     *             if class of a serialized object cannot be found.
-     * @throws IOException
-     *             any of the usual Input/Output related exceptions.
+     * @throws Exception
+     *             any of the deserialization related exceptions.
      */
     public void deserialize(SessionInfo sessionInfo, HttpSession session)
-            throws ClassNotFoundException, IOException {
+            throws Exception {
         Map<String, Object> values = doDeserialize(sessionInfo,
                 session.getId());
 
@@ -425,6 +432,10 @@ public class SessionSerializer
         try (TransientInjectableObjectOutputStream outStream = TransientInjectableObjectOutputStream
                 .newInstance(out, handler, injectableFilter)) {
             outStream.writeWithTransients(attributes);
+            sessionSerializationCallback.onSerializationSuccess();
+        } catch (Exception ex) {
+            sessionSerializationCallback.onSerializationError(ex);
+            throw ex;
         }
 
         SessionInfo info = new SessionInfo(getClusterKey(attributes),
@@ -442,7 +453,7 @@ public class SessionSerializer
     }
 
     private Map<String, Object> doDeserialize(SessionInfo sessionInfo,
-            String sessionId) throws IOException, ClassNotFoundException {
+            String sessionId) throws Exception {
         byte[] data = sessionInfo.getData();
         long start = System.currentTimeMillis();
 
@@ -454,6 +465,10 @@ public class SessionSerializer
         try (TransientInjectableObjectInputStream inStream = new TransientInjectableObjectInputStream(
                 in, handler)) {
             attributes = inStream.readWithTransients();
+            sessionSerializationCallback.onDeserializationSuccess();
+        } catch (Exception ex) {
+            sessionSerializationCallback.onDeserializationError(ex);
+            throw ex;
         } finally {
             Thread.currentThread().setContextClassLoader(contextLoader);
         }

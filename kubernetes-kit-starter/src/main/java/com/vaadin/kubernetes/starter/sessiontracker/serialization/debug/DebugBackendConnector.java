@@ -20,7 +20,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 /**
  * A dummy {@link BackendConnector} implementations that locally stores the
  * serialized data.
- * 
+ *
  * It is meant to only be used with the Kubernetes Kit Debug Tool.
  */
 class DebugBackendConnector implements BackendConnector {
@@ -63,23 +63,28 @@ class DebugBackendConnector implements BackendConnector {
     }
 
     /**
-     * Blocks the thread for up to 10 seconds, waiting for serialization to be
-     * completed.
-     * 
+     * Blocks the thread for up to the defined timeout in milliseconds, waiting
+     * for serialization to be completed.
+     *
+     * @param timeout
+     *            the timeout in milliseconds to wait for the serialization to
+     *            be completed.
      * @param logger
      *            the logger to add potential error information.
      * @return the serialized session holder.
      */
-    SessionInfo waitForCompletion(Logger logger) {
-        int timeout = 10000;
+    SessionInfo waitForCompletion(int timeout, Logger logger) {
         try {
             if (!latch.await(timeout, TimeUnit.MILLISECONDS)) {
+                job.timeout();
                 logger.error(
-                        "Session Serialization did not completed in {} ms.",
+                        "Session serialization timed out because did not complete in {} ms. "
+                                + "Increase the serialization timeout (in milliseconds) by the "
+                                + "'vaadin.serialization.timeout' application or system property.",
                         timeout);
             }
         } catch (Exception e) { // NOSONAR
-            logger.error("Testing of Session Serialization failed", e);
+            logger.error("Testing of session serialization failed", e);
         }
         return sessionInfo;
     }

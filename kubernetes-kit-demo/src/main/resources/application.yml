@@ -4,19 +4,18 @@ logging:
   level:
     '[com.vaadin.kubernetes]': debug
 spring:
-  redis:
-    host: kubernetes-kit-redis-service
+  data:
+    redis:
+      host: kubernetes-kit-redis-service
 vaadin:
   whitelisted-packages: com.vaadin,org.vaadin,dev.hilla
   kubernetes:
     hazelcast:
       service-name: kubernetes-kit-hazelcast-service
   serialization:
+    timeout: 10000
     transients:
       include-packages: com.vaadin.kubernetes.demo
   devmode:
     sessionSerialization:
       enabled: true
-
-
-

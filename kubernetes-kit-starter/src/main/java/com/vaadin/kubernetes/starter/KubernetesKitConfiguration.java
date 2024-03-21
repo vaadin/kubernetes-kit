@@ -41,6 +41,7 @@ import org.springframework.util.StringUtils;
 
 import com.vaadin.flow.spring.SpringBootAutoConfiguration;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionListener;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
@@ -74,9 +75,16 @@ public class KubernetesKitConfiguration {
         private static final Predicate<Class<?>> TRANSIENT_INJECTABLE_VAADIN_EXCLUSIONS = type -> !type
                 .getPackageName().startsWith("com.vaadin.flow.internal");
 
+        final KubernetesKitProperties properties;
+
+        public VaadinReplicatedSessionConfiguration(
+                KubernetesKitProperties properties) {
+            this.properties = properties;
+        }
+
         SessionTrackerFilter sessionTrackerFilter(
                 SessionSerializer sessionSerializer) {
-            return new SessionTrackerFilter(sessionSerializer);
+            return new SessionTrackerFilter(sessionSerializer, properties);
         }
 
         SessionListener sessionListener(BackendConnector backendConnector,
@@ -98,11 +106,19 @@ public class KubernetesKitConfiguration {
         }
 
         @Bean
+        @ConditionalOnMissingBean
+        SessionSerializationCallback sessionSerializationCallback() {
+            return SessionSerializationCallback.DEFAULT;
+        }
+
+        @Bean
         SessionSerializer sessionSerializer(BackendConnector backendConnector,
                 TransientHandler transientInjector,
+                SessionSerializationCallback sessionSerializationCallback,
                 @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter) {
             SessionSerializer sessionSerializer = new SessionSerializer(
-                    backendConnector, transientInjector);
+                    backendConnector, transientInjector,
+                    sessionSerializationCallback);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }
@@ -162,10 +178,13 @@ public class KubernetesKitConfiguration {
     @AutoConfiguration
     @Conditional(VaadinReplicatedSessionDevModeConfiguration.OnSessionSerializationDebug.class)
     public static class VaadinReplicatedSessionDevModeConfiguration {
+
         @Bean
         @ConditionalOnMissingBean
-        SerializationDebugRequestHandler.InitListener sessionSerializationDebugToolInstaller() {
-            return new SerializationDebugRequestHandler.InitListener();
+        SerializationDebugRequestHandler.InitListener sessionSerializationDebugToolInstaller(
+                SerializationProperties serializationProperties) {
+            return new SerializationDebugRequestHandler.InitListener(
+                    serializationProperties);
         }
 
         @Bean

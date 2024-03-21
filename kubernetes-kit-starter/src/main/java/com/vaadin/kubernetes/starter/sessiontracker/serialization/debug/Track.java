@@ -68,7 +68,7 @@ public final class Track implements Serializable {
 
     /**
      * Gets the handle of the tracked object in the references table.
-     * 
+     *
      * @return the handle of the tracked object, or -1 if the object is not
      *         present in the references table.
      */

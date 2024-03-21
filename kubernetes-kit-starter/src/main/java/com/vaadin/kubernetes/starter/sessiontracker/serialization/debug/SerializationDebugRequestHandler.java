@@ -41,16 +41,20 @@ import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
+
+import static com.vaadin.kubernetes.starter.SerializationProperties.DEFAULT_SERIALIZATION_TIMEOUT_MS;
 
 /**
  * A {@link RequestHandler} implementation that performs a check on HTTP session
  * serialization and deserialization.
  *
- * The request handler is executed only in development mode and it the
+ * The request handler is executed only in development mode and if the
  * {@literal vaadin.devmode.sessionSerialization.enabled} configuration property
  * is set to {@literal true}.
  *
@@ -82,6 +86,15 @@ public class SerializationDebugRequestHandler implements RequestHandler {
     public static final String SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY = SerializationDebugRequestHandler.class
             .getName() + ".RESULT";
 
+    private static final String SERIALIZATION_TIMEOUT_PROPERTY = "vaadin.serialization.timeout";
+
+    private final SerializationProperties serializationProperties;
+
+    public SerializationDebugRequestHandler(
+            SerializationProperties serializationProperties) {
+        this.serializationProperties = serializationProperties;
+    }
+
     @Override
     public boolean handleRequest(VaadinSession vaadinSession,
             VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
@@ -103,7 +116,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             try {
                 VaadinService vaadinService = vaadinSession.getService();
                 vaadinSession.accessSynchronously(() -> {
-                    SerializableConsumer<Result> onSuccess = null;
+                    SerializableConsumer<Result> onComplete = null;
                     UI ui = vaadinService.findUI(vaadinRequest);
                     if (ui != null) {
                         boolean pushEnabled = ui.getPushConfiguration()
@@ -117,14 +130,16 @@ public class SerializationDebugRequestHandler implements RequestHandler {
                                     return notifier;
                                 });
                         if (pushEnabled) {
-                            onSuccess = ui.accessLater(
+                            onComplete = ui.accessLater(
                                     debugNotifier::publishResults, () -> {
                                     });
                         }
                     }
+                    int serializationTimeout = getSerializationTimeout(
+                            serializationProperties);
                     vaadinRequest.setAttribute(
                             SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY,
-                            new Runner(onSuccess));
+                            new Runner(onComplete, serializationTimeout));
                 });
 
             } catch (Exception ex) {
@@ -136,19 +151,22 @@ public class SerializationDebugRequestHandler implements RequestHandler {
 
     static class Runner implements Consumer<HttpServletRequest> {
 
-        private final Consumer<Result> onSuccess;
+        private final Consumer<Result> onComplete;
+        private final int serializationTimeout;
 
-        public Runner(Consumer<Result> onSuccess) {
-            this.onSuccess = onSuccess;
+        public Runner(Consumer<Result> onComplete, int serializationTimeout) {
+            this.onComplete = onComplete;
+            this.serializationTimeout = serializationTimeout;
         }
 
-        private void executeOnSuccess(Result result) {
-            if (onSuccess != null) {
+        private void executeOnComplete(Result result) {
+            if (onComplete != null) {
                 try {
-                    onSuccess.accept(result);
+                    onComplete.accept(result);
                 } catch (Exception ex) {
                     // Do not interrupt the request
-                    ex.printStackTrace();
+                    LoggerFactory.getLogger(Runner.class).error(
+                            "Error during executing on complete task", ex);
                 }
             }
         }
@@ -157,7 +175,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             HttpSession session = request.getSession(false);
             if (session != null && request.isRequestedSessionIdValid()) {
                 serializeAndDeserialize(new WrappedHttpSession(session),
-                        this::executeOnSuccess);
+                        this::executeOnComplete, serializationTimeout);
             }
         }
     }
@@ -175,23 +193,25 @@ public class SerializationDebugRequestHandler implements RequestHandler {
                     .getAttribute(SERIALIZATION_TEST_REQUEST_ATTRIBUTE_KEY);
             if (action instanceof Runner) {
                 LOGGER.debug(
-                        "Vaadin Request processed, Running Session Serialized Debug Tool");
+                        "Vaadin request processed, running Session Serialization Debug Tool");
                 ((Runner) action).accept(req);
             }
         }
     }
 
     public static void serializeAndDeserialize(WrappedSession session,
-                                               Consumer<Result> onComplete) {
+            Consumer<Result> onComplete, int serializationTimeout) {
         // Work on a copy of the session to avoid overwriting attributes
         DebugHttpSession debugHttpSession = new DebugHttpSession(session);
         Job job = new Job(session.getId());
         DebugBackendConnector connector = new DebugBackendConnector(job);
         SessionSerializer serializer = new SessionSerializer(connector,
-                new DebugTransientHandler(job));
+                new DebugTransientHandler(job),
+                SessionSerializationCallback.DEFAULT);
         try {
             trySerialize(serializer, debugHttpSession, job);
-            SessionInfo info = connector.waitForCompletion(LOGGER);
+            SessionInfo info = connector.waitForCompletion(serializationTimeout,
+                    LOGGER);
             if (info != null) {
                 debugHttpSession = new DebugHttpSession(
                         "DEBUG-DESERIALIZE-" + session.getId());
@@ -200,10 +220,9 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         } finally {
             Result result = job.complete();
             StringBuilder message = new StringBuilder(
-                    "Session serialization attempt completed in ")
-                            .append(result.getDuration())
-                            .append(" ms with outcomes: ")
-                            .append(result.getOutcomes());
+                    "Session serialization attempt finished in ")
+                    .append(result.getDuration()).append(" ms with outcomes: ")
+                    .append(result.getOutcomes());
             List<String> errors = result.getErrors();
             if (!errors.isEmpty()) {
                 message.append(System.lineSeparator())
@@ -234,13 +253,27 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         }
     }
 
+    private int getSerializationTimeout(SerializationProperties properties) {
+        int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
+        if (properties != null && properties.getTimeout() > 0) {
+            timeout = properties.getTimeout();
+        } else {
+            String timeoutStr = System
+                    .getProperty(SERIALIZATION_TIMEOUT_PROPERTY);
+            if (timeoutStr != null) {
+                timeout = Integer.parseInt(timeoutStr);
+            }
+        }
+        return timeout;
+    }
+
     private static void trySerialize(SessionSerializer serializer,
             HttpSession session, Job job) {
         try {
             serializer.serialize(session);
         } catch (Exception e) {
             job.serializationFailed(e);
-            LOGGER.error("Test Session serialization failed", e);
+            LOGGER.error("Test session serialization failed", e);
         }
     }
 
@@ -251,7 +284,7 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             job.deserialized();
         } catch (Exception e) {
             job.deserializationFailed(e);
-            LOGGER.error("Test Session Deserialization failed", e);
+            LOGGER.error("Test session deserialization failed", e);
         }
     }
 
@@ -273,6 +306,15 @@ public class SerializationDebugRequestHandler implements RequestHandler {
      */
     public static class InitListener implements VaadinServiceInitListener {
 
+        public SerializationProperties serializationProperties;
+
+        public InitListener() {
+        }
+
+        public InitListener(SerializationProperties serializationProperties) {
+            this.serializationProperties = serializationProperties;
+        }
+
         @Override
         public void serviceInit(ServiceInitEvent serviceInitEvent) {
             ApplicationConfiguration appConfiguration = ApplicationConfiguration
@@ -291,8 +333,9 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             } else {
                 logger.info(
                         "Installing SerializationDebugRequestHandler for session serialization debug");
-                serviceInitEvent.addRequestHandler(
-                        new SerializationDebugRequestHandler());
+                serviceInitEvent
+                        .addRequestHandler(new SerializationDebugRequestHandler(
+                                serializationProperties));
             }
         }
     }
