@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -229,17 +230,30 @@ public class SessionSerializer
         getLogger().debug(
                 "Starting asynchronous serialization of session {} with distributed key {}",
                 sessionId, clusterKey);
-        backendConnector.markSerializationStarted(clusterKey);
         pending.put(sessionId, true);
-
-        executorService.submit(() -> {
-            Consumer<SessionInfo> whenSerialized = sessionInfo -> {
-                backendConnector.sendSession(sessionInfo);
-                backendConnector.markSerializationComplete(clusterKey);
-            };
-
-            handleSessionSerialization(sessionId, attributes, whenSerialized);
-        });
+        // Backend operations are performed asynchronously to prevent the UI to
+        // freeze in case of errors, timeouts or slow performance.
+        // Current session is immediately marked as 'serialization pending',
+        // because if 'markSerializationStarted' is hanging, it does not make
+        // sense to retry the operation instantly.
+        CompletableFuture.runAsync(
+                () -> backendConnector.markSerializationStarted(clusterKey),
+                executorService).whenComplete((unused, error) -> {
+                    if (error != null) {
+                        pending.remove(sessionId);
+                        getLogger().debug(
+                                "Failed marking serialization start for of session {} with distributed key {}",
+                                sessionId, clusterKey, error);
+                    } else {
+                        Consumer<SessionInfo> whenSerialized = sessionInfo -> {
+                            backendConnector.sendSession(sessionInfo);
+                            backendConnector
+                                    .markSerializationComplete(clusterKey);
+                        };
+                        handleSessionSerialization(sessionId, attributes,
+                                whenSerialized);
+                    }
+                });
     }
 
     private void handleSessionSerialization(String sessionId,
