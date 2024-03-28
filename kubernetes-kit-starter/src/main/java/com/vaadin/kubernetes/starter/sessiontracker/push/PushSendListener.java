@@ -12,10 +12,27 @@ package com.vaadin.kubernetes.starter.sessiontracker.push;
 import org.atmosphere.cpr.AtmosphereResource;
 
 /**
- * Associates AtmosphereResource with a PushConnection identifier in order to be
- * able to reattach them later on.
+ * Component notified when a UIDL message is sent to the client via PUSH
+ * mechanism.
+ * <p>
+ * </p>
+ * The component is also notified when the PUSH connection is established in
+ * order to perform initialization tasks for the connected resource.
+ * <p>
+ * </p>
+ * Implementation must be thread safe, since method invocation may originate in
+ * different threads.
  */
 public interface PushSendListener {
+
+    /**
+     * Invoked when a new PUSH connection is established.
+     *
+     * @param resource
+     *            the {@link AtmosphereResource} behind the PUSH connection.
+     */
+    default void onConnect(AtmosphereResource resource) {
+    }
 
     /**
      * Invoked whenever a UIDL message has been sent to the client.

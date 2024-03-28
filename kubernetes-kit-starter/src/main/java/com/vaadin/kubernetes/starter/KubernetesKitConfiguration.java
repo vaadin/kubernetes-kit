@@ -11,6 +11,7 @@ package com.vaadin.kubernetes.starter;
 
 import jakarta.servlet.FilterRegistration;
 import jakarta.servlet.ServletContext;
+
 import java.util.function.Predicate;
 
 import com.hazelcast.config.Config;
@@ -47,7 +48,6 @@ import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
-import com.vaadin.kubernetes.starter.sessiontracker.push.PushSendListener;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
@@ -155,21 +155,26 @@ public class KubernetesKitConfiguration {
         @Order(Integer.MIN_VALUE + 50)
         FilterRegistrationBean<SessionTrackerFilter> sessionTrackerFilterRegistration(
                 BackendConnector backendConnector,
-                SessionSerializer sessionSerializer) {
+                SessionSerializer sessionSerializer,
+                PushSessionTracker pushSessionTracker) {
+            SessionListener sessionListener = sessionListener(backendConnector,
+                    sessionSerializer);
+            pushSessionTracker.setActiveSessionChecker(
+                    sessionListener.activeSessionChecker());
             return new FilterRegistrationBean<>(
                     sessionTrackerFilter(sessionSerializer)) {
                 @Override
                 protected FilterRegistration.Dynamic addRegistration(
                         String description, ServletContext servletContext) {
-                    servletContext.addListener(sessionListener(backendConnector,
-                            sessionSerializer));
+                    servletContext.addListener(sessionListener);
                     return super.addRegistration(description, servletContext);
                 }
             };
         }
 
         @Bean
-        PushSendListener pushSendListener(SessionSerializer sessionSerializer) {
+        PushSessionTracker pushSendListener(
+                SessionSerializer sessionSerializer) {
             return new PushSessionTracker(sessionSerializer);
         }
 

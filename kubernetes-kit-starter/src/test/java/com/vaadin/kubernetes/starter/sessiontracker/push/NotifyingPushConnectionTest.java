@@ -38,6 +38,7 @@ public class NotifyingPushConnectionTest {
         connection.connect(resource);
         connection.sendMessage("foo");
 
+        verify(listener).onConnect(eq(resource));
         verify(listener).onMessageSent(eq(resource));
     }
 
