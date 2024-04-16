@@ -233,7 +233,7 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     @Override
     protected Object replaceObject(Object obj) {
         obj = trackObject(obj);
-        if (obj != null) {
+        if (obj != null && !(obj instanceof Track)) {
             Class<?> type = obj.getClass();
             if (injectableFilter.test(type) && !inspected.containsKey(obj)) {
                 Object original = obj;
@@ -290,10 +290,10 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     }
 
     private Object trackObject(Object obj) {
-        if (getLogger().isTraceEnabled()) {
-            getLogger().trace("Serializing object {}", obj.getClass());
-        }
         if (trackingMode && trackingEnabled && !tracking.containsKey(obj)) {
+            if (getLogger().isTraceEnabled()) {
+                getLogger().trace("Serializing object {}", obj.getClass());
+            }
             Object original = obj;
             try {
                 Track track = createTrackObject(++trackingCounter, obj);
