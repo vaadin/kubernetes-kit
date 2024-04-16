@@ -504,6 +504,11 @@ public class SessionSerializer
         // the server has not shut down before this and made the session
         // unavailable
         waitForSerialization();
+        destroy();
+    }
+
+    public void destroy() {
+        this.executorService.shutdown();
     }
 
     private static class SerializationThreadFactory implements ThreadFactory {

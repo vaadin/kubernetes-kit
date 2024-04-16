@@ -89,4 +89,8 @@ class DebugBackendConnector implements BackendConnector {
         return sessionInfo;
     }
 
+    void destroy() {
+        sessionInfo = null;
+        job.reset();
+    }
 }
