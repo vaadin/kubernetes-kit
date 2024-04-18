@@ -23,7 +23,8 @@ class FailingToStringReplacerTest {
     void toStringReplacer_objectSerialized()
             throws IOException, ClassNotFoundException {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
-        TransientHandler handler = new DebugTransientHandler(new Job("TEST"));
+        TransientHandler handler = new DebugTransientHandler(
+                new Job("SID", "KEY"));
 
         ThrowingToStringWithFields obj = new ThrowingToStringWithFields();
 

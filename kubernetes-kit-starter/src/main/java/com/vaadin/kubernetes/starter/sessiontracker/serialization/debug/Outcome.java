@@ -18,6 +18,10 @@ public enum Outcome {
      */
     NOT_STARTED,
     /**
+     * Process has been canceled. May happen only on server shutdown.
+     */
+    CANCELED,
+    /**
      * Not serializable classes found during serialization phase
      */
     NOT_SERIALIZABLE_CLASSES,

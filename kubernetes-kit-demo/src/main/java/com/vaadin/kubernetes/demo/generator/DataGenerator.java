@@ -69,7 +69,7 @@ public class DataGenerator {
                         contact.setCompany(companies.get(companyIndex));
                         int contactIndex = r.nextInt(statuses.size());
                         contact.setStatus(statuses.get(contactIndex));
-                    }).limit(50).toList();
+                    }).limit(1500).toList();
 
             contactRepository.saveAll(contacts);
 

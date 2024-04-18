@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.StringJoiner;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,11 +46,12 @@ class Job {
     private static final Pattern SERIALIZEDLAMBDA_CANNOT_CAST = Pattern.compile(
             "class java.lang.invoke.SerializedLambda cannot be cast to class ([^ ]+)( |$)");
 
+    private CountDownLatch serializationLatch = new CountDownLatch(1);
     private final String sessionId;
     private long startTimeNanos;
     private final Set<Outcome> outcome = new LinkedHashSet<>();
     private final Map<String, List<String>> messages = new LinkedHashMap<>();
-    private String storageKey;
+    private String clusterKey;
     private final Map<Object, Track> tracked = new IdentityHashMap<>();
 
     private final Stack<Track> deserializingStack = new Stack<>();
@@ -57,14 +59,45 @@ class Job {
 
     private final Map<Integer, SerializedLambda> serializedLambdaMap = new HashMap<>();
 
-    Job(String sessionId) {
+    Job(String sessionId, String clusterKey) {
         this.sessionId = sessionId;
+        this.clusterKey = clusterKey;
         this.startTimeNanos = System.nanoTime();
+    }
+
+    /**
+     * Blocks the thread for up to the defined timeout in milliseconds, waiting
+     * for serialization to be completed.
+     *
+     * @param timeout
+     *            the timeout in milliseconds to wait for the serialization to
+     *            be completed.
+     * @param logger
+     *            the logger to add potential error information.
+     * @return the serialized session holder.
+     */
+    boolean waitForSerializationCompletion(int timeout, Logger logger) {
+        boolean completed = false;
+        try {
+            completed = serializationLatch.await(timeout,
+                    TimeUnit.MILLISECONDS);
+            if (!completed) {
+                timeout();
+                logger.error(
+                        "Session serialization timed out because did not complete in {} ms. "
+                                + "Increase the serialization timeout (in milliseconds) by the "
+                                + "'vaadin.serialization.timeout' application or system property.",
+                        timeout);
+                return false;
+            }
+        } catch (Exception e) { // NOSONAR
+            logger.error("Testing of session serialization failed", e);
+        }
+        return completed;
     }
 
     void reset() {
         startTimeNanos = System.nanoTime();
-        storageKey = null;
         outcome.clear();
         messages.clear();
         tracked.clear();
@@ -74,7 +107,15 @@ class Job {
         outcome.add(Outcome.SERIALIZATION_FAILED);
     }
 
+    void cancel() {
+        outcome.add(Outcome.CANCELED);
+        while (serializationLatch.getCount() > 0) {
+            serializationLatch.countDown();
+        }
+    }
+
     public void serializationStarted() {
+        serializationLatch = new CountDownLatch(1);
         reset();
     }
 
@@ -115,12 +156,22 @@ class Job {
     }
 
     void serialized(SessionInfo info) {
-        if (info != null) {
-            storageKey = info.getClusterKey();
-            outcome.add(Outcome.DESERIALIZATION_FAILED);
-            if (!outcome.contains(Outcome.NOT_SERIALIZABLE_CLASSES)) {
-                outcome.remove(Outcome.SERIALIZATION_FAILED);
+        try {
+            if (info != null) {
+                if (!clusterKey.equals(info.getClusterKey())) {
+                    throw new IllegalStateException(
+                            "Unexpected cluster key " + info.getClusterKey()
+                                    + " on session info, expecting it to be "
+                                    + clusterKey);
+                }
+                clusterKey = info.getClusterKey();
+                outcome.add(Outcome.DESERIALIZATION_FAILED);
+                if (!outcome.contains(Outcome.NOT_SERIALIZABLE_CLASSES)) {
+                    outcome.remove(Outcome.SERIALIZATION_FAILED);
+                }
             }
+        } finally {
+            serializationLatch.countDown();
         }
     }
 
@@ -263,7 +314,7 @@ class Job {
                                     .stream().map(entry -> "\t" + entry)))
                             .collect(Collectors.toList()));
         }
-        return new Result(sessionId, storageKey, outcome, duration, messages);
+        return new Result(sessionId, clusterKey, outcome, duration, messages);
     }
 
     void log(String category, String message) {

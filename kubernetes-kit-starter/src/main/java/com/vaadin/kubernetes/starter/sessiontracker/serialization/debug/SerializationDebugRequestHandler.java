@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -27,6 +28,8 @@ import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.function.SerializableConsumer;
@@ -78,7 +81,8 @@ import static com.vaadin.kubernetes.starter.SerializationProperties.DEFAULT_SERI
  * {@literal -Dsun.io.serialization.extendedDebugInfo} system property to
  * {@literal true}.
  */
-public class SerializationDebugRequestHandler implements RequestHandler {
+public class SerializationDebugRequestHandler
+        implements RequestHandler, ApplicationListener<ContextClosedEvent> {
 
     private static final Logger LOGGER = LoggerFactory
             .getLogger(SerializationDebugRequestHandler.class);
@@ -90,9 +94,21 @@ public class SerializationDebugRequestHandler implements RequestHandler {
 
     private final SerializationProperties serializationProperties;
 
+    private final DebugBackendConnector debugBackendConnector;
+    private final SessionSerializer sessionSerializer;
+
     public SerializationDebugRequestHandler(
             SerializationProperties serializationProperties) {
         this.serializationProperties = serializationProperties;
+        this.debugBackendConnector = new DebugBackendConnector();
+        this.sessionSerializer = new SessionSerializer(debugBackendConnector,
+                debugBackendConnector, SessionSerializationCallback.DEFAULT);
+    }
+
+    @Override
+    public void onApplicationEvent(ContextClosedEvent event) {
+        debugBackendConnector.shutdown();
+        sessionSerializer.onApplicationEvent(event);
     }
 
     @Override
@@ -149,12 +165,12 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         return false;
     }
 
-    static class Runner implements Consumer<HttpServletRequest> {
+    class Runner implements Consumer<HttpServletRequest> {
 
         private final Consumer<Result> onComplete;
         private final int serializationTimeout;
 
-        public Runner(Consumer<Result> onComplete, int serializationTimeout) {
+        private Runner(Consumer<Result> onComplete, int serializationTimeout) {
             this.onComplete = onComplete;
             this.serializationTimeout = serializationTimeout;
         }
@@ -174,8 +190,10 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         public void accept(HttpServletRequest request) {
             HttpSession session = request.getSession(false);
             if (session != null && request.isRequestedSessionIdValid()) {
-                serializeAndDeserialize(new WrappedHttpSession(session),
-                        this::executeOnComplete, serializationTimeout);
+                SerializationDebugRequestHandler.this
+                        .internalSerializeAndDeserialize(
+                                new WrappedHttpSession(session),
+                                this::executeOnComplete, serializationTimeout);
             }
         }
     }
@@ -199,26 +217,36 @@ public class SerializationDebugRequestHandler implements RequestHandler {
         }
     }
 
+    /**
+     * @deprecated this method is not meant to be public. Will be removed
+     *             without replacement.
+     */
+    @Deprecated(forRemoval = true)
     public static void serializeAndDeserialize(WrappedSession session,
+            Consumer<Result> onComplete, int serializationTimeout) {
+        new SerializationDebugRequestHandler(new SerializationProperties())
+                .internalSerializeAndDeserialize(session, onComplete,
+                        serializationTimeout);
+    }
+
+    private void internalSerializeAndDeserialize(WrappedSession session,
             Consumer<Result> onComplete, int serializationTimeout) {
         // Work on a copy of the session to avoid overwriting attributes
         DebugHttpSession debugHttpSession = new DebugHttpSession(session);
-        Job job = new Job(session.getId());
-        DebugBackendConnector connector = new DebugBackendConnector(job);
-        SessionSerializer serializer = new SessionSerializer(connector,
-                new DebugTransientHandler(job),
-                SessionSerializationCallback.DEFAULT);
+        String clusterKey = debugHttpSession.getClusterKey();
+        Job job = debugBackendConnector.newJob(session.getId(), clusterKey);
         try {
-            trySerialize(serializer, debugHttpSession, job);
-            SessionInfo info = connector.waitForCompletion(serializationTimeout,
-                    LOGGER);
+            trySerialize(sessionSerializer, debugHttpSession, job);
+            SessionInfo info = debugBackendConnector.waitForCompletion(job,
+                    serializationTimeout, LOGGER);
             if (info != null) {
                 debugHttpSession = new DebugHttpSession(
                         "DEBUG-DESERIALIZE-" + session.getId());
-                tryDeserialize(serializer, info, debugHttpSession, job);
+                tryDeserialize(sessionSerializer, info, debugHttpSession, job);
             }
         } finally {
             Result result = job.complete();
+            debugBackendConnector.deleteSession(clusterKey);
             StringBuilder message = new StringBuilder(
                     "Session serialization attempt finished in ")
                     .append(result.getDuration()).append(" ms with outcomes: ")
@@ -250,6 +278,9 @@ public class SerializationDebugRequestHandler implements RequestHandler {
             }
             LOGGER.info(message.toString()); // NOSONAR
             onComplete.accept(result);
+
+            // Give a hint to the GC, so it might clean up eagerly
+            System.gc();
         }
     }
 
@@ -355,6 +386,10 @@ public class SerializationDebugRequestHandler implements RequestHandler {
                     .forEach(key -> storage.put(key, source.getAttribute(key)));
             storage.put(CurrentKey.COOKIE_NAME,
                     UUID.randomUUID() + "_SOURCE:" + source.getId());
+        }
+
+        String getClusterKey() {
+            return (String) storage.get(CurrentKey.COOKIE_NAME);
         }
 
         @Override
