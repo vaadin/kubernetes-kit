@@ -8,11 +8,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
+import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -98,6 +102,26 @@ class SerializationDeserializationTest {
 
         Mockito.verify(mockHandler).inspect(obj);
         Mockito.verifyNoMoreInteractions(mockHandler);
+    }
+
+    @Test
+    @EnableOnJavaIOReflection
+    void serialization_transientInspection_trackObjectsIgnored(
+            @Autowired TestConfig.CtorInjectionTarget obj) throws Exception {
+        List<Object> target = new ArrayList<>();
+        target.add(new HashMap<>());
+        target.add(obj);
+        target.add(new MimeType());
+
+        TransientHandler mockHandler = Mockito.mock(TransientHandler.class,
+                Mockito.withSettings().extraInterfaces(DebugMode.class));
+
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        TransientInjectableObjectOutputStream.newInstance(os, mockHandler)
+                .writeWithTransients(target);
+
+        Mockito.verify(mockHandler, Mockito.never())
+                .inspect(ArgumentMatchers.argThat(o -> o instanceof Track));
     }
 
     @Test
