@@ -10,6 +10,8 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.List;
 import java.util.function.ToIntFunction;
 
 /**
@@ -27,7 +29,7 @@ public final class Track implements Serializable {
     /**
      * Path to the object in the object graph.
      */
-    public final String stackInfo;
+    public final transient List<String> stackInfo;
     /**
      * Identifier of the instance inside the references table.
      *
@@ -49,10 +51,11 @@ public final class Track implements Serializable {
      */
     transient Object object;
 
-    public Track(int id, int depth, String stackInfo, Object object) {
+    public Track(int id, int depth, Collection<String> stackInfo,
+            Object object) {
         this.id = id;
         this.depth = depth;
-        this.stackInfo = stackInfo;
+        this.stackInfo = stackInfo != null ? List.copyOf(stackInfo) : List.of();
         this.object = object;
         this.className = (object != null) ? object.getClass().getName()
                 : "NULL";
@@ -61,7 +64,7 @@ public final class Track implements Serializable {
     private Track(int depth, Class<?> type) {
         this.id = -1;
         this.depth = depth;
-        this.stackInfo = null;
+        this.stackInfo = List.of();
         this.object = null;
         this.className = type.getName();
     }
