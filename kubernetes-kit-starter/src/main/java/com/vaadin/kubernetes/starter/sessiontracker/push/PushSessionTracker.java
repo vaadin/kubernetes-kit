@@ -11,7 +11,12 @@ package com.vaadin.kubernetes.starter.sessiontracker.push;
 
 import jakarta.servlet.http.HttpSession;
 
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
+
 import org.atmosphere.cpr.AtmosphereResource;
+import org.atmosphere.cpr.AtmosphereResourceSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,29 +36,93 @@ public class PushSessionTracker implements PushSendListener {
 
     private final SessionSerializer sessionSerializer;
 
+    private Predicate<String> activeSessionChecker = id -> true;
+
     public PushSessionTracker(SessionSerializer sessionSerializer) {
         this.sessionSerializer = sessionSerializer;
     }
 
+    /**
+     * Sets the active HTTP session checker.
+     *
+     * @param activeSessionChecker
+     *            active HTTP session checker.
+     */
+    public void setActiveSessionChecker(
+            Predicate<String> activeSessionChecker) {
+        this.activeSessionChecker = Objects.requireNonNull(activeSessionChecker,
+                "session checker must not be null");
+    }
+
+    @Override
+    public void onConnect(AtmosphereResource resource) {
+        // The HTTP request associate to the resource might not be available
+        // after connection for example because recycled by the servlet
+        // container.
+        // To be able to always get the correct cluster key, it is fetched
+        // during connection and stored in the atmosphere resource session.
+        AtmosphereResourceSession resourceSession = resource
+                .getAtmosphereConfig().sessionFactory().getSession(resource);
+        tryGetSerializationKey(resource).ifPresent(key -> resourceSession
+                .setAttribute(CurrentKey.COOKIE_NAME, key));
+    }
+
     @Override
     public void onMessageSent(AtmosphereResource resource) {
-        HttpSession session = resource.session(false);
-        if (session != null && resource.getRequest().wrappedRequest()
-                .isRequestedSessionIdValid()) {
-            SessionTrackerCookie
-                    .getValue(resource.getRequest().wrappedRequest())
-                    .ifPresent(CurrentKey::set);
-            getLogger().debug("Serializing session {} with key {}",
-                    session.getId(), CurrentKey.get());
-            try {
-                sessionSerializer.serialize(session);
-            } finally {
-                CurrentKey.clear();
+        HttpSession httpSession = resource.session(false);
+        if (httpSession != null
+                && activeSessionChecker.test(httpSession.getId())) {
+            tryGetSerializationKey(resource).ifPresent(CurrentKey::set);
+            if (CurrentKey.get() != null) {
+                getLogger().debug("Serializing session {} with key {}",
+                        httpSession.getId(), CurrentKey.get());
+                try {
+                    sessionSerializer.serialize(httpSession);
+                } finally {
+                    CurrentKey.clear();
+                }
+            } else {
+                getLogger().debug(
+                        "Skipping session serialization. Missing serialization key.");
             }
         } else {
             getLogger().debug(
-                    "Skipping session serialization. Session is invalidated");
+                    "Skipping session serialization. Session not available");
         }
+    }
+
+    private Optional<String> tryGetSerializationKey(
+            AtmosphereResource resource) {
+
+        AtmosphereResourceSession resourceSession = resource
+                .getAtmosphereConfig().sessionFactory()
+                .getSession(resource, false);
+        HttpSession httpSession = resource.session(false);
+        String key = null;
+        if (resourceSession != null) {
+            key = resourceSession.getAttribute(CurrentKey.COOKIE_NAME,
+                    String.class);
+        }
+        if (key == null) {
+            try {
+                key = SessionTrackerCookie
+                        .getValue(resource.getRequest().wrappedRequest())
+                        .orElse(null);
+            } catch (Exception ex) {
+                getLogger().debug("Cannot get serialization key from request",
+                        ex);
+            }
+        }
+        if (key == null && httpSession != null) {
+            try {
+                key = SessionTrackerCookie.getFromSession(httpSession)
+                        .orElse(null);
+            } catch (Exception ex) {
+                getLogger().debug("Cannot get serialization key from session",
+                        ex);
+            }
+        }
+        return Optional.ofNullable(key);
     }
 
     private Logger getLogger() {

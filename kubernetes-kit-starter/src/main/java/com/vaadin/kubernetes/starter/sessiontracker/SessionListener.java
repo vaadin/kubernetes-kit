@@ -13,6 +13,10 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpSessionEvent;
 import jakarta.servlet.http.HttpSessionListener;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +46,7 @@ public class SessionListener implements HttpSessionListener {
 
     private final BackendConnector sessionBackendConnector;
     private final SessionSerializer sessionSerializer;
+    private final Set<String> activeSessions = ConcurrentHashMap.newKeySet();
 
     /**
      * Creates a new {@link SessionListener} instance.
@@ -63,6 +68,7 @@ public class SessionListener implements HttpSessionListener {
     public void sessionCreated(HttpSessionEvent se) {
         HttpSession session = se.getSession();
         getLogger().debug("Session with id {} created", session.getId());
+        activeSessions.add(session.getId());
         String clusterKey = CurrentKey.get();
         if (clusterKey != null) {
             SessionInfo sessionInfo = sessionBackendConnector
@@ -88,6 +94,7 @@ public class SessionListener implements HttpSessionListener {
     public void sessionDestroyed(HttpSessionEvent se) {
         HttpSession session = se.getSession();
         String sessionId = session.getId();
+        activeSessions.remove(sessionId);
         getLogger().debug("Session with id {} destroyed", sessionId);
         SessionTrackerCookie.getFromSession(session).ifPresent(clusterKey -> {
             getLogger().debug(
@@ -104,6 +111,16 @@ public class SessionListener implements HttpSessionListener {
                         clusterKey, sessionId, e);
             }
         });
+    }
+
+    /**
+     * Gets a predicate that tests if the given identifier matches an active
+     * HTTP session.
+     *
+     * @return a predicate to check if an HTTP session is active or not.
+     */
+    public Predicate<String> activeSessionChecker() {
+        return activeSessions::contains;
     }
 
     static Logger getLogger() {

@@ -9,6 +9,8 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.push;
 
+import java.util.function.Consumer;
+
 import org.atmosphere.cpr.AtmosphereResource;
 
 import com.vaadin.flow.component.UI;
@@ -34,12 +36,22 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
     }
 
     @Override
+    public void connect(AtmosphereResource resource) {
+        super.connect(resource);
+        notifyPushListeners(listener -> listener.onConnect(resource));
+    }
+
+    @Override
     protected void sendMessage(String message) {
         super.sendMessage(message);
         AtmosphereResource resource = getResource();
+        notifyPushListeners(listener -> listener.onMessageSent(resource));
+    }
+
+    private void notifyPushListeners(Consumer<PushSendListener> action) {
         getUI().getSession().getService().getContext()
                 .getAttribute(Lookup.class).lookupAll(PushSendListener.class)
-                .forEach(listener -> listener.onMessageSent(resource));
+                .forEach(action);
     }
 
     /**
