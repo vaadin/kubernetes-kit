@@ -1,4 +1,5 @@
 target/
+**/src/main/bundles/
 .idea/
 .vscode/
 .settings
