@@ -301,7 +301,7 @@ class SerializationDebugRequestHandlerTest {
         properties.setTimeout(1);
         handler = new SerializationDebugRequestHandler(properties);
 
-        httpSession.setAttribute("OBJ1", new DeepNested());
+        httpSession.setAttribute("OBJ1", new SlowSerialization());
 
         runDebugTool();
         Result result = resultHolder.get();
@@ -343,6 +343,17 @@ class SerializationDebugRequestHandlerTest {
 
     private static class ChildNotSerializable implements Serializable {
         private NotSerializable data = new NotSerializable();
+    }
+
+    private static class SlowSerialization extends DeepNested {
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            out.defaultWriteObject();
+        }
     }
 
     private static class DeepNested implements Serializable {
