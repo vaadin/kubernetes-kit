@@ -46,7 +46,7 @@ class Job {
     private static final Pattern SERIALIZEDLAMBDA_CANNOT_CAST = Pattern.compile(
             "class java.lang.invoke.SerializedLambda cannot be cast to class ([^ ]+)( |$)");
 
-    private CountDownLatch serializationLatch = new CountDownLatch(1);
+    private CountDownLatch serializationLatch = new CountDownLatch(2);
     private final String sessionId;
     private long startTimeNanos;
     private final Set<Outcome> outcome = new LinkedHashSet<>();
@@ -115,7 +115,7 @@ class Job {
     }
 
     public void serializationStarted() {
-        serializationLatch = new CountDownLatch(1);
+        serializationLatch.countDown();
         reset();
     }
 
