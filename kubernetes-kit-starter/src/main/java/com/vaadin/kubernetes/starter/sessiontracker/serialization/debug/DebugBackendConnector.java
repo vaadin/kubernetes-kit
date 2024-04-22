@@ -33,7 +33,7 @@ class DebugBackendConnector implements BackendConnector {
 
     private SessionInfo sessionInfo;
 
-    private CountDownLatch latch;
+    private CountDownLatch latch = new CountDownLatch(2);
 
     @Override
     public void sendSession(SessionInfo sessionInfo) {
@@ -47,7 +47,7 @@ class DebugBackendConnector implements BackendConnector {
 
     @Override
     public void markSerializationStarted(String clusterKey) {
-        latch = new CountDownLatch(1);
+        latch.countDown();
         job.serializationStarted();
     }
 
