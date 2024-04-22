@@ -3,7 +3,13 @@ package com.vaadin.kubernetes.starter.sessiontracker;
 import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.HttpSessionEvent;
 
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
@@ -27,9 +33,7 @@ public class SessionListenerTest {
     void sessionCreated_nullClusterKey_sessionIsNotDeserialized() {
         BackendConnector backendConnector = mock(BackendConnector.class);
         SessionSerializer sessionSerializer = mock(SessionSerializer.class);
-        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
-        HttpSession session = mock(HttpSession.class);
-        when(sessionEvent.getSession()).thenReturn(session);
+        HttpSessionEvent sessionEvent = createSessionEvent();
 
         SessionListener listener = new SessionListener(backendConnector,
                 sessionSerializer);
@@ -52,9 +56,7 @@ public class SessionListenerTest {
         BackendConnector backendConnector = mock(BackendConnector.class);
         SessionSerializer sessionSerializer = mock(SessionSerializer.class);
 
-        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
-        HttpSession session = mock(HttpSession.class);
-        when(sessionEvent.getSession()).thenReturn(session);
+        HttpSessionEvent sessionEvent = createSessionEvent();
 
         SessionListener listener = new SessionListener(backendConnector,
                 sessionSerializer);
@@ -80,9 +82,8 @@ public class SessionListenerTest {
 
         SessionSerializer sessionSerializer = mock(SessionSerializer.class);
 
-        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
-        HttpSession session = mock(HttpSession.class);
-        when(sessionEvent.getSession()).thenReturn(session);
+        AtomicReference<HttpSession> sessionHolder = new AtomicReference<>();
+        HttpSessionEvent sessionEvent = createSessionEvent(sessionHolder::set);
 
         SessionListener listener = new SessionListener(backendConnector,
                 sessionSerializer);
@@ -91,7 +92,8 @@ public class SessionListenerTest {
         verify(sessionEvent).getSession();
         verify(backendConnector).getSession(eq(clusterKey));
         try {
-            verify(sessionSerializer).deserialize(eq(sessionInfo), eq(session));
+            verify(sessionSerializer).deserialize(eq(sessionInfo),
+                    eq(sessionHolder.get()));
         } catch (Exception e) {
             fail();
         }
@@ -101,11 +103,10 @@ public class SessionListenerTest {
     void sessionDestroyed_replicateSessionIsDeleted() {
         BackendConnector backendConnector = mock(BackendConnector.class);
         SessionSerializer sessionSerializer = mock(SessionSerializer.class);
-        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
-        HttpSession session = mock(HttpSession.class);
-        when(session.getAttribute(CurrentKey.COOKIE_NAME))
-                .thenReturn("clusterKey");
-        when(sessionEvent.getSession()).thenReturn(session);
+
+        HttpSessionEvent sessionEvent = createSessionEvent(
+                session -> when(session.getAttribute(CurrentKey.COOKIE_NAME))
+                        .thenReturn("clusterKey"));
 
         SessionListener listener = new SessionListener(backendConnector,
                 sessionSerializer);
@@ -119,9 +120,7 @@ public class SessionListenerTest {
     void sessionDestroyed_nullClusterKey_replicateSessionIsNotDeleted() {
         BackendConnector backendConnector = mock(BackendConnector.class);
         SessionSerializer sessionSerializer = mock(SessionSerializer.class);
-        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
-        HttpSession session = mock(HttpSession.class);
-        when(sessionEvent.getSession()).thenReturn(session);
+        HttpSessionEvent sessionEvent = createSessionEvent();
 
         SessionListener listener = new SessionListener(backendConnector,
                 sessionSerializer);
@@ -129,6 +128,41 @@ public class SessionListenerTest {
 
         verify(sessionEvent).getSession();
         verify(backendConnector, never()).deleteSession(any());
+    }
+
+    @Test
+    void activeSessionChecker_trackSessionLifecycle() {
+        BackendConnector backendConnector = mock(BackendConnector.class);
+        SessionSerializer sessionSerializer = mock(SessionSerializer.class);
+        SessionListener listener = new SessionListener(backendConnector,
+                sessionSerializer);
+
+        Predicate<String> checker = listener.activeSessionChecker();
+
+        HttpSessionEvent sessionEvent = createSessionEvent();
+        listener.sessionCreated(sessionEvent);
+        Assertions.assertTrue(checker.test(sessionEvent.getSession().getId()),
+                "HTTP Session should be active");
+
+        listener.sessionDestroyed(sessionEvent);
+        Assertions.assertFalse(checker.test(sessionEvent.getSession().getId()),
+                "HTTP Session should not be active");
+
+    }
+
+    private static HttpSessionEvent createSessionEvent() {
+        return createSessionEvent(session -> {
+        });
+    }
+
+    private static HttpSessionEvent createSessionEvent(
+            Consumer<HttpSession> customizer) {
+        HttpSessionEvent sessionEvent = mock(HttpSessionEvent.class);
+        HttpSession session = mock(HttpSession.class);
+        when(session.getId()).thenReturn(UUID.randomUUID().toString());
+        when(sessionEvent.getSession()).thenReturn(session);
+        customizer.accept(session);
+        return sessionEvent;
     }
 
 }
