@@ -1,6 +1,8 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
+import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -298,10 +300,10 @@ class SerializationDebugRequestHandlerTest {
     @Test
     void handleRequest_serializationTimeout_timeoutReported() {
         SerializationProperties properties = new SerializationProperties();
-        properties.setTimeout(1);
+        properties.setTimeout(100);
         handler = new SerializationDebugRequestHandler(properties);
 
-        httpSession.setAttribute("OBJ1", new DeepNested());
+        httpSession.setAttribute("OBJ1", new SlowSerialization());
 
         runDebugTool();
         Result result = resultHolder.get();
@@ -343,6 +345,17 @@ class SerializationDebugRequestHandlerTest {
 
     private static class ChildNotSerializable implements Serializable {
         private NotSerializable data = new NotSerializable();
+    }
+
+    private static class SlowSerialization extends DeepNested {
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            out.defaultWriteObject();
+        }
     }
 
     private static class DeepNested implements Serializable {

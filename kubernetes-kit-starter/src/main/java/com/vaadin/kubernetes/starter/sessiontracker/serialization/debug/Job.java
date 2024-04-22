@@ -102,12 +102,11 @@ class Job {
                     }
                     return info;
                 });
-        if (track.stackInfo != null && !track.stackInfo.isEmpty()) {
+        if (!track.stackInfo.isEmpty()) {
             details.add(String.format(
                     "Start Track ID: %d, Stack depth: %d. Reference stack: ",
                     track.id, track.depth));
-            details.addAll(
-                    track.stackInfo.lines().collect(Collectors.toList()));
+            details.addAll(track.stackInfo);
             details.add(String.format("End Track ID: %d", track.id));
             details.add("");
         }
@@ -153,9 +152,10 @@ class Job {
                         .filter(serializedLambda -> serializedLambda
                                 .getFunctionalInterfaceClass()
                                 .equals(targetType.replace('.', '/')))
-                        .map(serializedLambda -> "\t" + serializedLambda
-                                + System.lineSeparator()
-                                + tracked.get(serializedLambda).stackInfo)
+                        .flatMap(serializedLambda -> Stream.concat(
+                                Stream.of("\t" + serializedLambda),
+                                tracked.get(serializedLambda).stackInfo
+                                        .stream()))
                         .collect(Collectors.joining(System.lineSeparator()));
 
                 if (!bestCandidates.isEmpty()) {
@@ -229,10 +229,19 @@ class Job {
                     .flatMap(stackEntry -> tracked.values().stream().filter(
                             t -> t.getHandle() == stackEntry.getHandle())
                             .findFirst())
-                    .map(track -> "DESERIALIZATION STACK. Process failed at depth "
-                            + track.depth + System.lineSeparator()
-                            + "\t- object (class \"" + track.className + "\")"
-                            + System.lineSeparator() + track.stackInfo);
+                    .map(track -> {
+                        StringJoiner joiner = new StringJoiner(
+                                System.lineSeparator());
+                        joiner.add(
+                                "DESERIALIZATION STACK. Process failed at depth "
+                                        + track.depth);
+                        joiner.add("\t- object (class \"" + track.className
+                                + "\")");
+                        if (!track.stackInfo.isEmpty()) {
+                            track.stackInfo.forEach(joiner::add);
+                        }
+                        return joiner.toString();
+                    });
         }
         return Optional.empty();
     }
@@ -284,7 +293,7 @@ class Job {
 
     public void track(Object object, Track track) {
         if (track == null) {
-            track = new Track(-1, -1, "", null);
+            track = new Track(-1, -1, null, null);
         }
         tracked.put(object, track);
     }

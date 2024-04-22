@@ -21,6 +21,7 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -59,9 +60,9 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
  *
  * <pre>
  * {@code
- * new TransientInjectableObjectOutputStream(
- *      os, handler, type -> type.getPackageName().startsWith("com.vaadin.app")
- *  ).writeWithTransients(target);
+ * new TransientInjectableObjectOutputStream(os, handler,
+ *         type -> type.getPackageName().startsWith("com.vaadin.app"))
+ *         .writeWithTransients(target);
  * }
  * </pre>
  *
@@ -87,6 +88,7 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     private final VarHandle depthHandle;
     private final MethodHandle lookupObject;
     private final VarHandle debugStackInfo;
+    private final VarHandle debugStackInfoList;
     private final IdentityHashMap<Object, Track> tracking = new IdentityHashMap<>();
 
     private final boolean trackingEnabled;
@@ -110,10 +112,12 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
             depthHandle = tryGetDepthHandle();
             lookupObject = tryGetLookupObject();
             debugStackInfo = tryGetDebugStackHandle();
+            debugStackInfoList = tryGetDebugStackListHandle();
             trackingEnabled = true;
         } else {
             depthHandle = null;
             debugStackInfo = null;
+            debugStackInfoList = null;
             lookupObject = null;
             trackingEnabled = false;
         }
@@ -160,10 +164,12 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
         }
 
         void copy() throws IOException {
-            // TODO also remove metadata from the end of this stream before
-            // copying.
             wrapped.write(Arrays.copyOfRange(buf, metadataPosition + 3, count));
+            count = metadataPosition; // prevents copy the metadata again at the
+                                      // end of the stream
             writeTo(wrapped);
+            count = 0;
+            buf = new byte[0];
         }
     }
 
@@ -199,7 +205,6 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
      * <ul>
      * <li>tracking id</li>
      * <li>object graph depth</li>
-     * <li>object graph stack</li>
      * <li>object handle</li>
      * </ul>
      *
@@ -233,7 +238,8 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     @Override
     protected Object replaceObject(Object obj) {
         obj = trackObject(obj);
-        if (obj != null) {
+        // Only application classes might need to be replaced
+        if (trackingMode && obj != null) {
             Class<?> type = obj.getClass();
             if (injectableFilter.test(type) && !inspected.containsKey(obj)) {
                 Object original = obj;
@@ -290,10 +296,10 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
     }
 
     private Object trackObject(Object obj) {
-        if (getLogger().isTraceEnabled()) {
-            getLogger().trace("Serializing object {}", obj.getClass());
-        }
         if (trackingMode && trackingEnabled && !tracking.containsKey(obj)) {
+            if (getLogger().isTraceEnabled()) {
+                getLogger().trace("Serializing object {}", obj.getClass());
+            }
             Object original = obj;
             try {
                 Track track = createTrackObject(++trackingCounter, obj);
@@ -392,21 +398,44 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
         }
     }
 
+    private static VarHandle tryGetDebugStackListHandle() {
+        try {
+            Class<?> debugTraceInfoStackClass = Class
+                    .forName("java.io.ObjectOutputStream$DebugTraceInfoStack");
+            return MethodHandles
+                    .privateLookupIn(debugTraceInfoStackClass,
+                            MethodHandles.lookup())
+                    .findVarHandle(debugTraceInfoStackClass, "stack",
+                            List.class);
+        } catch (Exception ex) {
+            getLogger().trace(
+                    "Cannot access ObjectOutputStream.DebugTraceInfoStack.stack field.",
+                    ex);
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private Track createTrackObject(int id, Object obj) {
         int depth = -1;
         if (depthHandle != null) {
             depth = (int) depthHandle.get(this);
         }
-        String stackInfo = null;
+        List<String> stackInfo = null;
         if (debugStackInfo != null) {
             Object stackElement = debugStackInfo.get(this);
-            stackInfo = (stackElement != null) ? stackElement.toString() : null;
+            if (stackElement != null && debugStackInfoList != null) {
+                stackInfo = new ArrayList<>(
+                        (List<String>) debugStackInfoList.get(stackElement));
+                Collections.reverse(stackInfo);
+            }
         }
         return new Track(id, depth, stackInfo, obj);
     }
 
     private void trackClass(ObjectStreamClass type) {
-        if (inspector instanceof DebugMode && getLogger().isTraceEnabled()) {
+        if (trackingMode && inspector instanceof DebugMode
+                && getLogger().isTraceEnabled()) {
             String fields = Stream.of(type.getFields())
                     .filter(field -> !field.isPrimitive() && !Serializable.class
                             .isAssignableFrom(field.getType()))
