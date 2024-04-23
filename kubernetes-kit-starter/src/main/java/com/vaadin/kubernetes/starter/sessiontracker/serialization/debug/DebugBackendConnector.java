@@ -9,13 +9,16 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 
 import org.slf4j.Logger;
 
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 
 /**
  * A dummy {@link BackendConnector} implementations that locally stores the
@@ -23,49 +26,76 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
  *
  * It is meant to only be used with the Kubernetes Kit Debug Tool.
  */
-class DebugBackendConnector implements BackendConnector {
+class DebugBackendConnector implements BackendConnector,
+        BiFunction<String, String, TransientHandler> {
 
-    private final Job job;
-
-    public DebugBackendConnector(Job job) {
-        this.job = job;
-    }
-
-    private SessionInfo sessionInfo;
-
-    private CountDownLatch latch = new CountDownLatch(2);
+    private final Map<String, Job> jobs = new ConcurrentHashMap<>();
+    private final Map<String, SessionInfo> serializedSessions = new ConcurrentHashMap<>();
+    private final Map<Job, DebugTransientHandler> handlers = new IdentityHashMap<>();
 
     @Override
     public void sendSession(SessionInfo sessionInfo) {
-        this.sessionInfo = sessionInfo;
+        serializedSessions.put(sessionInfo.getClusterKey(), sessionInfo);
     }
 
     @Override
     public SessionInfo getSession(String clusterKey) {
-        return sessionInfo;
-    }
-
-    @Override
-    public void markSerializationStarted(String clusterKey) {
-        latch.countDown();
-        job.serializationStarted();
-    }
-
-    @Override
-    public void markSerializationComplete(String clusterKey) {
-        job.serialized(sessionInfo);
-        latch.countDown();
+        getJob(clusterKey);
+        return serializedSessions.get(clusterKey);
     }
 
     @Override
     public void deleteSession(String clusterKey) {
-        // NO-OP
+        serializedSessions.remove(clusterKey);
+        Job job = jobs.remove(clusterKey);
+        if (job != null) {
+            job.reset();
+            handlers.remove(job);
+        }
+    }
+
+    @Override
+    public void markSerializationStarted(String clusterKey) {
+        getJob(clusterKey).serializationStarted();
+    }
+
+    @Override
+    public void markSerializationComplete(String clusterKey) {
+        Job job = getJob(clusterKey);
+        job.serialized(serializedSessions.get(clusterKey));
+    }
+
+    @Override
+    public TransientHandler apply(String sessionId, String clusterKey) {
+        return handlers.computeIfAbsent(getJob(clusterKey),
+                DebugTransientHandler::new);
+    }
+
+    Job newJob(String sessionId, String clusterKey) {
+        Job job = new Job(sessionId, clusterKey);
+        jobs.put(clusterKey, job);
+        return job;
+    }
+
+    void shutdown() {
+        jobs.values().forEach(Job::cancel);
+    }
+
+    private Job getJob(String clusterKey) {
+        Job job = jobs.get(clusterKey);
+        if (job == null) {
+            throw new IllegalStateException(
+                    "No job started for clusterKey " + clusterKey);
+        }
+        return job;
     }
 
     /**
      * Blocks the thread for up to the defined timeout in milliseconds, waiting
      * for serialization to be completed.
      *
+     * @param job
+     *            the serialization job to wait for.
      * @param timeout
      *            the timeout in milliseconds to wait for the serialization to
      *            be completed.
@@ -73,20 +103,13 @@ class DebugBackendConnector implements BackendConnector {
      *            the logger to add potential error information.
      * @return the serialized session holder.
      */
-    SessionInfo waitForCompletion(int timeout, Logger logger) {
-        try {
-            if (!latch.await(timeout, TimeUnit.MILLISECONDS)) {
-                job.timeout();
-                logger.error(
-                        "Session serialization timed out because did not complete in {} ms. "
-                                + "Increase the serialization timeout (in milliseconds) by the "
-                                + "'vaadin.serialization.timeout' application or system property.",
-                        timeout);
-            }
-        } catch (Exception e) { // NOSONAR
-            logger.error("Testing of session serialization failed", e);
-        }
-        return sessionInfo;
+    SessionInfo waitForCompletion(Job job, int timeout, Logger logger) {
+        job.waitForSerializationCompletion(timeout, logger);
+        String clusterKey = jobs.entrySet().stream()
+                .filter(e -> job == e.getValue()).map(Map.Entry::getKey)
+                .findFirst().orElseThrow(
+                        () -> new IllegalStateException("Job is not active"));
+        return serializedSessions.get(clusterKey);
     }
 
 }

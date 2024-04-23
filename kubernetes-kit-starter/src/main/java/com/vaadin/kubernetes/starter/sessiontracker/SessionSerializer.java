@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -115,7 +116,8 @@ public class SessionSerializer
 
     private final BackendConnector backendConnector;
 
-    private final TransientHandler handler;
+    // (sessionId, clusterKey) -> TransientHandler
+    private final BiFunction<String, String, TransientHandler> handlerProvider;
 
     private final long optimisticSerializationTimeoutMs;
 
@@ -138,8 +140,40 @@ public class SessionSerializer
     public SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
             SessionSerializationCallback sessionSerializationCallback) {
+        this(backendConnector, (sessionId, clusterKey) -> transientHandler,
+                sessionSerializationCallback);
+    }
+
+    /**
+     * Creates a new {@link SessionSerializer}.
+     * <p>
+     * </p>
+     * The {@link TransientHandler} provider is called when serialization
+     * process start, providing {@code session ID} and {@code cluster key}, to
+     * allow the implementor to track or provide actions based on the current
+     * processing.
+     * <p>
+     * </p>
+     * This constructor is basically an internal API, meant to be used only by
+     * the serialization debug tool.
+     * <p>
+     * </p>
+     * For internal use only,
+     *
+     * @param backendConnector
+     *            backend connector to store serialized data on distributed
+     *            storage.
+     * @param transientHandlerProvider
+     *            provides handler to inspect and inject transient fields.
+     * @param sessionSerializationCallback
+     *            callbacks for successful serialization and deserialization or
+     *            when an error happens
+     */
+    public SessionSerializer(BackendConnector backendConnector,
+            BiFunction<String, String, TransientHandler> transientHandlerProvider,
+            SessionSerializationCallback sessionSerializationCallback) {
         this.backendConnector = backendConnector;
-        this.handler = transientHandler;
+        this.handlerProvider = transientHandlerProvider;
         this.sessionSerializationCallback = sessionSerializationCallback;
         optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
     }
@@ -152,7 +186,7 @@ public class SessionSerializer
         this.backendConnector = backendConnector;
         this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
         this.sessionSerializationCallback = sessionSerializationCallback;
-        this.handler = transientHandler;
+        this.handlerProvider = (sessionId, clusterKey) -> transientHandler;
     }
 
     /**
@@ -442,9 +476,11 @@ public class SessionSerializer
     private SessionInfo doSerialize(String sessionId,
             Map<String, Object> attributes) throws Exception {
         long start = System.currentTimeMillis();
+        String clusterKey = getClusterKey(attributes);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (TransientInjectableObjectOutputStream outStream = TransientInjectableObjectOutputStream
-                .newInstance(out, handler, injectableFilter)) {
+                .newInstance(out, handlerProvider.apply(sessionId, clusterKey),
+                        injectableFilter)) {
             outStream.writeWithTransients(attributes);
             sessionSerializationCallback.onSerializationSuccess();
         } catch (Exception ex) {
@@ -452,13 +488,12 @@ public class SessionSerializer
             throw ex;
         }
 
-        SessionInfo info = new SessionInfo(getClusterKey(attributes),
-                out.toByteArray());
+        SessionInfo info = new SessionInfo(clusterKey, out.toByteArray());
 
         getLogger().debug(
-                "Serialization of attributes {} for session {} with distributed key {} completed in {}ms",
+                "Serialization of attributes {} for session {} with distributed key {} completed in {}ms ({} bytes)",
                 attributes.keySet(), sessionId, info.getClusterKey(),
-                System.currentTimeMillis() - start);
+                System.currentTimeMillis() - start, info.getData().length);
         return info;
     }
 
@@ -477,7 +512,8 @@ public class SessionSerializer
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         Map<String, Object> attributes;
         try (TransientInjectableObjectInputStream inStream = new TransientInjectableObjectInputStream(
-                in, handler)) {
+                in, handlerProvider.apply(sessionId,
+                        sessionInfo.getClusterKey()))) {
             attributes = inStream.readWithTransients();
             sessionSerializationCallback.onDeserializationSuccess();
         } catch (Exception ex) {
@@ -518,6 +554,7 @@ public class SessionSerializer
         // the server has not shut down before this and made the session
         // unavailable
         waitForSerialization();
+        executorService.shutdown();
     }
 
     private static class SerializationThreadFactory implements ThreadFactory {
@@ -526,8 +563,8 @@ public class SessionSerializer
 
         @Override
         public Thread newThread(Runnable runnable) {
-            return new Thread(runnable, "sessionSerializer-worker-"
-                    + threadNumber.getAndIncrement());
+            return new Thread(runnable, "sessionSerializer-worker-" + hashCode()
+                    + "-" + threadNumber.getAndIncrement());
         }
 
     }
