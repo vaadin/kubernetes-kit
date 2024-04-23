@@ -1,21 +1,23 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.invoke.SerializedLambda;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import org.assertj.core.api.SoftAssertions;
 import org.assertj.core.data.Index;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.mock.web.MockHttpSession;
@@ -314,8 +316,40 @@ class SerializationDebugRequestHandlerTest {
     }
 
     @Test
-    @Disabled("Find a way to simulate SerializedLambda ClassCastException")
     void handleRequest_lambdaSelfReferenceClassCast_errorCaught() {
+
+        LambdaDeserializationClassCast holder = new LambdaDeserializationClassCast();
+        httpSession.setAttribute("OBJ1", holder.selfReferenceLambda);
+
+        runDebugTool();
+        Result result = resultHolder.get();
+        assertThat(result.getOutcomes())
+                .containsExactly(Outcome.DESERIALIZATION_FAILED);
+        String unserializableInfo = String.join(System.lineSeparator(),
+                result.getErrors());
+        assertThat(unserializableInfo)
+                .contains("cannot assign instance of "
+                        + SerializedLambda.class.getName())
+                .contains("field "
+                        + LambdaDeserializationClassCast.class.getName()
+                        + ".selfReferenceLambda")
+                .contains("in instance of "
+                        + LambdaDeserializationClassCast.class.getName())
+                .contains(
+                        "SERIALIZED LAMBDA CLASS CAST EXCEPTION BEST CANDIDATES")
+                .contains("SerializedLambda[capturingClass=class "
+                        + LambdaDeserializationClassCast.class.getName());
+    }
+
+    static class LambdaDeserializationClassCast implements Serializable {
+
+        private final Serializable capture = new Serializable() {
+        };
+
+        private final SerializableRunnable selfReferenceLambda = () -> {
+            Objects.requireNonNull(capture);
+        };
+
     }
 
     private void assertDebugToolNotExecuted() {

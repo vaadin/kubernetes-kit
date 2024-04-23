@@ -9,8 +9,10 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
+import java.io.InvalidObjectException;
 import java.io.ObjectStreamClass;
 import java.lang.invoke.SerializedLambda;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -194,10 +196,11 @@ class Job {
         outcome.add(Outcome.DESERIALIZATION_FAILED);
         log(CATEGORY_ERRORS,
                 Outcome.DESERIALIZATION_FAILED.name() + ": " + ex.getMessage());
-        if (ex instanceof ClassCastException
-                && ex.getMessage().contains(SerializedLambda.class.getName())
+        Throwable cause = tryUnwrapLambdaDeserializationCause(ex);
+        if (cause instanceof ClassCastException
+                && cause.getMessage().contains(SerializedLambda.class.getName())
                 && !serializedLambdaMap.isEmpty()) {
-            String targetType = tryDetectClassCastTarget(ex.getMessage());
+            String targetType = tryDetectClassCastTarget(cause.getMessage());
             if (targetType != null) {
                 String bestCandidates = serializedLambdaMap.values().stream()
                         .filter(serializedLambda -> serializedLambda
@@ -221,6 +224,19 @@ class Job {
             dumpDeserializationStack()
                     .ifPresent(message -> log(CATEGORY_ERRORS, message));
         }
+    }
+
+    // Base on the JDK version, SerializedLambda.readResolve may differently
+    // wrap the cause of error
+    private Throwable tryUnwrapLambdaDeserializationCause(Throwable exception) {
+        Throwable cause = exception;
+        if (cause instanceof InvalidObjectException) {
+            cause = cause.getCause();
+        }
+        if (cause instanceof InvocationTargetException) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
 
     private Logger getLogger() {
