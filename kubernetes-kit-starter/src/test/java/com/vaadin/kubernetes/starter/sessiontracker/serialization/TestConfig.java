@@ -61,6 +61,7 @@ class TestConfig {
     static class CtorInjectionTarget implements Serializable {
         transient TestService defaultImpl;
         transient TestService alternative;
+        transient Object nonBeanTransient = new Object();
 
         public CtorInjectionTarget(TestService defaultImpl,
                 @Qualifier("ALTERNATIVE") TestService alternative) {
@@ -91,6 +92,7 @@ class TestConfig {
         @Autowired
         @Qualifier("EXTENSION")
         transient PrototypeComponent extPrototypeScoped;
+        transient Object nonBeanTransient = new Object();
     }
 
     interface PrototypeService {
@@ -119,6 +121,7 @@ class TestConfig {
         @Autowired
         @Qualifier("B")
         transient PrototypeService prototypeServiceB;
+        transient Object nonBeanTransient = new Object();
     }
 
     @Component

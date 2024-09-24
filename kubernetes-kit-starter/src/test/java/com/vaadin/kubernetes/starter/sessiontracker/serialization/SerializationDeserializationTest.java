@@ -45,7 +45,6 @@ class SerializationDeserializationTest {
                         .readWithTransients();
         Assertions.assertThat(result).isNotSameAs(target)
                 .isExactlyInstanceOf(TestConfig.CtorInjectionTarget.class)
-                .hasNoNullFieldsOrProperties()
                 .asInstanceOf(InstanceOfAssertFactories
                         .type(TestConfig.CtorInjectionTarget.class))
                 .extracting(obj -> obj.defaultImpl, obj -> obj.alternative)
