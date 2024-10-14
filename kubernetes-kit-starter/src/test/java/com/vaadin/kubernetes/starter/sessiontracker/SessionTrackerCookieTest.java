@@ -144,4 +144,23 @@ public class SessionTrackerCookieTest {
         assertTrue(value.isPresent());
         assertEquals(clusterKey, value.get());
     }
+
+
+    @Test
+    void setIfNeeded_nullCookiesAndSession_cookieIsConfigured() {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getCookies()).thenReturn(null);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        @SuppressWarnings("unchecked")
+        Consumer<Cookie> cookieConsumer = (Consumer<Cookie>) mock(
+                Consumer.class);
+
+        SessionTrackerCookie.setIfNeeded(null, request, response,
+                cookieConsumer);
+
+        verify(cookieConsumer).accept(any());
+        verify(response).addCookie(any());
+    }
+
+
 }

@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+
 import java.io.IOException;
 import java.util.function.Consumer;
 
@@ -72,10 +73,8 @@ public class SessionTrackerFilter extends HttpFilter {
         try {
             HttpSession session = request.getSession(false);
 
-            if (session != null) {
-                SessionTrackerCookie.setIfNeeded(session, request, response,
-                        cookieConsumer(request));
-            }
+            SessionTrackerCookie.setIfNeeded(session, request, response,
+                    cookieConsumer(request));
             super.doFilter(request, response, chain);
 
             if (session != null && request.isRequestedSessionIdValid()

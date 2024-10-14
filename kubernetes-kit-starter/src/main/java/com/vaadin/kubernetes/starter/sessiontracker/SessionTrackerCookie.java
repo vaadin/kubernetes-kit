@@ -13,6 +13,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -45,11 +46,14 @@ public final class SessionTrackerCookie {
         Optional<Cookie> clusterKeyCookie = getCookie(request);
         if (clusterKeyCookie.isEmpty()) {
             String clusterKey = UUID.randomUUID().toString();
-            session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
+            if (session != null) {
+                session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
+            }
             Cookie cookie = new Cookie(CurrentKey.COOKIE_NAME, clusterKey);
             cookieConsumer.accept(cookie);
             response.addCookie(cookie);
-        } else if (session.getAttribute(CurrentKey.COOKIE_NAME) == null) {
+        } else if (session != null
+                && session.getAttribute(CurrentKey.COOKIE_NAME) == null) {
             String clusterKey = clusterKeyCookie.get().getValue();
             session.setAttribute(CurrentKey.COOKIE_NAME, clusterKey);
         }
