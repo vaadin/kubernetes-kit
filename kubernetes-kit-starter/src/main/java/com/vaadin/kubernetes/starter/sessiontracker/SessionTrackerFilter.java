@@ -66,9 +66,7 @@ public class SessionTrackerFilter extends HttpFilter {
         try {
             HttpSession session = request.getSession(false);
 
-            if (session != null) {
-                SessionTrackerCookie.setIfNeeded(session, request, response);
-            }
+            SessionTrackerCookie.setIfNeeded(session, request, response);
             super.doFilter(request, response, chain);
 
             if (session != null && request.isRequestedSessionIdValid()
