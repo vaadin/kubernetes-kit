@@ -85,16 +85,6 @@ public class ClusterSupportTest {
     }
 
     @Test
-    void serviceInit_clusterSupportIsSetInCurrentInstance() {
-        ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
-
-        clusterSupport.serviceInit(serviceInitEvent);
-
-        currentInstanceMockedStatic
-                .verify(() -> CurrentInstance.set(any(), any()));
-    }
-
-    @Test
     void serviceInit_requestHandlerIsAdded() {
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
@@ -122,10 +112,10 @@ public class ClusterSupportTest {
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn(null);
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
         when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
         clusterSupport.serviceInit(serviceInitEvent);
@@ -148,7 +138,7 @@ public class ClusterSupportTest {
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("");
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
@@ -174,7 +164,7 @@ public class ClusterSupportTest {
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("1.0.0");
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
@@ -200,7 +190,7 @@ public class ClusterSupportTest {
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("2.0.0");
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
@@ -225,7 +215,7 @@ public class ClusterSupportTest {
 
         when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
                 .thenReturn("2.0.0");
-        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
@@ -243,7 +233,7 @@ public class ClusterSupportTest {
     }
 
     @ParameterizedTest(name = "{index} And_IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
-    @CsvSource({ "true, 1, 1, 2, 1", "false, 0, 0, 1, 0" })
+    @CsvSource({ "true, 1, 1, 1, 1", "false, 0, 0, 0, 0" })
     void onComponentEvent_removesStickyClusterCookieAndInvalidatesSession(
             boolean nodeSwitch, int doAppCleanupTimes, int addCookieTimes,
             int getWrappedSessionTimes, int invalidateTimes)
@@ -262,6 +252,8 @@ public class ClusterSupportTest {
                 .thenReturn(vaadinRequest);
         vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
                 .thenReturn(vaadinResponse);
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.empty());
         when(switchVersionListener.nodeSwitch(any(), any()))
