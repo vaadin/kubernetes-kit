@@ -9,15 +9,13 @@
  */
 package com.vaadin.kubernetes.starter.ui;
 
-import java.util.Optional;
-
 import javax.servlet.http.Cookie;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;
@@ -52,13 +50,6 @@ public class ClusterSupport implements VaadinServiceInitListener {
     private String appVersion;
 
     /**
-     * Get the current instance of the ClusterSupport.
-     */
-    public static ClusterSupport getCurrent() {
-        return CurrentInstance.get(ClusterSupport.class);
-    }
-
-    /**
      * Register the global version switch listener. If set to <code>null</code>
      * the current session and the sticky cluster cookie are removed without any
      * version switch condition check.
@@ -82,24 +73,18 @@ public class ClusterSupport implements VaadinServiceInitListener {
                 "ClusterSupport service initialized. Registering RequestHandler with Application Version: "
                         + appVersion);
 
-        // Set the thread local instance
-        CurrentInstance.set(ClusterSupport.class, this);
-
         // Register a generic request handler for all the requests
         serviceInitEvent.addRequestHandler(this::handleRequest);
     }
 
     private boolean handleRequest(VaadinSession vaadinSession,
             VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
+        String versionHeader = vaadinRequest.getHeader(UPDATE_VERSION_HEADER);
 
         vaadinSession.access(() -> {
             // Always check for the update version header
-            String versionHeader = vaadinRequest
-                    .getHeader(UPDATE_VERSION_HEADER);
-
+            WrappedSession session = vaadinSession.getSession();
             vaadinSession.getUIs().forEach(ui -> {
-                WrappedSession session = VaadinRequest.getCurrent()
-                        .getWrappedSession();
                 Optional<Component> versionNotifier = ui.getChildren()
                         .filter(child -> (child instanceof VersionNotifier))
                         .findFirst();
