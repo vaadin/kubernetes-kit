@@ -54,9 +54,9 @@ class SpringTransientHandlerTest {
 
         assertThat(transients).hasSize(2).containsExactlyInAnyOrder(
                 new TransientDescriptor(Parent.class, "theService",
-                        TestService.class, "alternativeImpl"),
+                        TestService.class, "alternativeImpl", false),
                 new TransientDescriptor(Child.class, "theService",
-                        TestService.class, "defaultImpl"));
+                        TestService.class, "defaultImpl", false));
     }
 
     @Test
@@ -67,7 +67,7 @@ class SpringTransientHandlerTest {
         assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.NamedComponentTarget.class,
                         "named", TestConfig.NamedComponent.class,
-                        TestConfig.NamedComponent.NAME));
+                        TestConfig.NamedComponent.NAME, false));
 
     }
 
@@ -79,11 +79,12 @@ class SpringTransientHandlerTest {
         assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.PrototypeTarget.class,
                         "prototypeScoped", TestConfig.PrototypeComponent.class,
-                        TestConfig.PrototypeComponent.class.getName()),
+                        TestConfig.PrototypeComponent.class.getName(), false),
                 new TransientDescriptor(TestConfig.PrototypeTarget.class,
                         "extPrototypeScoped",
                         TestConfig.PrototypeComponent.class,
-                        TestConfig.PrototypeComponentExt.class.getName()));
+                        TestConfig.PrototypeComponentExt.class.getName(),
+                        false));
     }
 
     @Test
@@ -94,10 +95,12 @@ class SpringTransientHandlerTest {
         assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.PrototypeServiceTarget.class,
                         "prototypeServiceA", TestConfig.PrototypeService.class,
-                        TestConfig.PrototypeServiceImplA.class.getName()),
+                        TestConfig.PrototypeServiceImplA.class.getName(),
+                        false),
                 new TransientDescriptor(TestConfig.PrototypeServiceTarget.class,
                         "prototypeServiceB", TestConfig.PrototypeService.class,
-                        TestConfig.PrototypeServiceImplB.class.getName()));
+                        TestConfig.PrototypeServiceImplB.class.getName(),
+                        false));
     }
 
     @Test
@@ -109,13 +112,13 @@ class SpringTransientHandlerTest {
                 new TransientDescriptor(
                         TestConfig.ProxiedPrototypeServiceTarget.class,
                         "prototypeServiceA", TestConfig.PrototypeService.class,
-                        TestConfig.ProxiedPrototypeServiceImplA.class
-                                .getName()),
+                        TestConfig.ProxiedPrototypeServiceImplA.class.getName(),
+                        false),
                 new TransientDescriptor(
                         TestConfig.ProxiedPrototypeServiceTarget.class,
                         "prototypeServiceB", TestConfig.PrototypeService.class,
-                        TestConfig.ProxiedPrototypeServiceImplB.class
-                                .getName()));
+                        TestConfig.ProxiedPrototypeServiceImplB.class.getName(),
+                        false));
     }
 
     @Test
@@ -125,7 +128,8 @@ class SpringTransientHandlerTest {
 
         assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.ProxiedBeanTarget.class,
-                        "service", TestService.class, "transactionalService"));
+                        "service", TestService.class, "transactionalService",
+                        false));
     }
 
     @Test
@@ -142,9 +146,10 @@ class SpringTransientHandlerTest {
                 null, null);
         List<TransientDescriptor> descriptors = List.of(
                 new TransientDescriptor(TestConfig.CtorInjectionTarget.class,
-                        "defaultImpl", TestService.class, "defaultImpl"),
+                        "defaultImpl", TestService.class, "defaultImpl", false),
                 new TransientDescriptor(TestConfig.CtorInjectionTarget.class,
-                        "alternative", TestService.class, "alternativeImpl"));
+                        "alternative", TestService.class, "alternativeImpl",
+                        false));
         handler.inject(newTarget, descriptors);
 
         Assertions.assertSame(target.defaultImpl, newTarget.defaultImpl,

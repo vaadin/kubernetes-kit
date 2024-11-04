@@ -34,7 +34,6 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
-
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,13 +61,15 @@ class SessionSerializerTest {
     private HttpSession httpSession;
     private String clusterSID;
     private MockVaadinService vaadinService;
+    private TransientHandler transientHandler;
 
     @BeforeEach
     void setUp() {
         serializationCallback = mock(SessionSerializationCallback.class);
         connector = mock(BackendConnector.class);
-        serializer = new SessionSerializer(connector,
-                mock(TransientHandler.class), serializationCallback,
+        transientHandler = mock(TransientHandler.class);
+        serializer = new SessionSerializer(connector, transientHandler,
+                serializationCallback,
                 TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS);
 
         clusterSID = UUID.randomUUID().toString();
@@ -155,6 +156,36 @@ class SessionSerializerTest {
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
         // Serialization should not be sent the backend
         verify(connector).sendSession(isNotNull());
+    }
+
+    @Test
+    void serialize_optimisticLocking_sessionLockRequired_immediatelySwitchToPessimisticLocking() {
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID);
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        AtomicBoolean pessimisticLockingRequested = new AtomicBoolean();
+        doAnswer(i -> pessimisticLockingRequested.getAndSet(true))
+                .when(serializationCallback).onSerializationError(
+                        any(PessimisticSerializationRequiredException.class));
+
+        when(transientHandler.inspect(any()))
+                .thenThrow(new PessimisticSerializationRequiredException(
+                        "VaadinSession lock required"))
+                .thenReturn(List.of());
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID);
+
+        await().atMost(1000, MILLISECONDS)
+                .untilTrue(pessimisticLockingRequested);
+
+        await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector).sendSession(notNull());
     }
 
     @Test
