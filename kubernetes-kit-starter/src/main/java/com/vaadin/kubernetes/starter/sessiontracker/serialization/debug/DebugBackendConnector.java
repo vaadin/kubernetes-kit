@@ -35,7 +35,9 @@ class DebugBackendConnector implements BackendConnector,
 
     @Override
     public void sendSession(SessionInfo sessionInfo) {
-        serializedSessions.put(sessionInfo.getClusterKey(), sessionInfo);
+        if (sessionInfo != null) {
+            serializedSessions.put(sessionInfo.getClusterKey(), sessionInfo);
+        }
     }
 
     @Override
