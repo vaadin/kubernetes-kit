@@ -320,6 +320,7 @@ public class SerializationDebugRequestHandler
     private static void tryDeserialize(SessionSerializer serializer,
             SessionInfo info, HttpSession debugHttpSession, Job job) {
         try {
+            job.deserializationStarted();
             serializer.deserialize(info, debugHttpSession);
             job.deserialized();
         } catch (Exception e) {

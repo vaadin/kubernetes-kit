@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -58,6 +59,8 @@ class Job {
     private final Map<String, List<String>> messages = new LinkedHashMap<>();
     private String clusterKey;
     private final Map<Object, Track> tracked = new IdentityHashMap<>();
+    private final Map<Integer, Track> trackedById = new IdentityHashMap<>();
+    private final Map<Integer, Track> trackedByHandle = new IdentityHashMap<>();
 
     private final ArrayDeque<Track> deserializingStack = new ArrayDeque<>();
     private final Map<String, List<String>> unserializableDetails = new HashMap<>();
@@ -128,6 +131,8 @@ class Job {
         outcome.clear();
         messages.clear();
         tracked.clear();
+        trackedById.clear();
+        trackedByHandle.clear();
         deserializingStack.clear();
         unserializableDetails.clear();
         serializedLambdaMap.clear();
@@ -221,6 +226,14 @@ class Job {
         }
     }
 
+    void deserializationStarted() {
+        trackedByHandle.clear();
+        trackedByHandle.putAll(tracked.values().stream()
+                .filter(t -> t.getHandle() != -1).collect(Collectors
+                        .toMap(Track::getHandle, Function.identity())));
+
+    }
+
     void deserialized() {
         outcome.remove(Outcome.DESERIALIZATION_FAILED);
     }
@@ -282,9 +295,8 @@ class Job {
             // get serialized instance from tracked objects
             // save it and then ensure it is deserialized correctly
             int trackId = track.id;
-            Object serializedObject = tracked.values().stream()
-                    .filter(t -> t.id == trackId).findFirst().map(t -> t.object)
-                    .orElse(null);
+            Object serializedObject = Optional.of(trackedById.get(trackId))
+                    .map(t -> t.object).orElse(null);
             // Following condition should always be true, otherwise it means the
             // stream is somehow corrupted
             if (serializedObject instanceof SerializedLambda) {
@@ -326,9 +338,8 @@ class Job {
     Optional<String> dumpDeserializationStack() {
         if (!deserializingStack.isEmpty()) {
             return Optional.of(deserializingStack.peek())
-                    .flatMap(stackEntry -> tracked.values().stream().filter(
-                            t -> t.getHandle() == stackEntry.getHandle())
-                            .findFirst())
+                    .flatMap(stackEntry -> Optional.ofNullable(
+                            trackedByHandle.get(stackEntry.getHandle())))
                     .map(track -> {
                         StringJoiner joiner = new StringJoiner(
                                 System.lineSeparator());
@@ -395,7 +406,10 @@ class Job {
     public void track(Object object, Track track) {
         if (track == null) {
             track = new Track(-1, -1, null, null);
+        } else {
+            trackedById.put(track.id, track);
         }
         tracked.put(object, track);
+
     }
 }
