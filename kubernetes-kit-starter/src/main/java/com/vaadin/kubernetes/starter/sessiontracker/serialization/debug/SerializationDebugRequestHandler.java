@@ -23,6 +23,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -234,7 +235,15 @@ public class SerializationDebugRequestHandler
         // Work on a copy of the session to avoid overwriting attributes
         DebugHttpSession debugHttpSession = new DebugHttpSession(session);
         String clusterKey = debugHttpSession.getClusterKey();
-        Job job = debugBackendConnector.newJob(session.getId(), clusterKey);
+        Optional<Job> maybeJob = debugBackendConnector.newJob(session.getId(),
+                clusterKey);
+        if (maybeJob.isEmpty()) {
+            LOGGER.debug(
+                    "A serialization test for session {} with cluster key {} is already in progress, rejecting request.",
+                    session.getId(), clusterKey);
+            return;
+        }
+        Job job = maybeJob.get();
         try {
             trySerialize(sessionSerializer, debugHttpSession, job);
             SessionInfo info = debugBackendConnector.waitForCompletion(job,

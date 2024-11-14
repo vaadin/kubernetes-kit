@@ -14,6 +14,7 @@ import java.io.ObjectStreamClass;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Stack;
 import java.util.StringJoiner;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +48,10 @@ class Job {
     private static final Pattern SERIALIZEDLAMBDA_CANNOT_CAST = Pattern.compile(
             "class java.lang.invoke.SerializedLambda cannot be cast to class ([^ ]+)( |$)");
 
-    private CountDownLatch serializationLatch = new CountDownLatch(2);
+    private final CountDownLatch serializationCompletedLatch = new CountDownLatch(
+            1);
+    private final CountDownLatch serializationStartedLatch = new CountDownLatch(
+            1);
     private final String sessionId;
     private long startTimeNanos;
     private final Set<Outcome> outcome = new LinkedHashSet<>();
@@ -56,7 +59,7 @@ class Job {
     private String clusterKey;
     private final Map<Object, Track> tracked = new IdentityHashMap<>();
 
-    private final Stack<Track> deserializingStack = new Stack<>();
+    private final ArrayDeque<Track> deserializingStack = new ArrayDeque<>();
     private final Map<String, List<String>> unserializableDetails = new HashMap<>();
 
     private final Map<Integer, SerializedLambda> serializedLambdaMap = new HashMap<>();
@@ -79,21 +82,37 @@ class Job {
      * @return the serialized session holder.
      */
     boolean waitForSerializationCompletion(int timeout, Logger logger) {
-        boolean completed = false;
+        boolean completed = true;
         try {
-            completed = serializationLatch.await(timeout,
+            completed = serializationStartedLatch.await(timeout,
                     TimeUnit.MILLISECONDS);
             if (!completed) {
                 timeout();
                 logger.error(
-                        "Session serialization timed out because did not complete in {} ms. "
-                                + "Increase the serialization timeout (in milliseconds) by the "
-                                + "'vaadin.serialization.timeout' application or system property.",
+                        "Session serialization timed out because did not started in {} ms, "
+                                + "most likely because another attempt is already in progress.",
                         timeout);
                 return false;
             }
         } catch (Exception e) { // NOSONAR
             logger.error("Testing of session serialization failed", e);
+        }
+        if (completed) {
+            try {
+                completed = serializationCompletedLatch.await(timeout,
+                        TimeUnit.MILLISECONDS);
+                if (!completed) {
+                    timeout();
+                    logger.error(
+                            "Session serialization timed out because did not complete in {} ms. "
+                                    + "Increase the serialization timeout (in milliseconds) by the "
+                                    + "'vaadin.serialization.timeout' application or system property.",
+                            timeout);
+                    return false;
+                }
+            } catch (Exception e) { // NOSONAR
+                logger.error("Testing of session serialization failed", e);
+            }
         }
         return completed;
     }
@@ -111,13 +130,16 @@ class Job {
 
     void cancel() {
         outcome.add(Outcome.CANCELED);
-        while (serializationLatch.getCount() > 0) {
-            serializationLatch.countDown();
+        if (serializationStartedLatch.getCount() > 0) {
+            serializationStartedLatch.countDown();
+        }
+        if (serializationCompletedLatch.getCount() > 0) {
+            serializationCompletedLatch.countDown();
         }
     }
 
     public void serializationStarted() {
-        serializationLatch.countDown();
+        serializationStartedLatch.countDown();
         reset();
     }
 
@@ -173,7 +195,7 @@ class Job {
                 }
             }
         } finally {
-            serializationLatch.countDown();
+            serializationCompletedLatch.countDown();
         }
     }
 
