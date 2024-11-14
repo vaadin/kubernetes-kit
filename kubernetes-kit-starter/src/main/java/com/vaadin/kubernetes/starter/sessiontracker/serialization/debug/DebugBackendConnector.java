@@ -84,7 +84,8 @@ class DebugBackendConnector implements BackendConnector,
      *         {@link Optional} if there is a job already in progress.
      */
     synchronized Optional<Job> newJob(String sessionId, String clusterKey) {
-        if (!jobs.containsKey(clusterKey)) {
+        if (!jobs.containsKey(clusterKey) && jobs.values().stream()
+                .noneMatch(j -> j.isRunning(sessionId))) {
             Job job = new Job(sessionId, clusterKey);
             jobs.put(clusterKey, job);
             return Optional.of(job);

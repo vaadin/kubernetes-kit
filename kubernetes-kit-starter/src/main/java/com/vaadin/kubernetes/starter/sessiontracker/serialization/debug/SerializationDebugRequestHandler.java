@@ -239,8 +239,8 @@ public class SerializationDebugRequestHandler
                 clusterKey);
         if (maybeJob.isEmpty()) {
             LOGGER.debug(
-                    "A serialization test for session {} with cluster key {} is already in progress, rejecting request.",
-                    session.getId(), clusterKey);
+                    "A serialization test for session {} is already in progress, rejecting request.",
+                    session.getId());
             return;
         }
         Job job = maybeJob.get();

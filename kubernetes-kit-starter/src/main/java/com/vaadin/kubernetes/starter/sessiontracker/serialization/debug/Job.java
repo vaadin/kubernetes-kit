@@ -117,6 +117,12 @@ class Job {
         return completed;
     }
 
+    boolean isRunning(String sessionId) {
+        return this.sessionId.equals(sessionId)
+                && serializationStartedLatch.getCount() > 0
+                || serializationCompletedLatch.getCount() > 0;
+    }
+
     void reset() {
         startTimeNanos = System.nanoTime();
         outcome.clear();
@@ -130,12 +136,7 @@ class Job {
 
     void cancel() {
         outcome.add(Outcome.CANCELED);
-        if (serializationStartedLatch.getCount() > 0) {
-            serializationStartedLatch.countDown();
-        }
-        if (serializationCompletedLatch.getCount() > 0) {
-            serializationCompletedLatch.countDown();
-        }
+        releaseLocks();
     }
 
     public void serializationStarted() {
@@ -208,6 +209,16 @@ class Job {
     void timeout() {
         outcome.remove(Outcome.SERIALIZATION_FAILED);
         outcome.add(Outcome.SERIALIZATION_TIMEOUT);
+        releaseLocks();
+    }
+
+    private void releaseLocks() {
+        if (serializationStartedLatch.getCount() > 0) {
+            serializationStartedLatch.countDown();
+        }
+        if (serializationCompletedLatch.getCount() > 0) {
+            serializationCompletedLatch.countDown();
+        }
     }
 
     void deserialized() {
@@ -336,6 +347,7 @@ class Job {
     }
 
     Result complete() {
+        releaseLocks();
         if (outcome.isEmpty()) {
             outcome.add(Outcome.SUCCESS);
         }
