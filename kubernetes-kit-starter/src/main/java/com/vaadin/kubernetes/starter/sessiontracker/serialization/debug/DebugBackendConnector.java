@@ -74,14 +74,14 @@ class DebugBackendConnector implements BackendConnector,
 
     /**
      * Gets a new Job for the current session and cluster key, or an empty
-     * {@link Optional }if there is a job already in progress.
+     * {@link Optional} if there is a job already in progress.
      *
      * @param sessionId
      *            the session id
      * @param clusterKey
      *            the cluster key
      * @return a new Job for the current session and cluster key, or an empty
-     *         {@link Optional }if there is a job already in progress.
+     *         {@link Optional} if there is a job already in progress.
      */
     synchronized Optional<Job> newJob(String sessionId, String clusterKey) {
         if (!jobs.containsKey(clusterKey)) {
