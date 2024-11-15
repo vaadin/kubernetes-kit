@@ -14,6 +14,7 @@ import java.io.ObjectStreamClass;
 import java.lang.invoke.SerializedLambda;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Stack;
 import java.util.StringJoiner;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -48,15 +49,20 @@ class Job {
     private static final Pattern SERIALIZEDLAMBDA_CANNOT_CAST = Pattern.compile(
             "class java.lang.invoke.SerializedLambda cannot be cast to class ([^ ]+)( |$)");
 
-    private CountDownLatch serializationLatch = new CountDownLatch(2);
+    private final CountDownLatch serializationCompletedLatch = new CountDownLatch(
+            1);
+    private final CountDownLatch serializationStartedLatch = new CountDownLatch(
+            1);
     private final String sessionId;
     private long startTimeNanos;
     private final Set<Outcome> outcome = new LinkedHashSet<>();
     private final Map<String, List<String>> messages = new LinkedHashMap<>();
     private String clusterKey;
     private final Map<Object, Track> tracked = new IdentityHashMap<>();
+    private final Map<Integer, Track> trackedById = new IdentityHashMap<>();
+    private final Map<Integer, Track> trackedByHandle = new IdentityHashMap<>();
 
-    private final Stack<Track> deserializingStack = new Stack<>();
+    private final ArrayDeque<Track> deserializingStack = new ArrayDeque<>();
     private final Map<String, List<String>> unserializableDetails = new HashMap<>();
 
     private final Map<Integer, SerializedLambda> serializedLambdaMap = new HashMap<>();
@@ -79,23 +85,45 @@ class Job {
      * @return the serialized session holder.
      */
     boolean waitForSerializationCompletion(int timeout, Logger logger) {
-        boolean completed = false;
+        boolean completed = true;
         try {
-            completed = serializationLatch.await(timeout,
+            completed = serializationStartedLatch.await(timeout,
                     TimeUnit.MILLISECONDS);
             if (!completed) {
                 timeout();
                 logger.error(
-                        "Session serialization timed out because did not complete in {} ms. "
-                                + "Increase the serialization timeout (in milliseconds) by the "
-                                + "'vaadin.serialization.timeout' application or system property.",
+                        "Session serialization timed out because it did not start in {} ms, "
+                                + "most likely because another attempt is already in progress.",
                         timeout);
                 return false;
             }
         } catch (Exception e) { // NOSONAR
             logger.error("Testing of session serialization failed", e);
         }
+        if (completed) {
+            try {
+                completed = serializationCompletedLatch.await(timeout,
+                        TimeUnit.MILLISECONDS);
+                if (!completed) {
+                    timeout();
+                    logger.error(
+                            "Session serialization timed out because it did not complete in {} ms. "
+                                    + "Increase the serialization timeout (in milliseconds) using the "
+                                    + "'vaadin.serialization.timeout' application or system property.",
+                            timeout);
+                    return false;
+                }
+            } catch (Exception e) { // NOSONAR
+                logger.error("Testing of session serialization failed", e);
+            }
+        }
         return completed;
+    }
+
+    boolean isRunning(String sessionId) {
+        return this.sessionId.equals(sessionId)
+                && serializationStartedLatch.getCount() > 0
+                || serializationCompletedLatch.getCount() > 0;
     }
 
     void reset() {
@@ -103,6 +131,8 @@ class Job {
         outcome.clear();
         messages.clear();
         tracked.clear();
+        trackedById.clear();
+        trackedByHandle.clear();
         deserializingStack.clear();
         unserializableDetails.clear();
         serializedLambdaMap.clear();
@@ -111,13 +141,11 @@ class Job {
 
     void cancel() {
         outcome.add(Outcome.CANCELED);
-        while (serializationLatch.getCount() > 0) {
-            serializationLatch.countDown();
-        }
+        releaseLocks();
     }
 
     public void serializationStarted() {
-        serializationLatch.countDown();
+        serializationStartedLatch.countDown();
         reset();
     }
 
@@ -173,7 +201,7 @@ class Job {
                 }
             }
         } finally {
-            serializationLatch.countDown();
+            serializationCompletedLatch.countDown();
         }
     }
 
@@ -186,6 +214,24 @@ class Job {
     void timeout() {
         outcome.remove(Outcome.SERIALIZATION_FAILED);
         outcome.add(Outcome.SERIALIZATION_TIMEOUT);
+        releaseLocks();
+    }
+
+    private void releaseLocks() {
+        if (serializationStartedLatch.getCount() > 0) {
+            serializationStartedLatch.countDown();
+        }
+        if (serializationCompletedLatch.getCount() > 0) {
+            serializationCompletedLatch.countDown();
+        }
+    }
+
+    void deserializationStarted() {
+        trackedByHandle.clear();
+        trackedByHandle.putAll(tracked.values().stream()
+                .filter(t -> t.getHandle() != -1).collect(Collectors
+                        .toMap(Track::getHandle, Function.identity())));
+
     }
 
     void deserialized() {
@@ -249,9 +295,8 @@ class Job {
             // get serialized instance from tracked objects
             // save it and then ensure it is deserialized correctly
             int trackId = track.id;
-            Object serializedObject = tracked.values().stream()
-                    .filter(t -> t.id == trackId).findFirst().map(t -> t.object)
-                    .orElse(null);
+            Object serializedObject = Optional.of(trackedById.get(trackId))
+                    .map(t -> t.object).orElse(null);
             // Following condition should always be true, otherwise it means the
             // stream is somehow corrupted
             if (serializedObject instanceof SerializedLambda) {
@@ -293,9 +338,8 @@ class Job {
     Optional<String> dumpDeserializationStack() {
         if (!deserializingStack.isEmpty()) {
             return Optional.of(deserializingStack.peek())
-                    .flatMap(stackEntry -> tracked.values().stream().filter(
-                            t -> t.getHandle() == stackEntry.getHandle())
-                            .findFirst())
+                    .flatMap(stackEntry -> Optional.ofNullable(
+                            trackedByHandle.get(stackEntry.getHandle())))
                     .map(track -> {
                         StringJoiner joiner = new StringJoiner(
                                 System.lineSeparator());
@@ -314,6 +358,7 @@ class Job {
     }
 
     Result complete() {
+        releaseLocks();
         if (outcome.isEmpty()) {
             outcome.add(Outcome.SUCCESS);
         }
@@ -361,7 +406,10 @@ class Job {
     public void track(Object object, Track track) {
         if (track == null) {
             track = new Track(-1, -1, null, null);
+        } else {
+            trackedById.put(track.id, track);
         }
         tracked.put(object, track);
+
     }
 }
