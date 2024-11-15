@@ -173,9 +173,10 @@ public class KubernetesKitConfiguration {
         }
 
         @Bean
-        PushSessionTracker pushSendListener(
-                SessionSerializer sessionSerializer) {
-            return new PushSessionTracker(sessionSerializer);
+        PushSessionTracker pushSendListener(SessionSerializer sessionSerializer,
+                KubernetesKitProperties properties) {
+            return new PushSessionTracker(sessionSerializer,
+                    properties.getClusterKeyCookieName());
         }
 
     }

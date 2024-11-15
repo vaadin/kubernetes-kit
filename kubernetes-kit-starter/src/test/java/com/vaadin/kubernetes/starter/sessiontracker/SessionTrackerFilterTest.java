@@ -26,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
@@ -143,7 +145,8 @@ class SessionTrackerFilterTest {
                 SessionTrackerCookie.class)) {
             filter.doFilter(request, response, filterChain);
             mockedStatic.verify(() -> SessionTrackerCookie.setIfNeeded(any(),
-                    any(), any(), cookieConsumerArgumentCaptor.capture()));
+                    any(), any(), anyString(),
+                    cookieConsumerArgumentCaptor.capture()));
             Consumer<Cookie> cookieConsumer = cookieConsumerArgumentCaptor
                     .getValue();
             cookieConsumer.accept(cookie);

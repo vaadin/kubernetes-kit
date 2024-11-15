@@ -61,7 +61,8 @@ public class SessionTrackerFilter extends HttpFilter {
     protected void doFilter(HttpServletRequest request,
             HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-        SessionTrackerCookie.getValue(request).ifPresent(key -> {
+        String cookieName = properties.getClusterKeyCookieName();
+        SessionTrackerCookie.getValue(request, cookieName).ifPresent(key -> {
             CurrentKey.set(key);
             if (request.getSession(false) == null) {
                 // Cluster key set but no session, create one, so it can be
@@ -74,7 +75,7 @@ public class SessionTrackerFilter extends HttpFilter {
             HttpSession session = request.getSession(false);
 
             SessionTrackerCookie.setIfNeeded(session, request, response,
-                    cookieConsumer(request));
+                    cookieName, cookieConsumer(request));
             super.doFilter(request, response, chain);
 
             if (session != null && request.isRequestedSessionIdValid()
