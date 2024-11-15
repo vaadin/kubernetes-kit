@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.backend;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.core.HazelcastInstance;
@@ -35,7 +36,14 @@ public class HazelcastConnector implements BackendConnector {
         getLogger().debug("Sending session {} to Hazelcast",
                 sessionInfo.getClusterKey());
         String mapKey = getKey(sessionInfo.getClusterKey());
-        sessions.put(mapKey, sessionInfo.getData());
+        Duration timeToLive = sessionInfo.getTimeToLive();
+        if (timeToLive.isZero() || timeToLive.isNegative()) {
+            sessions.put(mapKey, sessionInfo.getData());
+        } else {
+            sessions.put(mapKey, sessionInfo.getData(), timeToLive.toSeconds(),
+                    TimeUnit.SECONDS);
+        }
+
         getLogger().debug("Session {} sent to Hazelcast",
                 sessionInfo.getClusterKey());
     }

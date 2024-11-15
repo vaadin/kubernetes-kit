@@ -9,9 +9,14 @@
  */
 package com.vaadin.kubernetes.starter;
 
+import java.time.Duration;
+
 import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -20,6 +25,28 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class KubernetesKitConfigurationTest {
+
+    @Test
+    public void sessionExpirationPolicy_configNotSet_policyIsNever() {
+        var prop = new KubernetesKitProperties();
+        var cfg = new KubernetesKitConfiguration.VaadinReplicatedSessionConfiguration(
+                prop);
+        var sessionExpirationPolicy = cfg.sessionExpirationPolicy();
+        Assertions.assertSame(sessionExpirationPolicy,
+                SessionExpirationPolicy.NEVER);
+    }
+
+    @Test
+    public void sessionExpirationPolicy_configSet_policyIsSessionTimeoutPlusTolerance() {
+        var prop = new KubernetesKitProperties();
+        prop.setBackendSessionExpirationTolerance(Duration.ofMinutes(10));
+        var cfg = new KubernetesKitConfiguration.VaadinReplicatedSessionConfiguration(
+                prop);
+        var sessionExpirationPolicy = cfg.sessionExpirationPolicy();
+        assertEquals(Duration.ofMinutes(40),
+                sessionExpirationPolicy.apply(1800));
+
+    }
 
     @Test
     public void hazelcastInstance_serviceNameSet_kubernetesConfigured() {

@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.awaitility.core.ConditionFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.function.DeploymentConfiguration;
@@ -69,6 +72,8 @@ class SessionSerializerTest {
         connector = mock(BackendConnector.class);
         transientHandler = mock(TransientHandler.class);
         serializer = new SessionSerializer(connector, transientHandler,
+                sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
+                        ChronoUnit.MINUTES),
                 serializationCallback,
                 TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS);
 
@@ -81,6 +86,7 @@ class SessionSerializerTest {
 
     private static HttpSession newHttpSession(String clusterSID) {
         HttpSession httpSession = new MockHttpSession();
+        httpSession.setMaxInactiveInterval(1800);
         httpSession.setAttribute(CurrentKey.COOKIE_NAME, clusterSID);
         return httpSession;
     }
@@ -101,7 +107,13 @@ class SessionSerializerTest {
         verify(connector).markSerializationStarted(clusterSID);
 
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
-        verify(connector).sendSession(notNull());
+        ArgumentCaptor<SessionInfo> sessionInfoCaptor = ArgumentCaptor
+                .forClass(SessionInfo.class);
+        verify(connector).sendSession(sessionInfoCaptor.capture());
+        SessionInfo sessionInfo = sessionInfoCaptor.getValue();
+        Assertions.assertNotNull(sessionInfo);
+        Assertions.assertEquals(Duration.ofMinutes(35),
+                sessionInfo.getTimeToLive());
     }
 
     @Test

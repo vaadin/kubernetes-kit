@@ -9,6 +9,8 @@
  */
 package com.vaadin.kubernetes.starter;
 
+import java.time.Duration;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
@@ -32,6 +34,12 @@ public class KubernetesKitProperties {
      * Enables (or disables) auto-configuration.
      */
     private boolean autoConfigure = true;
+
+    /**
+     * Amount of time to be added to the HTTP session timeout to determine the
+     * expiration of the backend session.
+     */
+    private Duration backendSessionExpirationTolerance;
 
     /**
      * The name of the distributed storage session key cookie.
@@ -68,6 +76,23 @@ public class KubernetesKitProperties {
      */
     public void setAutoConfigure(boolean autoConfigure) {
         this.autoConfigure = autoConfigure;
+    }
+
+    /**
+     * Sets the amount of time to be added to the HTTP session timeout to
+     * determine the expiration of the backend session.
+     */
+    public void setBackendSessionExpirationTolerance(
+            Duration backendSessionExpirationTolerance) {
+        this.backendSessionExpirationTolerance = backendSessionExpirationTolerance;
+    }
+
+    /**
+     * Gets the amount of time to be added to the HTTP session timeout to
+     * determine the expiration of the backend session.
+     */
+    public Duration getBackendSessionExpirationTolerance() {
+        return backendSessionExpirationTolerance;
     }
 
     /**

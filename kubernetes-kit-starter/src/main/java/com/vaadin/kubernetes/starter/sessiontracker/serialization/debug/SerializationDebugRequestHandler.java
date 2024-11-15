@@ -49,6 +49,7 @@ import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
 
@@ -103,7 +104,8 @@ public class SerializationDebugRequestHandler
         this.serializationProperties = serializationProperties;
         this.debugBackendConnector = new DebugBackendConnector();
         this.sessionSerializer = new SessionSerializer(debugBackendConnector,
-                debugBackendConnector, SessionSerializationCallback.DEFAULT);
+                debugBackendConnector, SessionExpirationPolicy.NEVER,
+                SessionSerializationCallback.DEFAULT);
     }
 
     @Override

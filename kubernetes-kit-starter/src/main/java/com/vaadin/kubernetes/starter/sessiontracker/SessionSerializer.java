@@ -15,6 +15,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.NotSerializableException;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -43,6 +44,7 @@ import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 import com.vaadin.kubernetes.starter.ProductUtils;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectInputStream;
@@ -123,6 +125,8 @@ public class SessionSerializer
 
     private final SessionSerializationCallback sessionSerializationCallback;
 
+    private final SessionExpirationPolicy sessionExpirationPolicy;
+
     private Predicate<Class<?>> injectableFilter = type -> true;
 
     /**
@@ -139,9 +143,10 @@ public class SessionSerializer
      */
     public SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
+            SessionExpirationPolicy sessionExpirationPolicy,
             SessionSerializationCallback sessionSerializationCallback) {
         this(backendConnector, (sessionId, clusterKey) -> transientHandler,
-                sessionSerializationCallback);
+                sessionExpirationPolicy, sessionSerializationCallback);
     }
 
     /**
@@ -171,21 +176,25 @@ public class SessionSerializer
      */
     public SessionSerializer(BackendConnector backendConnector,
             BiFunction<String, String, TransientHandler> transientHandlerProvider,
+            SessionExpirationPolicy sessionExpirationPolicy,
             SessionSerializationCallback sessionSerializationCallback) {
         this.backendConnector = backendConnector;
         this.handlerProvider = transientHandlerProvider;
         this.sessionSerializationCallback = sessionSerializationCallback;
+        this.sessionExpirationPolicy = sessionExpirationPolicy;
         optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
     }
 
     // Visible for test
     SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
+            SessionExpirationPolicy sessionExpirationPolicy,
             SessionSerializationCallback sessionSerializationCallback,
             long optimisticSerializationTimeoutMs) {
         this.backendConnector = backendConnector;
         this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
         this.sessionSerializationCallback = sessionSerializationCallback;
+        this.sessionExpirationPolicy = sessionExpirationPolicy;
         this.handlerProvider = (sessionId, clusterKey) -> transientHandler;
     }
 
@@ -226,7 +235,9 @@ public class SessionSerializer
         Map<String, Object> values = session.getAttributeNames().stream()
                 .collect(Collectors.toMap(Function.identity(),
                         session::getAttribute));
-        queueSerialization(session.getId(), values);
+        Duration timeToLive = sessionExpirationPolicy
+                .apply(session.getMaxInactiveInterval());
+        queueSerialization(session.getId(), timeToLive, values);
     }
 
     /**
@@ -251,7 +262,7 @@ public class SessionSerializer
         }
     }
 
-    private void queueSerialization(String sessionId,
+    private void queueSerialization(String sessionId, Duration timeToLive,
             Map<String, Object> attributes) {
         if (pending.containsKey(sessionId)) {
             // This session will be serialized again soon enough
@@ -285,8 +296,8 @@ public class SessionSerializer
                             backendConnector
                                     .markSerializationComplete(clusterKey);
                         };
-                        handleSessionSerialization(sessionId, attributes,
-                                whenSerialized);
+                        handleSessionSerialization(sessionId, timeToLive,
+                                attributes, whenSerialized);
                     }
                     return null;
                 }).whenComplete((unused, error) -> {
@@ -299,7 +310,7 @@ public class SessionSerializer
     }
 
     private void handleSessionSerialization(String sessionId,
-            Map<String, Object> attributes,
+            Duration timeToLive, Map<String, Object> attributes,
             Consumer<SessionInfo> whenSerialized) {
         long start = System.currentTimeMillis();
         long timeout = start + optimisticSerializationTimeoutMs;
@@ -311,7 +322,7 @@ public class SessionSerializer
                     sessionId, clusterKey);
             while (System.currentTimeMillis() < timeout) {
                 SessionInfo info = serializeOptimisticLocking(sessionId,
-                        attributes);
+                        timeToLive, attributes);
                 if (info != null) {
                     pending.remove(sessionId); // Is this a race condition?
                     getLogger().debug(
@@ -343,13 +354,14 @@ public class SessionSerializer
         if (!unrecoverableError) { // NOSONAR
             // Serializing using optimistic locking failed for a long time so be
             // pessimistic and get it done
-            sessionInfo = serializePessimisticLocking(sessionId, attributes);
+            sessionInfo = serializePessimisticLocking(sessionId, timeToLive,
+                    attributes);
         }
         whenSerialized.accept(sessionInfo);
     }
 
     private SessionInfo serializePessimisticLocking(String sessionId,
-            Map<String, Object> attributes) {
+            Duration timeToLive, Map<String, Object> attributes) {
         long start = System.currentTimeMillis();
         String clusterKey = getClusterKey(attributes);
         Set<ReentrantLock> locks = getLocks(attributes);
@@ -357,7 +369,7 @@ public class SessionSerializer
             lock.lock();
         }
         try {
-            return doSerialize(sessionId, attributes);
+            return doSerialize(sessionId, timeToLive, attributes);
         } catch (Exception e) {
             getLogger().error(
                     "An error occurred during pessimistic serialization of session {} with distributed key {} ",
@@ -392,7 +404,8 @@ public class SessionSerializer
     }
 
     private SessionInfo serializeOptimisticLocking(String sessionId,
-            Map<String, Object> attributes) throws IOException {
+            Duration timeToLive, Map<String, Object> attributes)
+            throws IOException {
         String clusterKey = getClusterKey(attributes);
         try {
             long latestLockTime = findNewestLockTime(attributes);
@@ -406,7 +419,7 @@ public class SessionSerializer
                 return null;
             }
 
-            SessionInfo info = doSerialize(sessionId, attributes);
+            SessionInfo info = doSerialize(sessionId, timeToLive, attributes);
 
             long latestUnlockTimeCheck = findNewestUnlockTime(attributes);
 
@@ -487,7 +500,7 @@ public class SessionSerializer
         return latestUnlock;
     }
 
-    private SessionInfo doSerialize(String sessionId,
+    private SessionInfo doSerialize(String sessionId, Duration timeToLive,
             Map<String, Object> attributes) throws Exception {
         long start = System.currentTimeMillis();
         String clusterKey = getClusterKey(attributes);
@@ -502,7 +515,8 @@ public class SessionSerializer
             throw ex;
         }
 
-        SessionInfo info = new SessionInfo(clusterKey, out.toByteArray());
+        SessionInfo info = new SessionInfo(clusterKey, timeToLive,
+                out.toByteArray());
 
         getLogger().debug(
                 "Serialization of attributes {} for session {} with distributed key {} completed in {}ms ({} bytes)",
