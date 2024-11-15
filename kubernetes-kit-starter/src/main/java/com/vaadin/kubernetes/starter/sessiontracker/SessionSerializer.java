@@ -274,7 +274,6 @@ public class SessionSerializer
                 () -> backendConnector.markSerializationStarted(clusterKey),
                 executorService).handle((unused, error) -> {
                     if (error != null) {
-                        pending.remove(sessionId);
                         getLogger().debug(
                                 "Failed marking serialization start for of session {} with distributed key {}",
                                 sessionId, clusterKey, error);
