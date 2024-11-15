@@ -92,7 +92,7 @@ class Job {
             if (!completed) {
                 timeout();
                 logger.error(
-                        "Session serialization timed out because did not started in {} ms, "
+                        "Session serialization timed out because it did not start in {} ms, "
                                 + "most likely because another attempt is already in progress.",
                         timeout);
                 return false;
@@ -107,8 +107,8 @@ class Job {
                 if (!completed) {
                     timeout();
                     logger.error(
-                            "Session serialization timed out because did not complete in {} ms. "
-                                    + "Increase the serialization timeout (in milliseconds) by the "
+                            "Session serialization timed out because it did not complete in {} ms. "
+                                    + "Increase the serialization timeout (in milliseconds) using the "
                                     + "'vaadin.serialization.timeout' application or system property.",
                             timeout);
                     return false;
