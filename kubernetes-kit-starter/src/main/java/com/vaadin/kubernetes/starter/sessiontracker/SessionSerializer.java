@@ -272,9 +272,8 @@ public class SessionSerializer
         // sense to retry the operation instantly.
         CompletableFuture.runAsync(
                 () -> backendConnector.markSerializationStarted(clusterKey),
-                executorService).whenComplete((unused, error) -> {
+                executorService).handle((unused, error) -> {
                     if (error != null) {
-                        pending.remove(sessionId);
                         getLogger().debug(
                                 "Failed marking serialization start for of session {} with distributed key {}",
                                 sessionId, clusterKey, error);
@@ -286,6 +285,13 @@ public class SessionSerializer
                         };
                         handleSessionSerialization(sessionId, attributes,
                                 whenSerialized);
+                    }
+                    return null;
+                }).whenComplete((unused, error) -> {
+                    pending.remove(sessionId);
+                    if (error != null) {
+                        getLogger().error("Serialization of session {} failed",
+                                sessionId, error);
                     }
                 });
     }

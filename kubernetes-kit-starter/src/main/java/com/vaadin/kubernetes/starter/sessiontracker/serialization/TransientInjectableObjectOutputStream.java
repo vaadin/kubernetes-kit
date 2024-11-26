@@ -217,11 +217,12 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
             List<Track> trackList = tracking.values().stream()
                     .filter(Objects::nonNull)
                     .map(t -> t.assignHandle(this::lookupObjectHandle))
+                    .filter(t -> t.getHandle() != -1)
                     .collect(Collectors.toList());
             cast.markMetadata();
             reset();
             writeStreamHeader();
-            writeObject(true);
+            writeObject(true); // debug flag
             writeObject(new ArrayList<>(trackList));
             cast.copy();
         }

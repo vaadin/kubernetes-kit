@@ -11,6 +11,7 @@ package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
@@ -35,7 +36,9 @@ class DebugBackendConnector implements BackendConnector,
 
     @Override
     public void sendSession(SessionInfo sessionInfo) {
-        serializedSessions.put(sessionInfo.getClusterKey(), sessionInfo);
+        if (sessionInfo != null) {
+            serializedSessions.put(sessionInfo.getClusterKey(), sessionInfo);
+        }
     }
 
     @Override
@@ -71,10 +74,25 @@ class DebugBackendConnector implements BackendConnector,
                 DebugTransientHandler::new);
     }
 
-    Job newJob(String sessionId, String clusterKey) {
-        Job job = new Job(sessionId, clusterKey);
-        jobs.put(clusterKey, job);
-        return job;
+    /**
+     * Gets a new Job for the current session and cluster key, or an empty
+     * {@link Optional} if there is a job already in progress.
+     *
+     * @param sessionId
+     *            the session id
+     * @param clusterKey
+     *            the cluster key
+     * @return a new Job for the current session and cluster key, or an empty
+     *         {@link Optional} if there is a job already in progress.
+     */
+    synchronized Optional<Job> newJob(String sessionId, String clusterKey) {
+        if (!jobs.containsKey(clusterKey) && jobs.values().stream()
+                .noneMatch(j -> j.isRunning(sessionId))) {
+            Job job = new Job(sessionId, clusterKey);
+            jobs.put(clusterKey, job);
+            return Optional.of(job);
+        }
+        return Optional.empty();
     }
 
     void shutdown() {
