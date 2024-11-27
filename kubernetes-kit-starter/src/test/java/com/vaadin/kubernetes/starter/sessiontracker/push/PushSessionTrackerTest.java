@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 class PushSessionTrackerTest {
 
+    public static final String CLUSTER_COOKIE_NAME = "MY_COOKIE_NAME";
     private HttpSession httpSession;
     private HttpServletRequest servletRequest;
     private SessionSerializer sessionSerializer;
@@ -38,7 +39,8 @@ class PushSessionTrackerTest {
         httpSession = mock(HttpSession.class);
         servletRequest = mock(HttpServletRequest.class);
         sessionSerializer = mock(SessionSerializer.class);
-        sessionTracker = new PushSessionTracker(sessionSerializer);
+        sessionTracker = new PushSessionTracker(sessionSerializer,
+                CLUSTER_COOKIE_NAME);
         sessionTracker.setActiveSessionChecker(id -> true);
     }
 
@@ -67,8 +69,8 @@ class PushSessionTrackerTest {
     void onConnect_clusterKeyFromCookie_storeClusterKeyOnResourceSession() {
         AtmosphereResource resource = createResource(null);
         String clusterKey = UUID.randomUUID().toString();
-        when(servletRequest.getCookies()).thenReturn(new Cookie[] {
-                new Cookie(CurrentKey.COOKIE_NAME, clusterKey) });
+        when(servletRequest.getCookies()).thenReturn(
+                new Cookie[] { new Cookie(CLUSTER_COOKIE_NAME, clusterKey) });
 
         sessionTracker.onConnect(resource);
 

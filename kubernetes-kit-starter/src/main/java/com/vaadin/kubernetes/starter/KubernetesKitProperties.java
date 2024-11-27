@@ -11,6 +11,7 @@ package com.vaadin.kubernetes.starter;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SameSite;
 
 /**
@@ -31,6 +32,11 @@ public class KubernetesKitProperties {
      * Enables (or disables) auto-configuration.
      */
     private boolean autoConfigure = true;
+
+    /**
+     * The name of the distributed storage session key cookie.
+     */
+    private String clusterKeyCookieName = CurrentKey.COOKIE_NAME;
 
     /**
      * Value of the distributed storage session key cookie's SameSite attribute.
@@ -62,6 +68,25 @@ public class KubernetesKitProperties {
      */
     public void setAutoConfigure(boolean autoConfigure) {
         this.autoConfigure = autoConfigure;
+    }
+
+    /**
+     * Gets the name of the distributed storage session key cookie.
+     *
+     * @return the name of the distributed storage session key cookie
+     */
+    public String getClusterKeyCookieName() {
+        return clusterKeyCookieName;
+    }
+
+    /**
+     * Sets the name of the distributed storage session key cookie.
+     *
+     * @param clusterKeyCookieName
+     *            the name of the distributed storage session key cookie
+     */
+    public void setClusterKeyCookieName(String clusterKeyCookieName) {
+        this.clusterKeyCookieName = clusterKeyCookieName;
     }
 
     /**

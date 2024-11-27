@@ -37,9 +37,22 @@ public class PushSessionTracker implements PushSendListener {
     private final SessionSerializer sessionSerializer;
 
     private Predicate<String> activeSessionChecker = id -> true;
+    private String clusterCookieName;
 
+    /**
+     * @deprecated use {@link #PushSessionTracker(SessionSerializer, String)}
+     *             instead
+     */
+    @Deprecated(forRemoval = true)
     public PushSessionTracker(SessionSerializer sessionSerializer) {
         this.sessionSerializer = sessionSerializer;
+        this.clusterCookieName = CurrentKey.COOKIE_NAME;
+    }
+
+    public PushSessionTracker(SessionSerializer sessionSerializer,
+            String clusterCookieName) {
+        this.sessionSerializer = sessionSerializer;
+        this.clusterCookieName = clusterCookieName;
     }
 
     /**
@@ -106,7 +119,8 @@ public class PushSessionTracker implements PushSendListener {
         if (key == null) {
             try {
                 key = SessionTrackerCookie
-                        .getValue(resource.getRequest().wrappedRequest())
+                        .getValue(resource.getRequest().wrappedRequest(),
+                                clusterCookieName)
                         .orElse(null);
             } catch (Exception ex) {
                 getLogger().debug("Cannot get serialization key from request",
