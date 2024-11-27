@@ -1,7 +1,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
+import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.AfterEach;
@@ -53,8 +53,6 @@ class SpringTransientHandlerVaadinScopesTest {
                 Set.of(UITestSpringLookupInitializer.class));
 
         handler = new SpringTransientHandler(appCtx);
-        Map<String, Object> beans = appCtx.getBeansOfType(Object.class);
-        System.out.println(beans);
     }
 
     @AfterEach
@@ -74,35 +72,35 @@ class SpringTransientHandlerVaadinScopesTest {
         assertThat(transients).containsExactlyInAnyOrder(
                 new TransientDescriptor(TestConfig.TestView.class, "uiScoped",
                         TestConfig.UIScopedComponent.class,
-                        TestConfig.UIScopedComponent.class.getName()),
+                        TestConfig.UIScopedComponent.class.getName(), true),
                 new TransientDescriptor(TestConfig.TestView.class,
                         "routeScoped", TestConfig.RouteScopedComponent.class,
-                        TestConfig.RouteScopedComponent.class.getName()),
+                        TestConfig.RouteScopedComponent.class.getName(), true),
                 new TransientDescriptor(TestConfig.TestView.class,
                         "sessionScoped",
                         TestConfig.VaadinSessionScopedComponent.class,
-                        TestConfig.VaadinSessionScopedComponent.class
-                                .getName()));
+                        TestConfig.VaadinSessionScopedComponent.class.getName(),
+                        true));
     }
 
     @Configuration
     static class TestConfig {
         @UIScope
         @SpringComponent
-        static class UIScopedComponent {
-
+        static class UIScopedComponent implements Serializable {
+            String value = "";
         }
 
         @VaadinSessionScope
         @SpringComponent
-        static class VaadinSessionScopedComponent {
-
+        static class VaadinSessionScopedComponent implements Serializable {
+            String value = "";
         }
 
         @RouteScope
         @Component
-        static class RouteScopedComponent {
-
+        static class RouteScopedComponent implements Serializable {
+            String value = "";
         }
 
         // @Component
