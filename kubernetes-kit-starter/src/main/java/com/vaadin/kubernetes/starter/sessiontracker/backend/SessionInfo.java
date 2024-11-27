@@ -9,12 +9,15 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.backend;
 
+import java.time.Duration;
+
 /**
  * Holder for serialized session attributes.
  */
 public class SessionInfo {
     private final String clusterKey;
     private final byte[] data;
+    private final Duration timeToLive;
 
     /**
      * Creates a new {@link SessionInfo} for the given distributed storage key.
@@ -27,6 +30,25 @@ public class SessionInfo {
     public SessionInfo(String clusterKey, byte[] data) {
         this.clusterKey = clusterKey;
         this.data = data;
+        this.timeToLive = Duration.ZERO;
+    }
+
+    /**
+     * Creates a new {@link SessionInfo} for the given distributed storage key.
+     *
+     * @param clusterKey
+     *            the distributed storage key.
+     * @param timeToLive
+     *            the maximum amount of time an inactive session should be
+     *            preserved in the backed. A zero or negative value means the
+     *            session should not be evicted.
+     * @param data
+     *            serialized session attributes in binary format.
+     */
+    public SessionInfo(String clusterKey, Duration timeToLive, byte[] data) {
+        this.clusterKey = clusterKey;
+        this.data = data;
+        this.timeToLive = timeToLive;
     }
 
     /**
@@ -47,4 +69,14 @@ public class SessionInfo {
         return data;
     }
 
+    /**
+     * Gets the maximum amount of time an inactive session should be preserved
+     * in the backed. A zero or negative value means the session should not be
+     * evicted.
+     * 
+     * @return the session time to live.
+     */
+    public Duration getTimeToLive() {
+        return timeToLive;
+    }
 }

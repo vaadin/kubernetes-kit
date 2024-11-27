@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,6 +21,7 @@ import org.awaitility.core.ConditionFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.function.DeploymentConfiguration;
@@ -34,7 +37,6 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
-
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,13 +64,17 @@ class SessionSerializerTest {
     private HttpSession httpSession;
     private String clusterSID;
     private MockVaadinService vaadinService;
+    private TransientHandler transientHandler;
 
     @BeforeEach
     void setUp() {
         serializationCallback = mock(SessionSerializationCallback.class);
         connector = mock(BackendConnector.class);
-        serializer = new SessionSerializer(connector,
-                mock(TransientHandler.class), serializationCallback,
+        transientHandler = mock(TransientHandler.class);
+        serializer = new SessionSerializer(connector, transientHandler,
+                sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
+                        ChronoUnit.MINUTES),
+                serializationCallback,
                 TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS);
 
         clusterSID = UUID.randomUUID().toString();
@@ -80,6 +86,7 @@ class SessionSerializerTest {
 
     private static HttpSession newHttpSession(String clusterSID) {
         HttpSession httpSession = new MockHttpSession();
+        httpSession.setMaxInactiveInterval(1800);
         httpSession.setAttribute(CurrentKey.COOKIE_NAME, clusterSID);
         return httpSession;
     }
@@ -100,7 +107,13 @@ class SessionSerializerTest {
         verify(connector).markSerializationStarted(clusterSID);
 
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
-        verify(connector).sendSession(notNull());
+        ArgumentCaptor<SessionInfo> sessionInfoCaptor = ArgumentCaptor
+                .forClass(SessionInfo.class);
+        verify(connector).sendSession(sessionInfoCaptor.capture());
+        SessionInfo sessionInfo = sessionInfoCaptor.getValue();
+        Assertions.assertNotNull(sessionInfo);
+        Assertions.assertEquals(Duration.ofMinutes(35),
+                sessionInfo.getTimeToLive());
     }
 
     @Test
@@ -155,6 +168,36 @@ class SessionSerializerTest {
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
         // Serialization should not be sent the backend
         verify(connector).sendSession(isNotNull());
+    }
+
+    @Test
+    void serialize_optimisticLocking_sessionLockRequired_immediatelySwitchToPessimisticLocking() {
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID);
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        AtomicBoolean pessimisticLockingRequested = new AtomicBoolean();
+        doAnswer(i -> pessimisticLockingRequested.getAndSet(true))
+                .when(serializationCallback).onSerializationError(
+                        any(PessimisticSerializationRequiredException.class));
+
+        when(transientHandler.inspect(any()))
+                .thenThrow(new PessimisticSerializationRequiredException(
+                        "VaadinSession lock required"))
+                .thenReturn(List.of());
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID);
+
+        await().atMost(1000, MILLISECONDS)
+                .untilTrue(pessimisticLockingRequested);
+
+        await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector).sendSession(notNull());
     }
 
     @Test
@@ -291,7 +334,8 @@ class SessionSerializerTest {
         verify(connector).markSerializationStarted(clusterSID);
 
         await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
-        verify(connector).sendSession(isNull());
+        verify(connector, never()).sendSession(any());
+        verify(connector).markSerializationComplete(clusterSID);
         locks.forEach(l -> verify(l, never()).lock());
 
     }

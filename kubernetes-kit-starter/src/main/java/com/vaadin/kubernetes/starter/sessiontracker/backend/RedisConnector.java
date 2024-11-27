@@ -9,10 +9,14 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.backend;
 
+import java.time.Duration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStringCommands;
+import org.springframework.data.redis.core.types.Expiration;
 
 import com.vaadin.kubernetes.starter.ProductUtils;
 
@@ -34,8 +38,15 @@ public class RedisConnector implements BackendConnector {
                 sessionInfo.getClusterKey());
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
-            connection.set(getKey(sessionInfo.getClusterKey()),
-                    sessionInfo.getData());
+            byte[] key = getKey(sessionInfo.getClusterKey());
+            Duration timeToLive = sessionInfo.getTimeToLive();
+            if (timeToLive.isZero() || timeToLive.isNegative()) {
+                connection.set(key, sessionInfo.getData());
+            } else {
+                connection.set(key, sessionInfo.getData(),
+                        Expiration.from(timeToLive),
+                        RedisStringCommands.SetOption.UPSERT);
+            }
             getLogger().debug("Session {} sent to Redis",
                     sessionInfo.getClusterKey());
         }
