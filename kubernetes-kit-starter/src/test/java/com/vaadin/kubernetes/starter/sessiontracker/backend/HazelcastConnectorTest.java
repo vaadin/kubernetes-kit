@@ -1,6 +1,8 @@
 package com.vaadin.kubernetes.starter.sessiontracker.backend;
 
+import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
@@ -39,15 +41,25 @@ public class HazelcastConnectorTest {
 
     @Test
     void sendSession_sessionIsAdded() {
-        SessionInfo sessionInfo = mock(SessionInfo.class);
-        when(sessionInfo.getClusterKey()).thenReturn(clusterKey);
-        byte[] data = new byte[] { 'f', 'o', 'o' };
-        when(sessionInfo.getData()).thenReturn(data);
+        SessionInfo sessionInfo = new SessionInfo(clusterKey,
+                new byte[] { 'f', 'o', 'o' });
 
         connector.sendSession(sessionInfo);
 
         verify(sessionMap).put(eq(HazelcastConnector.getKey(clusterKey)),
-                aryEq(data));
+                aryEq(sessionInfo.getData()));
+    }
+
+    @Test
+    void sendSession_expiration_sessionIsAddedWithTimeToLive() {
+        SessionInfo sessionInfo = new SessionInfo(clusterKey,
+                Duration.ofMinutes(30), new byte[] { 'f', 'o', 'o' });
+
+        connector.sendSession(sessionInfo);
+
+        verify(sessionMap).put(eq(HazelcastConnector.getKey(clusterKey)),
+                aryEq(sessionInfo.getData()), eq(30L * 60),
+                eq(TimeUnit.SECONDS));
     }
 
     @Test

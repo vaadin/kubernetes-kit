@@ -12,6 +12,8 @@ package com.vaadin.kubernetes.starter;
 import jakarta.servlet.FilterRegistration;
 import jakarta.servlet.ServletContext;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.function.Predicate;
 
 import com.hazelcast.config.Config;
@@ -48,6 +50,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
+import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
@@ -107,6 +110,18 @@ public class KubernetesKitConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
+        SessionExpirationPolicy sessionExpirationPolicy() {
+            Duration duration = properties
+                    .getBackendSessionExpirationTolerance();
+            if (duration != null) {
+                return sessionTimeout -> duration.plus(sessionTimeout,
+                        ChronoUnit.SECONDS);
+            }
+            return SessionExpirationPolicy.NEVER;
+        }
+
+        @Bean
+        @ConditionalOnMissingBean
         SessionSerializationCallback sessionSerializationCallback() {
             return SessionSerializationCallback.DEFAULT;
         }
@@ -115,10 +130,11 @@ public class KubernetesKitConfiguration {
         SessionSerializer sessionSerializer(BackendConnector backendConnector,
                 TransientHandler transientInjector,
                 SessionSerializationCallback sessionSerializationCallback,
+                SessionExpirationPolicy sessionExpirationPolicy,
                 @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter) {
             SessionSerializer sessionSerializer = new SessionSerializer(
                     backendConnector, transientInjector,
-                    sessionSerializationCallback);
+                    sessionExpirationPolicy, sessionSerializationCallback);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }
