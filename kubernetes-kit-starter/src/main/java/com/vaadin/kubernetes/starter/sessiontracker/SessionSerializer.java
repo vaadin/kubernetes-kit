@@ -321,6 +321,11 @@ public class SessionSerializer
                     return;
                 }
             }
+        } catch (PessimisticSerializationRequiredException e) {
+            getLogger().warn(
+                    "Optimistic serialization of session {} with distributed key {} cannot be completed "
+                            + " because VaadinSession lock is required. Switching to pessimistic locking.",
+                    sessionId, clusterKey, e);
         } catch (NotSerializableException e) {
             getLogger().error(
                     "Optimistic serialization of session {} with distributed key {} failed,"
@@ -418,7 +423,8 @@ public class SessionSerializer
             logSessionDebugInfo("Serialized session " + sessionId
                     + " with distributed key " + clusterKey, attributes);
             return info;
-        } catch (NotSerializableException e) {
+        } catch (NotSerializableException
+                | PessimisticSerializationRequiredException e) {
             throw e;
         } catch (Exception e) {
             getLogger().trace(

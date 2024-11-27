@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Objects;
@@ -17,26 +18,37 @@ import java.util.Objects;
  * Holds transient field details and a symbolic reference to the actual value.
  */
 public final class TransientDescriptor implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 3577574582136843045L;
+
     private final Class<?> declaringClass;
     private final String name;
     private final Class<?> type;
-
     private final String instanceReference;
+    private final boolean vaadinScoped;
 
     public TransientDescriptor(Field field, String reference) {
+        this(field, reference, false);
+    }
+
+    public TransientDescriptor(Field field, String reference,
+            boolean vaadinScoped) {
         declaringClass = field.getDeclaringClass();
         name = field.getName();
         type = field.getType();
         instanceReference = reference;
+        this.vaadinScoped = vaadinScoped;
     }
 
     // Visible for test
     TransientDescriptor(Class<?> declaringClass, String name, Class<?> type,
-            String instanceReference) {
+            String instanceReference, boolean vaadinScoped) {
         this.declaringClass = declaringClass;
         this.name = name;
         this.type = type;
         this.instanceReference = instanceReference;
+        this.vaadinScoped = vaadinScoped;
     }
 
     /**
@@ -82,6 +94,17 @@ public final class TransientDescriptor implements Serializable {
     }
 
     /**
+     * Gets if the instance value needs Vaadin thread locals to be set during
+     * injection phase.
+     *
+     * @return {@literal true} is Vaadin thread locals are required to perform
+     *         injection, otherwise {@literal false}.
+     */
+    boolean isVaadinScoped() {
+        return vaadinScoped;
+    }
+
+    /**
      * Gets the Field object for the transient field.
      *
      * @return the Field object for the transient field.
@@ -103,18 +126,20 @@ public final class TransientDescriptor implements Serializable {
         TransientDescriptor that = (TransientDescriptor) o;
         return declaringClass.equals(that.declaringClass)
                 && name.equals(that.name) && type.equals(that.type)
-                && instanceReference.equals(that.instanceReference);
+                && instanceReference.equals(that.instanceReference)
+                && vaadinScoped == that.vaadinScoped;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(declaringClass, name, type, instanceReference);
+        return Objects.hash(declaringClass, name, type, instanceReference,
+                vaadinScoped);
     }
 
     @Override
     public String toString() {
         return String.format(
-                "TransientDescriptor { field: %s.%s, type: %s, instance: %s }",
-                declaringClass, name, type, instanceReference);
+                "TransientDescriptor { field: %s.%s, type: %s, instance: %s, vaadinScope: %s }",
+                declaringClass, name, type, instanceReference, vaadinScoped);
     }
 }

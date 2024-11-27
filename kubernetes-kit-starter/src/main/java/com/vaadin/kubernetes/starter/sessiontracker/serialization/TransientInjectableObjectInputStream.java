@@ -189,11 +189,11 @@ public class TransientInjectableObjectInputStream extends ObjectInputStream {
                     obj.getClass(), descriptors);
             getLogger().debug("Try injection into {}", obj.getClass());
             try {
-                injector.inject(obj, descriptors);
+                holder.inVaadinScope(() -> injector.inject(obj, descriptors));
             } catch (Exception ex) {
                 getLogger().error(
                         "Failed to inject transient fields into type {}",
-                        obj.getClass());
+                        obj.getClass(), ex);
             }
         } else {
             getLogger().trace("Ignoring NULL TransientAwareHolder");
