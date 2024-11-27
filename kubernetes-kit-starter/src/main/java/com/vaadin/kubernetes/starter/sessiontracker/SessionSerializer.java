@@ -279,7 +279,9 @@ public class SessionSerializer
                                 sessionId, clusterKey, error);
                     } else {
                         Consumer<SessionInfo> whenSerialized = sessionInfo -> {
-                            backendConnector.sendSession(sessionInfo);
+                            if (sessionInfo != null) {
+                                backendConnector.sendSession(sessionInfo);
+                            }
                             backendConnector
                                     .markSerializationComplete(clusterKey);
                         };

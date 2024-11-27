@@ -322,7 +322,8 @@ class SessionSerializerTest {
         verify(connector).markSerializationStarted(clusterSID);
 
         await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
-        verify(connector).sendSession(isNull());
+        verify(connector, never()).sendSession(any());
+        verify(connector).markSerializationComplete(clusterSID);
         locks.forEach(l -> verify(l, never()).lock());
 
     }
