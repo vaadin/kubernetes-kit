@@ -9,6 +9,8 @@
  */
 package com.vaadin.kubernetes.starter;
 
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationStreamFactory;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import jakarta.servlet.FilterRegistration;
 import jakarta.servlet.ServletContext;
 
@@ -96,7 +98,8 @@ public class KubernetesKitConfiguration {
         }
 
         @Bean
-        SpringTransientHandler springDeserializationHandler(
+        @ConditionalOnMissingBean
+        TransientHandler springDeserializationHandler(
                 ApplicationContext appCtx) {
             return new SpringTransientHandler(appCtx);
         }
@@ -127,14 +130,21 @@ public class KubernetesKitConfiguration {
         }
 
         @Bean
+        @ConditionalOnMissingBean
+        SerializationStreamFactory serializationStreamFactory(){
+            return new TransientInjectableObjectStreamFactory();
+        }
+
+        @Bean
         SessionSerializer sessionSerializer(BackendConnector backendConnector,
-                TransientHandler transientInjector,
-                SessionSerializationCallback sessionSerializationCallback,
-                SessionExpirationPolicy sessionExpirationPolicy,
-                @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter) {
+                                            TransientHandler transientInjector,
+                                            SessionSerializationCallback sessionSerializationCallback,
+                                            SessionExpirationPolicy sessionExpirationPolicy,
+                                            @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter,
+                                            SerializationStreamFactory serializationStreamFactory) {
             SessionSerializer sessionSerializer = new SessionSerializer(
                     backendConnector, transientInjector,
-                    sessionExpirationPolicy, sessionSerializationCallback);
+                    sessionExpirationPolicy, sessionSerializationCallback, serializationStreamFactory);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }
