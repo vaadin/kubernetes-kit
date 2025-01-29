@@ -42,6 +42,8 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.dom.Element;
+import com.vaadin.flow.dom.ElementUtil;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
@@ -377,16 +379,17 @@ public class SessionSerializer
             lock.lock();
         }
         Optional<Object> session = attributes.values().stream()
-                .filter(o -> o instanceof VaadinSession)
-                .findFirst();
+                .filter(o -> o instanceof VaadinSession).findFirst();
         try {
             if (session.isPresent()) {
                 VaadinSession vaadinSession = (VaadinSession) session.get();
                 for (UI ui : vaadinSession.getUIs()) {
-                    // TODO get all components, not just the ones from the first level
-                    boolean found = ui.getCurrentView().getChildren().anyMatch(
-                            component -> component instanceof UnserializableComponentWrapper<?, ?>);
-                    if (found) {
+                    AtomicInteger wrappersCounter = new AtomicInteger();
+                    ui.getElement().getNode().visitNodeTree(node -> ElementUtil
+                            .from(node).flatMap(Element::getComponent)
+                            .filter(UnserializableComponentWrapper.class::isInstance)
+                            .ifPresent(c -> wrappersCounter.incrementAndGet()));
+                    if (wrappersCounter.get() > 0) {
                         return true;
                     }
                 }
@@ -408,14 +411,14 @@ public class SessionSerializer
             lock.lock();
         }
         try {
-            beforeSerializePessimistic(getWrappers(attributes));
+            beforeSerializePessimistic(getUnserializableWrappers(attributes));
             return doSerialize(sessionId, timeToLive, attributes);
         } catch (Exception e) {
             getLogger().error(
                     "An error occurred during pessimistic serialization of session {} with distributed key {} ",
                     sessionId, clusterKey, e);
         } finally {
-            afterSerializePessimistic(getWrappers(attributes));
+            afterSerializePessimistic(getUnserializableWrappers(attributes));
             for (ReentrantLock lock : locks) {
                 lock.unlock();
             }
@@ -426,20 +429,19 @@ public class SessionSerializer
         return null;
     }
 
-    private List<UnserializableComponentWrapper<?, ?>> getWrappers(
+    private List<UnserializableComponentWrapper<?, ?>> getUnserializableWrappers(
             Map<String, Object> attributes) {
         List<UnserializableComponentWrapper<?, ?>> wrappers = new ArrayList<>();
         Optional<Object> session = attributes.values().stream()
-                .filter(o -> o instanceof VaadinSession)
-                .findFirst();
+                .filter(o -> o instanceof VaadinSession).findFirst();
         if (session.isPresent()) {
             VaadinSession vaadinSession = (VaadinSession) session.get();
             for (UI ui : vaadinSession.getUIs()) {
-                // TODO get all components, not just the ones from the first level
-                wrappers.addAll(ui.getCurrentView().getChildren().filter(
-                                component -> component instanceof UnserializableComponentWrapper<?, ?>)
-                        .map(component -> (UnserializableComponentWrapper<?, ?>) component)
-                        .toList());
+                ui.getElement().getNode().visitNodeTree(node -> ElementUtil
+                        .from(node).flatMap(Element::getComponent)
+                        .filter(UnserializableComponentWrapper.class::isInstance)
+                        .ifPresent(c -> wrappers.add(
+                                (UnserializableComponentWrapper<?, ?>) c)));
             }
         }
         return wrappers;
