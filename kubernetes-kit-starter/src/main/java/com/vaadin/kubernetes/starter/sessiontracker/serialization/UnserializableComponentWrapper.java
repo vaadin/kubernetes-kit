@@ -15,8 +15,9 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.function.SerializableFunction;
+import com.vaadin.flow.internal.StateTree;
 
-@Tag("unserializable-component-wrapper")
+@Tag(Tag.DIV)
 public class UnserializableComponentWrapper<S extends Serializable, T extends Component>
         extends Component {
 
@@ -48,18 +49,21 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     }
 
     public void beforeSerialization() {
+        state = saver.apply(component);
         component.removeFromParent();
         flush(getElement());
-        state = saver.apply(component);
-        component = null;
     }
 
     public void afterSerialization() {
         component = generator.apply(state);
         getElement().appendChild(component.getElement());
+        flush(getElement());
     }
 
     private void flush(Element element) {
-        element.getNode().collectChanges(some -> {});
+        if (element.getNode().getOwner() instanceof StateTree owner) {
+            owner.collectChanges(change -> {
+            });
+        }
     }
 }
