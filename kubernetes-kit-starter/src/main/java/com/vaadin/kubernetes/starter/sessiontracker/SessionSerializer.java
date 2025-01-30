@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.dom.ElementUtil;
@@ -385,10 +386,8 @@ public class SessionSerializer
                 VaadinSession vaadinSession = (VaadinSession) session.get();
                 for (UI ui : vaadinSession.getUIs()) {
                     AtomicInteger wrappersCounter = new AtomicInteger();
-                    ui.getElement().getNode().visitNodeTree(node -> ElementUtil
-                            .from(node).flatMap(Element::getComponent)
-                            .filter(UnserializableComponentWrapper.class::isInstance)
-                            .ifPresent(c -> wrappersCounter.incrementAndGet()));
+                    findUnserializableWrappers(ui,
+                            c -> wrappersCounter.incrementAndGet());
                     if (wrappersCounter.get() > 0) {
                         return true;
                     }
@@ -437,14 +436,18 @@ public class SessionSerializer
         if (session.isPresent()) {
             VaadinSession vaadinSession = (VaadinSession) session.get();
             for (UI ui : vaadinSession.getUIs()) {
-                ui.getElement().getNode().visitNodeTree(node -> ElementUtil
-                        .from(node).flatMap(Element::getComponent)
-                        .filter(UnserializableComponentWrapper.class::isInstance)
-                        .ifPresent(c -> wrappers.add(
-                                (UnserializableComponentWrapper<?, ?>) c)));
+                findUnserializableWrappers(ui, c -> wrappers
+                        .add((UnserializableComponentWrapper<?, ?>) c));
             }
         }
         return wrappers;
+    }
+
+    private void findUnserializableWrappers(UI ui, Consumer<Component> action) {
+        ui.getElement().getNode().visitNodeTree(node -> ElementUtil.from(node)
+                .flatMap(Element::getComponent)
+                .filter(UnserializableComponentWrapper.class::isInstance)
+                .ifPresent(action));
     }
 
     private void beforeSerializePessimistic(
