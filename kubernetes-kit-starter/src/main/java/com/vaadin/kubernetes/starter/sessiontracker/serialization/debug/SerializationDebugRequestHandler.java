@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -105,7 +106,7 @@ public class SerializationDebugRequestHandler
         this.debugBackendConnector = new DebugBackendConnector();
         this.sessionSerializer = new SessionSerializer(debugBackendConnector,
                 debugBackendConnector, SessionExpirationPolicy.NEVER,
-                SessionSerializationCallback.DEFAULT);
+                SessionSerializationCallback.DEFAULT, new TransientInjectableObjectStreamFactory());
     }
 
     @Override
