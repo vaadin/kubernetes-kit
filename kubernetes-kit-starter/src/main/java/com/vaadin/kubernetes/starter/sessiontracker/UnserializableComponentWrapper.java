@@ -28,8 +28,8 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
 
     private transient T component;
     private S state;
-    private SerializableFunction<S, T> generator;
-    private SerializableFunction<T, S> saver;
+    private SerializableFunction<S, T> componentDeserializer;
+    private SerializableFunction<T, S> componentSerializer;
 
     public UnserializableComponentWrapper(T component) {
         getElement().appendChild(component.getElement());
@@ -41,22 +41,22 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         return new UnserializableComponentWrapper<>(component);
     }
 
-    public UnserializableComponentWrapper<S, T> withGenerator(
-            SerializableFunction<S, T> generator) {
-        this.generator = generator;
+    public UnserializableComponentWrapper<S, T> withComponentDeserializer(
+            SerializableFunction<S, T> componentDeserializer) {
+        this.componentDeserializer = componentDeserializer;
         return this;
     }
 
-    public UnserializableComponentWrapper<S, T> withSaver(
-            SerializableFunction<T, S> saver) {
-        this.saver = saver;
+    public UnserializableComponentWrapper<S, T> withComponentSerializer(
+            SerializableFunction<T, S> componentSerializer) {
+        this.componentSerializer = componentSerializer;
         return this;
     }
 
     @Serial
     private void writeObject(java.io.ObjectOutputStream out)
             throws IOException {
-        state = saver.apply(component);
+        state = componentSerializer.apply(component);
         if (!component.isAttached()) {
             out.defaultWriteObject();
         } else {
@@ -85,7 +85,7 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     }
 
     private void restoreComponent() {
-        component = generator.apply(state);
+        component = componentDeserializer.apply(state);
         getElement().appendChild(component.getElement());
     }
 
