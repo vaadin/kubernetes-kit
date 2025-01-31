@@ -70,10 +70,10 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
             throws IOException, ClassNotFoundException {
         in.defaultReadObject();
         in.registerValidation(() -> {
-            component = componentDeserializer.apply(state);
             getUI().map(UI::getSession).ifPresent(session -> {
                 Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
                 try {
+                    component = componentDeserializer.apply(state);
                     getElement().appendChild(component.getElement());
                 } finally {
                     cleaner.run();
