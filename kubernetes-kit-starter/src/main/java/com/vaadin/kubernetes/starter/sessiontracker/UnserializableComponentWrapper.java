@@ -28,8 +28,8 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
 
     private transient T component;
     private S state;
-    private SerializableFunction<S, T> componentDeserializer;
     private SerializableFunction<T, S> componentSerializer;
+    private SerializableFunction<S, T> componentDeserializer;
 
     public UnserializableComponentWrapper(T component) {
         getElement().appendChild(component.getElement());
@@ -41,15 +41,15 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         return new UnserializableComponentWrapper<>(component);
     }
 
-    public UnserializableComponentWrapper<S, T> withComponentDeserializer(
-            SerializableFunction<S, T> componentDeserializer) {
-        this.componentDeserializer = componentDeserializer;
-        return this;
-    }
-
     public UnserializableComponentWrapper<S, T> withComponentSerializer(
             SerializableFunction<T, S> componentSerializer) {
         this.componentSerializer = componentSerializer;
+        return this;
+    }
+
+    public UnserializableComponentWrapper<S, T> withComponentDeserializer(
+            SerializableFunction<S, T> componentDeserializer) {
+        this.componentDeserializer = componentDeserializer;
         return this;
     }
 
@@ -65,6 +65,23 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         }
     }
 
+    @Serial
+    private void readObject(java.io.ObjectInputStream in)
+            throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        in.registerValidation(() -> {
+            component = componentDeserializer.apply(state);
+            getUI().map(UI::getSession).ifPresent(session -> {
+                Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
+                try {
+                    getElement().appendChild(component.getElement());
+                } finally {
+                    cleaner.run();
+                }
+            });
+        }, 0);
+    }
+
     static void beforeSerialization(UI ui) {
         doWithWrapper(ui, wrapper -> {
             wrapper.component.removeFromParent();
@@ -78,15 +95,6 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
             wrapper.getElement().appendChild(wrapper.component.getElement());
             flush(wrapper);
         });
-    }
-
-    static void afterDeserialization(UI ui) {
-        doWithWrapper(ui, UnserializableComponentWrapper::restoreComponent);
-    }
-
-    private void restoreComponent() {
-        component = componentDeserializer.apply(state);
-        getElement().appendChild(component.getElement());
     }
 
     private static void flush(UnserializableComponentWrapper<?, ?> wrapper) {

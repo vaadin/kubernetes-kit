@@ -40,7 +40,6 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
@@ -422,35 +421,10 @@ public class SessionSerializer
                 .forEach(UnserializableComponentWrapper::afterSerialization);
     }
 
-    private void afterDeserialize(Map<String, Object> attributes) {
-        List<VaadinSession> vaadinSessions = getVaadinSessions(attributes);
-        for (VaadinSession session : vaadinSessions) {
-            Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
-            try {
-                for (UI ui : session.getUIs()) {
-                    Map<Class<?>, CurrentInstance> instances = CurrentInstance
-                            .setCurrent(ui);
-                    try {
-                        UnserializableComponentWrapper.afterDeserialization(ui);
-                    } finally {
-                        CurrentInstance.restoreInstances(instances);
-                    }
-                }
-            } finally {
-                cleaner.run();
-            }
-        }
-    }
-
-    private List<VaadinSession> getVaadinSessions(
-            Map<String, Object> attributes) {
+    private List<UI> getUIs(Map<String, Object> attributes) {
         return attributes.values().stream()
                 .filter(o -> o instanceof VaadinSession)
-                .map(VaadinSession.class::cast).toList();
-    }
-
-    private List<UI> getUIs(Map<String, Object> attributes) {
-        return getVaadinSessions(attributes).stream()
+                .map(VaadinSession.class::cast)
                 .flatMap(s -> s.getUIs().stream()).toList();
     }
 
@@ -608,7 +582,6 @@ public class SessionSerializer
                 in, handlerProvider.apply(sessionId,
                         sessionInfo.getClusterKey()))) {
             attributes = inStream.readWithTransients();
-            afterDeserialize(attributes);
             sessionSerializationCallback.onDeserializationSuccess();
         } catch (Exception ex) {
             sessionSerializationCallback.onDeserializationError(ex);
