@@ -9,8 +9,6 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
-import java.io.IOException;
-import java.io.Serial;
 import java.io.Serializable;
 
 import com.vaadin.flow.component.Component;
@@ -50,14 +48,21 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         return this;
     }
 
-    public void beforeSerialization() {
+    public void beforeSerialize() {
+        state = saver.apply(component);
         component.removeFromParent();
         flush(getElement());
     }
 
-    public void afterSerialization() {
+    public void afterSerialize() {
         getElement().appendChild(component.getElement());
         flush(getElement());
+    }
+
+    public void afterDeserialize() {
+        component = generator.apply(state);
+        state = null;
+        getElement().appendChild(component.getElement());
     }
 
     private void flush(Element element) {
@@ -65,23 +70,5 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
             owner.collectChanges(change -> {
             });
         }
-    }
-
-    @Serial
-    private void writeObject(java.io.ObjectOutputStream out)
-            throws IOException {
-        state = saver.apply(component);
-        if (!component.isAttached()) {
-            out.defaultWriteObject();
-        } else {
-            throw new IllegalStateException("Component still attached");
-        }
-    }
-
-    @Serial
-    private void readObject(java.io.ObjectInputStream in)
-            throws IOException, ClassNotFoundException {
-        in.defaultReadObject();
-        component = generator.apply(state);
     }
 }

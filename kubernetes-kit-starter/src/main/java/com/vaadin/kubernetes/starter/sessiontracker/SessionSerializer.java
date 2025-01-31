@@ -21,7 +21,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,7 +40,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
-import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.dom.ElementUtil;
@@ -322,7 +320,7 @@ public class SessionSerializer
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            if (unserializableComponentFound(attributes)) {
+            if (unserializableWrapperFound(attributes)) {
                 throw new PessimisticSerializationRequiredException(
                         "Unserializable component found");
             }
@@ -373,34 +371,6 @@ public class SessionSerializer
         whenSerialized.accept(sessionInfo);
     }
 
-    private boolean unserializableComponentFound(
-            Map<String, Object> attributes) {
-        Set<ReentrantLock> locks = getLocks(attributes);
-        for (ReentrantLock lock : locks) {
-            lock.lock();
-        }
-        Optional<Object> session = attributes.values().stream()
-                .filter(o -> o instanceof VaadinSession).findFirst();
-        try {
-            if (session.isPresent()) {
-                VaadinSession vaadinSession = (VaadinSession) session.get();
-                for (UI ui : vaadinSession.getUIs()) {
-                    AtomicInteger wrappersCounter = new AtomicInteger();
-                    findUnserializableWrappers(ui,
-                            c -> wrappersCounter.incrementAndGet());
-                    if (wrappersCounter.get() > 0) {
-                        return true;
-                    }
-                }
-            }
-        } finally {
-            for (ReentrantLock lock : locks) {
-                lock.unlock();
-            }
-        }
-        return false;
-    }
-
     private SessionInfo serializePessimisticLocking(String sessionId,
             Duration timeToLive, Map<String, Object> attributes) {
         long start = System.currentTimeMillis();
@@ -410,14 +380,15 @@ public class SessionSerializer
             lock.lock();
         }
         try {
-            beforeSerializePessimistic(getUnserializableWrappers(attributes));
+            beforeSerializePessimistic(
+                    getAllUnserializableWrappers(attributes));
             return doSerialize(sessionId, timeToLive, attributes);
         } catch (Exception e) {
             getLogger().error(
                     "An error occurred during pessimistic serialization of session {} with distributed key {} ",
                     sessionId, clusterKey, e);
         } finally {
-            afterSerializePessimistic(getUnserializableWrappers(attributes));
+            afterSerializePessimistic(getAllUnserializableWrappers(attributes));
             for (ReentrantLock lock : locks) {
                 lock.unlock();
             }
@@ -428,36 +399,74 @@ public class SessionSerializer
         return null;
     }
 
-    private List<UnserializableComponentWrapper<?, ?>> getUnserializableWrappers(
-            Map<String, Object> attributes) {
-        List<UnserializableComponentWrapper<?, ?>> wrappers = new ArrayList<>();
-        Optional<Object> session = attributes.values().stream()
-                .filter(o -> o instanceof VaadinSession).findFirst();
-        if (session.isPresent()) {
-            VaadinSession vaadinSession = (VaadinSession) session.get();
-            for (UI ui : vaadinSession.getUIs()) {
-                findUnserializableWrappers(ui, c -> wrappers
-                        .add((UnserializableComponentWrapper<?, ?>) c));
+    private boolean unserializableWrapperFound(Map<String, Object> attributes) {
+        Set<ReentrantLock> locks = getLocks(attributes);
+        for (ReentrantLock lock : locks) {
+            lock.lock();
+        }
+        try {
+            List<UI> uIs = attributes.values().stream()
+                    .filter(o -> o instanceof VaadinSession)
+                    .map(VaadinSession.class::cast)
+                    .flatMap(s -> s.getUIs().stream()).toList();
+            for (UI ui : uIs) {
+                if (!getUnserializableWrappers(ui).isEmpty()) {
+                    return true;
+                }
+            }
+        } finally {
+            for (ReentrantLock lock : locks) {
+                lock.unlock();
             }
         }
-        return wrappers;
+        return false;
     }
 
-    private void findUnserializableWrappers(UI ui, Consumer<Component> action) {
+    private List<UnserializableComponentWrapper<?, ?>> getAllUnserializableWrappers(
+            Map<String, Object> attributes) {
+        return attributes.values().stream()
+                .filter(o -> o instanceof VaadinSession)
+                .map(VaadinSession.class::cast)
+                .flatMap(s -> s.getUIs().stream())
+                .flatMap(ui -> getUnserializableWrappers(ui).stream()).toList();
+    }
+
+    private List<UnserializableComponentWrapper<?, ?>> getUnserializableWrappers(
+            UI ui) {
+        List<UnserializableComponentWrapper<?, ?>> wrappers = new ArrayList<>();
         ui.getElement().getNode().visitNodeTree(node -> ElementUtil.from(node)
                 .flatMap(Element::getComponent)
                 .filter(UnserializableComponentWrapper.class::isInstance)
-                .ifPresent(action));
+                .ifPresent(c -> wrappers
+                        .add((UnserializableComponentWrapper<?, ?>) c)));
+        return wrappers;
     }
 
     private void beforeSerializePessimistic(
             List<UnserializableComponentWrapper<?, ?>> wrappers) {
-        wrappers.forEach(UnserializableComponentWrapper::beforeSerialization);
+        wrappers.forEach(UnserializableComponentWrapper::beforeSerialize);
     }
 
     private void afterSerializePessimistic(
             List<UnserializableComponentWrapper<?, ?>> wrappers) {
-        wrappers.forEach(UnserializableComponentWrapper::afterSerialization);
+        wrappers.forEach(UnserializableComponentWrapper::afterSerialize);
+    }
+
+    private void afterDeserialize(Map<String, Object> attributes) {
+        List<VaadinSession> sessions = attributes.values().stream()
+                .filter(o -> o instanceof VaadinSession)
+                .map(VaadinSession.class::cast).toList();
+        for (VaadinSession session : sessions) {
+            Runnable cleaner = SessionUtil.injectLock(session);
+            try {
+                for (UI ui : session.getUIs()) {
+                    getUnserializableWrappers(ui).forEach(
+                            UnserializableComponentWrapper::afterDeserialize);
+                }
+            } finally {
+                cleaner.run();
+            }
+        }
     }
 
     private Set<ReentrantLock> getLocks(Map<String, Object> attributes) {
@@ -468,8 +477,7 @@ public class SessionSerializer
                         "com.vaadin.flow.server.VaadinSession".length() + 1);
                 String lockKey = serviceName + ".lock";
                 Object lockAttribute = attributes.get(lockKey);
-                if (lockAttribute instanceof ReentrantLock) {
-                    ReentrantLock lock = (ReentrantLock) lockAttribute;
+                if (lockAttribute instanceof ReentrantLock lock) {
                     locks.add(lock);
                 }
 
@@ -528,10 +536,9 @@ public class SessionSerializer
         StringBuilder info = new StringBuilder();
         for (String key : attributes.keySet()) {
             Object value = attributes.get(key);
-            if (value instanceof VaadinSession) {
-                VaadinSession s = (VaadinSession) value;
+            if (value instanceof VaadinSession session) {
                 try {
-                    for (UI ui : s.getUIs()) {
+                    for (UI ui : session.getUIs()) {
                         info.append("[UI ").append(ui.getUIId())
                                 .append(", last client message: ")
                                 .append(ui.getInternals()
@@ -555,8 +562,7 @@ public class SessionSerializer
     private long findNewestLockTime(Map<String, Object> attributes) {
         long latestLock = 0L;
         for (Entry<String, Object> entry : attributes.entrySet()) {
-            if (entry.getValue() instanceof VaadinSession) {
-                VaadinSession session = (VaadinSession) entry.getValue();
+            if (entry.getValue() instanceof VaadinSession session) {
                 latestLock = Math.max(latestLock, session.getLastLocked());
             }
         }
@@ -566,8 +572,7 @@ public class SessionSerializer
     private long findNewestUnlockTime(Map<String, Object> attributes) {
         long latestUnlock = 0L;
         for (Entry<String, Object> entry : attributes.entrySet()) {
-            if (entry.getValue() instanceof VaadinSession) {
-                VaadinSession session = (VaadinSession) entry.getValue();
+            if (entry.getValue() instanceof VaadinSession session) {
                 latestUnlock = Math.max(latestUnlock,
                         session.getLastUnlocked());
             }
@@ -618,6 +623,7 @@ public class SessionSerializer
                 in, handlerProvider.apply(sessionId,
                         sessionInfo.getClusterKey()))) {
             attributes = inStream.readWithTransients();
+            afterDeserialize(attributes);
             sessionSerializationCallback.onDeserializationSuccess();
         } catch (Exception ex) {
             sessionSerializationCallback.onDeserializationError(ex);
