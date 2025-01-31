@@ -48,18 +48,18 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         return this;
     }
 
-    public void beforeSerialize() {
+    public void beforeSerialization() {
         state = saver.apply(component);
         component.removeFromParent();
         flush(getElement());
     }
 
-    public void afterSerialize() {
+    public void afterSerialization() {
         getElement().appendChild(component.getElement());
         flush(getElement());
     }
 
-    public void afterDeserialize() {
+    public void afterDeserialization() {
         component = generator.apply(state);
         state = null;
         getElement().appendChild(component.getElement());

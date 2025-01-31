@@ -444,12 +444,12 @@ public class SessionSerializer
 
     private void beforeSerializePessimistic(
             List<UnserializableComponentWrapper<?, ?>> wrappers) {
-        wrappers.forEach(UnserializableComponentWrapper::beforeSerialize);
+        wrappers.forEach(UnserializableComponentWrapper::beforeSerialization);
     }
 
     private void afterSerializePessimistic(
             List<UnserializableComponentWrapper<?, ?>> wrappers) {
-        wrappers.forEach(UnserializableComponentWrapper::afterSerialize);
+        wrappers.forEach(UnserializableComponentWrapper::afterSerialization);
     }
 
     private void afterDeserialize(Map<String, Object> attributes) {
@@ -461,7 +461,7 @@ public class SessionSerializer
             try {
                 for (UI ui : session.getUIs()) {
                     getUnserializableWrappers(ui).forEach(
-                            UnserializableComponentWrapper::afterDeserialize);
+                            UnserializableComponentWrapper::afterDeserialization);
                 }
             } finally {
                 cleaner.run();
