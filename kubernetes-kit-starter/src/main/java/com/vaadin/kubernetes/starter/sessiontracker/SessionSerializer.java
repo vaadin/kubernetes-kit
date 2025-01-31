@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.dom.ElementUtil;
@@ -320,17 +321,12 @@ public class SessionSerializer
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            if (unserializableWrapperFound(attributes)) {
-                throw new PessimisticSerializationRequiredException(
-                        "Unserializable component found");
-            }
-
+            checkUnserializableWrappers(attributes);
             long start = System.currentTimeMillis();
             long timeout = start + optimisticSerializationTimeoutMs;
             getLogger().debug(
                     "Optimistic serialization of session {} with distributed key {} started",
                     sessionId, clusterKey);
-
             while (System.currentTimeMillis() < timeout) {
                 SessionInfo info = serializeOptimisticLocking(sessionId,
                         timeToLive, attributes);
@@ -345,7 +341,7 @@ public class SessionSerializer
             }
         } catch (PessimisticSerializationRequiredException e) {
             getLogger().warn(
-                    "Optimistic serialization of session {} with distributed key {} cannot be completed "
+                    "Optimistic serialization of session {} with distributed key {} cannot be completed"
                             + " because VaadinSession lock is required. Switching to pessimistic locking.",
                     sessionId, clusterKey, e);
         } catch (NotSerializableException e) {
@@ -399,47 +395,44 @@ public class SessionSerializer
         return null;
     }
 
-    private boolean unserializableWrapperFound(Map<String, Object> attributes) {
-        Set<ReentrantLock> locks = getLocks(attributes);
-        for (ReentrantLock lock : locks) {
-            lock.lock();
-        }
-        try {
-            List<UI> uIs = attributes.values().stream()
-                    .filter(o -> o instanceof VaadinSession)
-                    .map(VaadinSession.class::cast)
-                    .flatMap(s -> s.getUIs().stream()).toList();
-            for (UI ui : uIs) {
-                if (!getUnserializableWrappers(ui).isEmpty()) {
-                    return true;
-                }
+    private void checkUnserializableWrappers(Map<String, Object> attributes) {
+        Consumer<Component> action = c -> {
+            throw new PessimisticSerializationRequiredException(
+                    "Pessimistic serialization required because at least one "
+                            + UnserializableComponentWrapper.class.getName()
+                            + " is in the UI tree");
+        };
+        List<VaadinSession> sessions = attributes.values().stream()
+                .filter(o -> o instanceof VaadinSession)
+                .map(VaadinSession.class::cast).toList();
+        for (VaadinSession session : sessions) {
+            Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
+            try {
+                session.getUIs()
+                        .forEach(ui -> getUnserializableWrappers(ui, action));
+            } finally {
+                cleaner.run();
             }
-        } finally {
-            for (ReentrantLock lock : locks) {
-                lock.unlock();
-            }
         }
-        return false;
     }
 
     private List<UnserializableComponentWrapper<?, ?>> getAllUnserializableWrappers(
             Map<String, Object> attributes) {
-        return attributes.values().stream()
-                .filter(o -> o instanceof VaadinSession)
+        List<UnserializableComponentWrapper<?, ?>> wrappers = new ArrayList<>();
+        Consumer<Component> action = c -> wrappers
+                .add((UnserializableComponentWrapper<?, ?>) c);
+        attributes.values().stream().filter(o -> o instanceof VaadinSession)
                 .map(VaadinSession.class::cast)
                 .flatMap(s -> s.getUIs().stream())
-                .flatMap(ui -> getUnserializableWrappers(ui).stream()).toList();
+                .forEach(ui -> getUnserializableWrappers(ui, action));
+        return wrappers;
     }
 
-    private List<UnserializableComponentWrapper<?, ?>> getUnserializableWrappers(
-            UI ui) {
-        List<UnserializableComponentWrapper<?, ?>> wrappers = new ArrayList<>();
+    private void getUnserializableWrappers(UI ui, Consumer<Component> action) {
         ui.getElement().getNode().visitNodeTree(node -> ElementUtil.from(node)
                 .flatMap(Element::getComponent)
                 .filter(UnserializableComponentWrapper.class::isInstance)
-                .ifPresent(c -> wrappers
-                        .add((UnserializableComponentWrapper<?, ?>) c)));
-        return wrappers;
+                .ifPresent(action));
     }
 
     private void beforeSerializePessimistic(
@@ -457,14 +450,21 @@ public class SessionSerializer
                 .filter(o -> o instanceof VaadinSession)
                 .map(VaadinSession.class::cast).toList();
         for (VaadinSession session : sessions) {
-            Runnable cleaner = SessionUtil.injectLock(session);
+            Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
+            UI currentUI = UI.getCurrent();
             try {
                 for (UI ui : session.getUIs()) {
-                    getUnserializableWrappers(ui).forEach(
+                    UI.setCurrent(ui);
+                    List<UnserializableComponentWrapper<?, ?>> wrappers = new ArrayList<>();
+                    Consumer<Component> action = c -> wrappers
+                            .add((UnserializableComponentWrapper<?, ?>) c);
+                    getUnserializableWrappers(ui, action);
+                    wrappers.forEach(
                             UnserializableComponentWrapper::afterDeserialization);
                 }
             } finally {
                 cleaner.run();
+                UI.setCurrent(currentUI);
             }
         }
     }

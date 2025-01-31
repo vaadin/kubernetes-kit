@@ -21,11 +21,16 @@ import com.vaadin.flow.server.VaadinSession;
 
 public class SessionUtil {
 
-    public static Runnable injectLock(VaadinSession session) {
+    public static Runnable injectLockIfNeeded(VaadinSession session) {
         if (session != null) {
+            Lock lock = session.getLockInstance();
+            if (lock != null) {
+                lock.lock();
+                return () -> session.getLockInstance().unlock();
+            }
             try {
                 Field field = VaadinSession.class.getDeclaredField("lock");
-                Lock lock = new ReentrantLock();
+                lock = new ReentrantLock();
                 lock.lock();
                 ReflectTools.setJavaFieldValue(session, field, lock);
                 return () -> removeLock(session, field);

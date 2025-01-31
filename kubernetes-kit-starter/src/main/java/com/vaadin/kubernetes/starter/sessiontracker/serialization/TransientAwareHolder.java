@@ -91,7 +91,7 @@ final class TransientAwareHolder implements Serializable {
         // This method injects a temporary lock instance into the provided
         // VaadinSession and returns a runnable that will remove it when
         // executed.
-        Runnable cleaner = SessionUtil.injectLock(session);
+        Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
         try {
             runnable.run();
         } finally {
