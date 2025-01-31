@@ -35,7 +35,17 @@ public class SpreadsheetView extends VerticalLayout {
 
         var wrapper = UnserializableComponentWrapper
                 .<SpreadsheetState, Spreadsheet> of(spreadsheet)
-                .withGenerator(state -> {
+                .withComponentSerializer(ss -> {
+                    var out = new ByteArrayOutputStream();
+                    try {
+                        ss.write(out);
+                    } catch (IOException e) {
+                    }
+                    var excel = out.toByteArray();
+                    var state = new SpreadsheetState();
+                    state.setExcel(excel);
+                    return state;
+                }).withComponentDeserializer(state -> {
                     var ss = new Spreadsheet();
                     ss.setLocale(Locale.getDefault());
                     var excel = state.getExcel();
@@ -48,16 +58,6 @@ public class SpreadsheetView extends VerticalLayout {
                     }
                     ss.setWorkbook(workbook);
                     return ss;
-                }).withSaver(ss -> {
-                    var out = new ByteArrayOutputStream();
-                    try {
-                        ss.write(out);
-                    } catch (IOException e) {
-                    }
-                    var excel = out.toByteArray();
-                    var state = new SpreadsheetState();
-                    state.setExcel(excel);
-                    return state;
                 });
         add(wrapper);
     }
