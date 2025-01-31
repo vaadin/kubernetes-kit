@@ -16,7 +16,7 @@ import com.vaadin.flow.component.spreadsheet.Spreadsheet;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.kubernetes.demo.views.MainLayout;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.UnserializableComponentWrapper;
+import com.vaadin.kubernetes.starter.sessiontracker.UnserializableComponentWrapper;
 
 @Component
 @Scope("prototype")
@@ -34,7 +34,7 @@ public class SpreadsheetView extends VerticalLayout {
         spreadsheet.createCell(1, 1, "Copernicus");
 
         var wrapper = UnserializableComponentWrapper
-                .<SpreadsheetState, Spreadsheet>of(spreadsheet)
+                .<SpreadsheetState, Spreadsheet> of(spreadsheet)
                 .withGenerator(state -> {
                     var ss = new Spreadsheet();
                     ss.setLocale(Locale.getDefault());
