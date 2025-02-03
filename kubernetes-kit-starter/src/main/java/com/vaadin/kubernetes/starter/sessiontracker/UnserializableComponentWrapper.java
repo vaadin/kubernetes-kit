@@ -12,6 +12,7 @@ package com.vaadin.kubernetes.starter.sessiontracker;
 import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import com.vaadin.flow.component.Component;
@@ -28,60 +29,61 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
 
     private transient T component;
     private S state;
-    private SerializableFunction<T, S> componentSerializer;
-    private SerializableFunction<S, T> componentDeserializer;
+    private SerializableFunction<T, S> serializer;
+    private SerializableFunction<S, T> deserializer;
 
     public UnserializableComponentWrapper(T component) {
+        this.component = Objects.requireNonNull(component);
         getElement().appendChild(component.getElement());
-        this.component = component;
-    }
-
-    public static <S extends Serializable, T extends Component> UnserializableComponentWrapper<S, T> of(
-            T component) {
-        return new UnserializableComponentWrapper<>(component);
     }
 
     public UnserializableComponentWrapper<S, T> withComponentSerializer(
-            SerializableFunction<T, S> componentSerializer) {
-        this.componentSerializer = componentSerializer;
+            SerializableFunction<T, S> serializer) {
+        this.serializer = Objects.requireNonNull(serializer);
         return this;
     }
 
     public UnserializableComponentWrapper<S, T> withComponentDeserializer(
-            SerializableFunction<S, T> componentDeserializer) {
-        this.componentDeserializer = componentDeserializer;
+            SerializableFunction<S, T> deserializer) {
+        this.deserializer = Objects.requireNonNull(deserializer);
         return this;
     }
 
     @Serial
     private void writeObject(java.io.ObjectOutputStream out)
             throws IOException {
-        state = componentSerializer.apply(component);
-        if (!component.isAttached()) {
-            out.defaultWriteObject();
-        } else {
-            throw new IllegalStateException(
-                    component + " component is still attached");
-        }
+        state = serializer.apply(component);
+        out.defaultWriteObject();
     }
 
     @Serial
     private void readObject(java.io.ObjectInputStream in)
             throws IOException, ClassNotFoundException {
         in.defaultReadObject();
-        in.registerValidation(() -> {
-            getUI().map(UI::getSession).ifPresent(session -> {
-                Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
-                try {
-                    component = componentDeserializer.apply(state);
-                    getElement().appendChild(component.getElement());
-                } finally {
-                    cleaner.run();
-                }
-            });
-        }, 0);
+        in.registerValidation(
+                () -> getUI().map(UI::getSession).ifPresent(session -> {
+                    Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
+                    try {
+                        component = deserializer.apply(state);
+                        getElement().appendChild(component.getElement());
+                    } finally {
+                        cleaner.run();
+                    }
+                }), 0);
     }
 
+    /**
+     * Prepares the UI for serialization, removing unserializable components
+     * from the component tree.
+     * <p>
+     * The changes to the UI caused by the removal are silently ignored.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> any detach listener registered on the wrapped
+     * components will be executed.
+     *
+     * @param ui
+     *            The ui to prepare for serialization.
+     */
     static void beforeSerialization(UI ui) {
         doWithWrapper(ui, wrapper -> {
             wrapper.component.removeFromParent();
@@ -89,6 +91,19 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         });
     }
 
+    /**
+     * Restores the UI adding the unserializable components to the component
+     * tree.
+     * <p>
+     * The changes to the UI caused by re-adding the components are silently
+     * ignored.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> any attach listener registered on the wrapped
+     * components will be executed.
+     *
+     * @param ui
+     *            The ui to prepare for serialization.
+     */
     static void afterSerialization(UI ui) {
         doWithWrapper(ui, wrapper -> {
             wrapper.state = null;
