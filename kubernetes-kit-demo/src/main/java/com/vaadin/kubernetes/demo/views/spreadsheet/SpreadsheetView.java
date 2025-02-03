@@ -33,9 +33,8 @@ public class SpreadsheetView extends VerticalLayout {
         spreadsheet.createCell(1, 0, "Nicolaus");
         spreadsheet.createCell(1, 1, "Copernicus");
 
-        var wrapper = UnserializableComponentWrapper
-                .<SpreadsheetState, Spreadsheet> of(spreadsheet)
-                .withComponentSerializer(ss -> {
+        var wrapper = new UnserializableComponentWrapper<SpreadsheetState, Spreadsheet>(
+                spreadsheet).withComponentSerializer(ss -> {
                     var out = new ByteArrayOutputStream();
                     try {
                         ss.write(out);
