@@ -43,7 +43,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNotNull;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -260,8 +259,8 @@ class SessionSerializerTest {
     }
 
     @Test
-    void serialize_differentSessions_processedConcurrently() {
-
+    void serialize_differentSessions_processedConcurrently()
+            throws InterruptedException {
         List<String> started = new ArrayList<>();
         List<String> completed = new ArrayList<>();
         List<SessionInfo> infoList = new ArrayList<>();
@@ -275,7 +274,7 @@ class SessionSerializerTest {
 
         String sid1 = UUID.randomUUID().toString();
         HttpSession session1 = newHttpSession(sid1);
-        session1.setAttribute("DELAY", new SerializationDelay(200));
+        session1.setAttribute("DELAY", new SerializationDelay(300));
         vaadinService.newMockSession(session1);
 
         String sid2 = UUID.randomUUID().toString();
@@ -284,6 +283,7 @@ class SessionSerializerTest {
         vaadinService.newMockSession(session2);
 
         serializer.serialize(session1);
+        Thread.sleep(100);
         serializer.serialize(session2);
 
         await().atMost(1000, MILLISECONDS).until(() -> completed.size() == 2);
@@ -301,7 +301,6 @@ class SessionSerializerTest {
         verify(connector, times(2)).markSerializationStarted(anyString());
         verify(connector, times(2)).sendSession(notNull());
         verify(connector, times(2)).markSerializationComplete(anyString());
-
     }
 
     @Test
@@ -336,8 +335,7 @@ class SessionSerializerTest {
         await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
         verify(connector, never()).sendSession(any());
         verify(connector).markSerializationComplete(clusterSID);
-        locks.forEach(l -> verify(l, never()).lock());
-
+        locks.forEach(l -> verify(l, times(1)).lock());
     }
 
     @Test
