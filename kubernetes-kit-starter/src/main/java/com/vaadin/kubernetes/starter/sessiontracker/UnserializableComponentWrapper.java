@@ -117,16 +117,15 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     @Serial
     private void readObject(java.io.ObjectInputStream in)
             throws IOException, ClassNotFoundException {
+        if (deserializer == null) {
+            throw new IllegalStateException("Deserializer function not set");
+        }
         in.defaultReadObject();
         in.registerValidation(this::restoreComponent, 0);
     }
 
     private void restoreComponent() {
         getUI().map(UI::getSession).ifPresent(session -> {
-            if (deserializer == null) {
-                throw new IllegalStateException(
-                        "Deserializer function not set");
-            }
             Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
             try {
                 component = deserializer.apply(state);
