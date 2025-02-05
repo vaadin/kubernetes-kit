@@ -335,10 +335,14 @@ public class SessionSerializer
                 }
             }
         } catch (PessimisticSerializationRequiredException e) {
-            getLogger().warn(
-                    "Optimistic serialization of session {} with distributed key {} cannot be completed"
-                            + " because VaadinSession lock is required. Switching to pessimistic locking.",
-                    sessionId, clusterKey, e);
+            if (e instanceof UnserializableComponentWrapperFoundException) {
+                getLogger().debug(e.getMessage());
+            } else {
+                getLogger().warn(
+                        "Optimistic serialization of session {} with distributed key {} cannot be completed"
+                                + " because VaadinSession lock is required. Switching to pessimistic locking.",
+                        sessionId, clusterKey, e);
+            }
         } catch (NotSerializableException e) {
             getLogger().error(
                     "Optimistic serialization of session {} with distributed key {} failed,"
@@ -392,7 +396,7 @@ public class SessionSerializer
     @SuppressWarnings("rawtypes")
     private void checkUnserializableWrappers(Map<String, Object> attributes) {
         Consumer<UnserializableComponentWrapper> action = c -> {
-            throw new PessimisticSerializationRequiredException(
+            throw new UnserializableComponentWrapperFoundException(
                     "Pessimistic serialization required because at least one "
                             + UnserializableComponentWrapper.class.getName()
                             + " is in the UI tree");
