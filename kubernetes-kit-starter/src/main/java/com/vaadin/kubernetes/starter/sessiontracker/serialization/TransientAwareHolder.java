@@ -84,13 +84,6 @@ final class TransientAwareHolder implements Serializable {
         } else if (session != null) {
             instanceMap = CurrentInstance.setCurrent(session);
         }
-        // VaadinSession lock is usually set by calling
-        // VaadinSession.refreshTransients(WrappedSession,VaadinService), but
-        // during
-        // deserialization none of the required objects are available.
-        // This method injects a temporary lock instance into the provided
-        // VaadinSession and returns a runnable that will remove it when
-        // executed.
         Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
         try {
             runnable.run();
