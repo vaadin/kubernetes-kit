@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +43,7 @@ import com.vaadin.testbench.unit.mocks.MockedUI;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -205,7 +207,7 @@ class SessionSerializerTest {
     }
 
     @Test
-    void serialize_and_deserialize_unserializableComponentWrapper() {
+    void serialize_and_deserialize_unserializableComponent_usingUnserializableComponentWrapper() {
         UnserializableComponentWrapper<State, Unserializable> wrapper = createUnserializableComponentWrapper();
         vaadinSession.lock();
         UI ui = new MockedUI();
@@ -235,6 +237,10 @@ class SessionSerializerTest {
             fail(e);
         }
         verify(serializationCallback).onDeserializationSuccess();
+        Optional<Component> component = ui.getElement().getChildren().toList()
+                .get(0).getChildren().toList().get(0).getComponent();
+        assertThat(((Unserializable) component.get()).getName().fullName())
+                .isEqualTo("Unserializable");
     }
 
     @Test

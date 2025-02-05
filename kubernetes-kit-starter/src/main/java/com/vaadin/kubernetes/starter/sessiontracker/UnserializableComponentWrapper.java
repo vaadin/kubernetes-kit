@@ -24,22 +24,24 @@ import com.vaadin.flow.function.SerializableFunction;
 import com.vaadin.flow.internal.StateTree;
 
 /**
- * A wrapper component that can be used to wrap an unserializable
- * {@link Component} to make it serializable and deserializable using the
- * provided serializer and deserializer functions.
+ * A wrapper component that allows an otherwise unserializable {@link Component}
+ * to be serialized and deserialized using the provided serializer and
+ * deserializer functions.
  * <p>
- * The serializer is used to create a serializable state object from the
- * provided component during the serialization process and the deserializer is
- * used to regenerate the component from the state object after the entire graph
- * has been deserialized and reconstituted.
+ * During serialization, the serializer generates a serializable state object
+ * from the wrapped component. This state object is intended to store
+ * serializable and cacheable properties of the component. Upon deserialization,
+ * the deserializer reconstructs the component from scratch using the state
+ * object, after the entire graph has been restored. Developers are responsible
+ * for ensuring that the necessary component properties are properly persisted
+ * and restored.
  * <p>
- * The unserializable components are removed from the component tree during the
- * serialization, and they are re-added after the deserialization. The changes
- * to the {@link UI} caused by the removal and re-adding the components are
- * silently ignored.
+ * Unserializable components are temporarily removed from the component tree
+ * during serialization and reinserted after deserialization. Any {@link UI}
+ * changes caused by their removal and re-addition are silently ignored.
  * <p>
- * <b>IMPORTANT NOTE:</b> Any detach listener registered on the wrapped
- * component will be executed.
+ * <b>Important Note:</b> Any attach or detach listeners registered on the
+ * wrapped component will still be triggered.
  *
  * @param <S>
  *            the type of the state object that is created with the serializer
@@ -57,6 +59,10 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
 
     /**
      * Constructs a new unserializable component wrapper instance.
+     * <p>
+     * After the construction the serializer and deserializer functions must be
+     * provided with the {@link #withComponentSerializer(SerializableFunction)}
+     * and {@link #withComponentDeserializer(SerializableFunction)} methods.
      *
      * @param component
      *            the unserializable {@link Component} to be wrapped
@@ -68,7 +74,7 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
 
     /**
      * The serializer function that creates the serializable state object from
-     * the provided {@link Component} during the serialization process.
+     * the wrapped {@link Component} during the serialization process.
      *
      * @param serializer
      *            the serializer function
@@ -98,6 +104,12 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     @Serial
     private void writeObject(java.io.ObjectOutputStream out)
             throws IOException {
+        if (serializer == null) {
+            throw new IllegalStateException("Serializer function not set");
+        }
+        if (deserializer == null) {
+            throw new IllegalStateException("Deserializer function not set");
+        }
         state = serializer.apply(component);
         out.defaultWriteObject();
     }
@@ -105,17 +117,23 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     @Serial
     private void readObject(java.io.ObjectInputStream in)
             throws IOException, ClassNotFoundException {
+        if (deserializer == null) {
+            throw new IllegalStateException("Deserializer function not set");
+        }
         in.defaultReadObject();
-        in.registerValidation(
-                () -> getUI().map(UI::getSession).ifPresent(session -> {
-                    Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
-                    try {
-                        component = deserializer.apply(state);
-                        getElement().appendChild(component.getElement());
-                    } finally {
-                        cleaner.run();
-                    }
-                }), 0);
+        in.registerValidation(this::restoreComponent, 0);
+    }
+
+    private void restoreComponent() {
+        getUI().map(UI::getSession).ifPresent(session -> {
+            Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
+            try {
+                component = deserializer.apply(state);
+                getElement().appendChild(component.getElement());
+            } finally {
+                cleaner.run();
+            }
+        });
     }
 
     /**
@@ -162,6 +180,8 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         if (wrapper.getElement().getNode()
                 .getOwner() instanceof StateTree owner) {
             owner.collectChanges(change -> {
+                // The collector does nothing to prevent changes to the tree to
+                // be sent to the client
             });
         }
     }
