@@ -117,10 +117,10 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     @Serial
     private void readObject(java.io.ObjectInputStream in)
             throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
         if (deserializer == null) {
             throw new IllegalStateException("Deserializer function not set");
         }
-        in.defaultReadObject();
         in.registerValidation(this::restoreComponent, 0);
     }
 
