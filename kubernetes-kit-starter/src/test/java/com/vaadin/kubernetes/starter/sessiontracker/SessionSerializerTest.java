@@ -576,14 +576,9 @@ class SessionSerializerTest {
 
     private UnserializableComponentWrapper<State, Unserializable> createUnserializableComponentWrapper() {
         Unserializable unserializable = new Unserializable("Unserializable");
-        return new UnserializableComponentWrapper<State, Unserializable>(
-                unserializable).withComponentSerializer(component -> {
-                    String fullName = component.getName().fullName();
-                    return new State(fullName);
-                }).withComponentDeserializer(state -> {
-                    String text = state.text();
-                    return new Unserializable(text);
-                });
+        return new UnserializableComponentWrapper<>(unserializable,
+                component -> new State(component.getName().fullName()),
+                state -> new Unserializable(state.text()));
     }
 
     private static ConditionFactory await() {
