@@ -33,31 +33,36 @@ public class SpreadsheetView extends VerticalLayout {
         spreadsheet.createCell(1, 0, "Nicolaus");
         spreadsheet.createCell(1, 1, "Copernicus");
 
-        var wrapper = new UnserializableComponentWrapper<SpreadsheetState, Spreadsheet>(
-                spreadsheet).withComponentSerializer(ss -> {
-                    var out = new ByteArrayOutputStream();
-                    try {
-                        ss.write(out);
-                    } catch (IOException e) {
-                    }
-                    var excel = out.toByteArray();
-                    var state = new SpreadsheetState();
-                    state.setExcel(excel);
-                    return state;
-                }).withComponentDeserializer(state -> {
-                    var ss = new Spreadsheet();
-                    ss.setLocale(Locale.getDefault());
-                    var excel = state.getExcel();
-                    var in = new ByteArrayInputStream(excel);
-                    XSSFWorkbook workbook;
-                    try {
-                        workbook = new XSSFWorkbook(in);
-                    } catch (IOException e) {
-                        workbook = new XSSFWorkbook();
-                    }
-                    ss.setWorkbook(workbook);
-                    return ss;
-                });
+        var wrapper = new UnserializableComponentWrapper<>(spreadsheet,
+                this::serializer, this::deserializer);
         add(wrapper);
+    }
+
+    private SpreadsheetState serializer(Spreadsheet spreadsheet) {
+        var out = new ByteArrayOutputStream();
+        try {
+            spreadsheet.write(out);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        var excel = out.toByteArray();
+        var state = new SpreadsheetState();
+        state.setExcel(excel);
+        return state;
+    }
+
+    private Spreadsheet deserializer(SpreadsheetState state) {
+        var spreadsheet = new Spreadsheet();
+        spreadsheet.setLocale(Locale.getDefault());
+        var excel = state.getExcel();
+        var in = new ByteArrayInputStream(excel);
+        XSSFWorkbook workbook;
+        try {
+            workbook = new XSSFWorkbook(in);
+        } catch (IOException e) {
+            workbook = new XSSFWorkbook();
+        }
+        spreadsheet.setWorkbook(workbook);
+        return spreadsheet;
     }
 }
