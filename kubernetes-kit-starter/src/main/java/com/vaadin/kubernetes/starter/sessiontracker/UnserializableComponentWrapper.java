@@ -75,9 +75,12 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     public UnserializableComponentWrapper(T component,
             SerializableFunction<T, S> serializer,
             SerializableFunction<S, T> deserializer) {
-        this.component = Objects.requireNonNull(component);
-        this.serializer = Objects.requireNonNull(serializer);
-        this.deserializer = Objects.requireNonNull(deserializer);
+        this.component = Objects.requireNonNull(component,
+                "component cannot be null");
+        this.serializer = Objects.requireNonNull(serializer,
+                "serializer function cannot be null");
+        this.deserializer = Objects.requireNonNull(deserializer,
+                "deserializer function cannot be null");
         getElement().appendChild(component.getElement());
     }
 
