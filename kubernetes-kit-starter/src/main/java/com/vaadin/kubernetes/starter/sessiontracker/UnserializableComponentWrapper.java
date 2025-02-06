@@ -54,62 +54,36 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
 
     private transient T component;
     private S state;
-    private SerializableFunction<T, S> serializer;
-    private SerializableFunction<S, T> deserializer;
+    private final SerializableFunction<T, S> serializer;
+    private final SerializableFunction<S, T> deserializer;
 
     /**
      * Constructs a new unserializable component wrapper instance.
-     * <p>
-     * After the construction the serializer and deserializer functions must be
-     * provided with the {@link #withComponentSerializer(SerializableFunction)}
-     * and {@link #withComponentDeserializer(SerializableFunction)} methods.
      *
      * @param component
      *            the unserializable {@link Component} to be wrapped
-     */
-    public UnserializableComponentWrapper(T component) {
-        this.component = Objects.requireNonNull(component);
-        getElement().appendChild(component.getElement());
-    }
-
-    /**
-     * The serializer function that creates the serializable state object from
-     * the wrapped {@link Component} during the serialization process.
-     *
      * @param serializer
-     *            the serializer function
-     * @return the unserializable component wrapper itself
-     */
-    public UnserializableComponentWrapper<S, T> withComponentSerializer(
-            SerializableFunction<T, S> serializer) {
-        this.serializer = Objects.requireNonNull(serializer);
-        return this;
-    }
-
-    /**
-     * The deserializer function that is used to regenerate the
-     * {@link Component} from the state object after the entire graph has been
-     * deserialized and reconstituted.
+     *            the serializer function that generates the serializable state
+     *            object from the wrapped {@link Component} during the
+     *            serialization
      *
      * @param deserializer
-     *            the deserializer function
-     * @return the unserializable component wrapper itself
+     *            the deserializer function that reconstructs the
+     *            {@link Component} from scratch using the state object, after
+     *            the entire graph has been restored upon the deserialization
      */
-    public UnserializableComponentWrapper<S, T> withComponentDeserializer(
+    public UnserializableComponentWrapper(T component,
+            SerializableFunction<T, S> serializer,
             SerializableFunction<S, T> deserializer) {
+        this.component = Objects.requireNonNull(component);
+        this.serializer = Objects.requireNonNull(serializer);
         this.deserializer = Objects.requireNonNull(deserializer);
-        return this;
+        getElement().appendChild(component.getElement());
     }
 
     @Serial
     private void writeObject(java.io.ObjectOutputStream out)
             throws IOException {
-        if (serializer == null) {
-            throw new IllegalStateException("Serializer function not set");
-        }
-        if (deserializer == null) {
-            throw new IllegalStateException("Deserializer function not set");
-        }
         state = serializer.apply(component);
         out.defaultWriteObject();
     }
@@ -118,9 +92,6 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     private void readObject(java.io.ObjectInputStream in)
             throws IOException, ClassNotFoundException {
         in.defaultReadObject();
-        if (deserializer == null) {
-            throw new IllegalStateException("Deserializer function not set");
-        }
         in.registerValidation(this::restoreComponent, 0);
     }
 
