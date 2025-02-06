@@ -16,7 +16,7 @@ public interface SessionExpirationPolicy {
      * </p>
      * A return value of {@link Duration#ZERO} or less means the backend session
      * should never expire.
-     * 
+     *
      * @param sessionTimeout
      *            HTTP session timeout expressed in seconds.
      * @return the maximum amount of time an inactive session should be
