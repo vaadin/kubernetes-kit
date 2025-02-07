@@ -39,6 +39,10 @@ public class SpreadsheetView extends VerticalLayout {
     }
 
     private SpreadsheetState serializer(Spreadsheet spreadsheet) {
+        var state = new SpreadsheetState();
+        state.setHeight(spreadsheet.getHeight());
+        state.setWidth(spreadsheet.getWidth());
+        state.setLocale(spreadsheet.getLocale());
         var out = new ByteArrayOutputStream();
         try {
             spreadsheet.write(out);
@@ -46,21 +50,22 @@ public class SpreadsheetView extends VerticalLayout {
             throw new RuntimeException(e);
         }
         var excel = out.toByteArray();
-        var state = new SpreadsheetState();
         state.setExcel(excel);
         return state;
     }
 
     private Spreadsheet deserializer(SpreadsheetState state) {
         var spreadsheet = new Spreadsheet();
-        spreadsheet.setLocale(Locale.getDefault());
+        spreadsheet.setHeight(state.getHeight());
+        spreadsheet.setWidth(state.getWidth());
+        spreadsheet.setLocale(state.getLocale());
         var excel = state.getExcel();
         var in = new ByteArrayInputStream(excel);
         XSSFWorkbook workbook;
         try {
             workbook = new XSSFWorkbook(in);
         } catch (IOException e) {
-            workbook = new XSSFWorkbook();
+            throw new RuntimeException(e);
         }
         spreadsheet.setWorkbook(workbook);
         return spreadsheet;
