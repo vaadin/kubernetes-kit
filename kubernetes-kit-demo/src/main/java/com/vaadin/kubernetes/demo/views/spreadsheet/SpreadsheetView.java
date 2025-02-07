@@ -62,8 +62,6 @@ public class SpreadsheetView extends VerticalLayout {
     private static void configureSpreadsheet(Spreadsheet sheet) {
         sheet.setLocale(Locale.getDefault());
         sheet.setWidth("800px");
-        sheet.createCell(1, 0, "Nicolaus");
-        sheet.createCell(1, 1, "Copernicus");
     }
 
     private record WorkbookData(byte[] data,
