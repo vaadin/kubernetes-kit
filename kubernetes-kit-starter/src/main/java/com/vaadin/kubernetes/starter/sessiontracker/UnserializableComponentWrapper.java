@@ -34,8 +34,34 @@ import com.vaadin.flow.internal.StateTree;
  * the deserializer reconstructs the component from scratch using the state
  * object, after the entire graph has been restored. Developers are responsible
  * for ensuring that the necessary component properties are properly persisted
- * and restored.
- * <p>
+ * and restored. For example:
+ *
+ * <pre>
+ * {@code
+ * record State(int x) implements Serializable {
+ * }
+ *
+ * public CustomView() {
+ *     Unserializable unserializable = new Unserializable();
+ *     UnserializableComponentWrapper<State, Unserializable> wrapper = new UnserializableComponentWrapper<>(
+ *             unserializable, this::serializer, this::deserializer);
+ *     add(wrapper);
+ * }
+ *
+ * private State serializer(Unserializable unserializable) {
+ *     var state = new State();
+ *     state.setX(unserializable.getX());
+ *     return state;
+ * }
+ *
+ * private Unserializable deserializer(State state) {
+ *     var unserializable = new Unserializable();
+ *     unserializable.setX(state.getX());
+ *     return unserializable;
+ * }
+ * }
+ * </pre>
+ *
  * Unserializable components are temporarily removed from the component tree
  * during serialization and reinserted after deserialization. Any {@link UI}
  * changes caused by their removal and re-addition are silently ignored.
