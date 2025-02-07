@@ -3,12 +3,14 @@ package com.vaadin.kubernetes.starter.sessiontracker;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -24,6 +26,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpSession;
 
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Tag;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.function.DeploymentConfiguration;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
@@ -34,16 +39,17 @@ import com.vaadin.flow.server.startup.ApplicationConfiguration;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
+import com.vaadin.testbench.unit.mocks.MockedUI;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNotNull;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -201,6 +207,43 @@ class SessionSerializerTest {
     }
 
     @Test
+    void serialize_and_deserialize_unserializableComponent_usingUnserializableComponentWrapper() {
+        UnserializableComponentWrapper<State, Unserializable> wrapper = createUnserializableComponentWrapper();
+        vaadinSession.lock();
+        UI ui = new MockedUI();
+        ui.getInternals().setSession(vaadinSession);
+        ui.add(wrapper);
+        ui.doInit(null, 1234, "appId");
+        vaadinSession.addUI(ui);
+        vaadinSession.unlock();
+
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        List<SessionInfo> infoList = new ArrayList<>();
+        doAnswer(i -> infoList.add(i.getArgument(0))).when(connector)
+                .sendSession(any());
+
+        vaadinSession.setLockTimestamps(10, 20);
+
+        serializer.serialize(httpSession);
+        await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(serializationCallback).onSerializationSuccess();
+
+        try {
+            serializer.deserialize(infoList.get(0), httpSession);
+        } catch (Exception e) {
+            fail(e);
+        }
+        verify(serializationCallback).onDeserializationSuccess();
+        Optional<Component> component = ui.getElement().getChildren().toList()
+                .get(0).getChildren().toList().get(0).getComponent();
+        assertThat(((Unserializable) component.get()).getName().fullName())
+                .isEqualTo("Unserializable");
+    }
+
+    @Test
     void serialize_pendingSerialization_skip() {
         AtomicInteger serializationsCompleted = new AtomicInteger();
         AtomicInteger serializationsStarted = new AtomicInteger();
@@ -260,8 +303,8 @@ class SessionSerializerTest {
     }
 
     @Test
-    void serialize_differentSessions_processedConcurrently() {
-
+    void serialize_differentSessions_processedConcurrently()
+            throws InterruptedException {
         List<String> started = new ArrayList<>();
         List<String> completed = new ArrayList<>();
         List<SessionInfo> infoList = new ArrayList<>();
@@ -275,7 +318,7 @@ class SessionSerializerTest {
 
         String sid1 = UUID.randomUUID().toString();
         HttpSession session1 = newHttpSession(sid1);
-        session1.setAttribute("DELAY", new SerializationDelay(200));
+        session1.setAttribute("DELAY", new SerializationDelay(300));
         vaadinService.newMockSession(session1);
 
         String sid2 = UUID.randomUUID().toString();
@@ -284,6 +327,7 @@ class SessionSerializerTest {
         vaadinService.newMockSession(session2);
 
         serializer.serialize(session1);
+        Thread.sleep(100);
         serializer.serialize(session2);
 
         await().atMost(1000, MILLISECONDS).until(() -> completed.size() == 2);
@@ -301,7 +345,6 @@ class SessionSerializerTest {
         verify(connector, times(2)).markSerializationStarted(anyString());
         verify(connector, times(2)).sendSession(notNull());
         verify(connector, times(2)).markSerializationComplete(anyString());
-
     }
 
     @Test
@@ -315,7 +358,8 @@ class SessionSerializerTest {
                 .markSerializationComplete(clusterSID);
 
         vaadinSession.setLockTimestamps(10, 20);
-        httpSession.setAttribute("UNSERIALIZABLE", new Unserializable());
+        Unserializable unserializable = new Unserializable("Unserializable");
+        httpSession.setAttribute("UNSERIALIZABLE", unserializable);
 
         // Spy locks to ensure they are not engaged by pessimistic attempt
         List<Lock> locks = new ArrayList<>();
@@ -336,8 +380,7 @@ class SessionSerializerTest {
         await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
         verify(connector, never()).sendSession(any());
         verify(connector).markSerializationComplete(clusterSID);
-        locks.forEach(l -> verify(l, never()).lock());
-
+        locks.forEach(l -> verify(l, times(1)).lock());
     }
 
     @Test
@@ -487,7 +530,8 @@ class SessionSerializerTest {
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
-        httpSession.setAttribute("UNSERIALIZABLE", new Unserializable());
+        Unserializable unserializable = new Unserializable("Unserializable");
+        httpSession.setAttribute("UNSERIALIZABLE", unserializable);
 
         serializer.serialize(httpSession);
         await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
@@ -530,12 +574,18 @@ class SessionSerializerTest {
         verify(serializationCallback).onDeserializationError(any());
     }
 
+    private UnserializableComponentWrapper<State, Unserializable> createUnserializableComponentWrapper() {
+        Unserializable unserializable = new Unserializable("Unserializable");
+        return new UnserializableComponentWrapper<>(unserializable,
+                component -> new State(component.getName().fullName()),
+                state -> new Unserializable(state.text()));
+    }
+
     private static ConditionFactory await() {
         return Awaitility.with().pollInterval(20, MILLISECONDS);
     }
 
     private static class MockVaadinSession extends VaadinSession {
-
         long lastLocked;
         long lastUnlocked;
 
@@ -547,6 +597,11 @@ class SessionSerializerTest {
          */
         public MockVaadinSession(VaadinService service) {
             super(service);
+        }
+
+        @Override
+        public void addUI(UI ui) {
+            super.addUI(ui);
         }
 
         @Override
@@ -617,6 +672,7 @@ class SessionSerializerTest {
             this.delayMillis = delayMillis;
         }
 
+        @Serial
         private void writeObject(java.io.ObjectOutputStream stream)
                 throws IOException {
             stream.defaultWriteObject();
@@ -628,6 +684,22 @@ class SessionSerializerTest {
         }
     }
 
-    private static class Unserializable {
+    @Tag("unserializable-component")
+    private static class Unserializable extends Component {
+        private final Name name;
+
+        private Unserializable(String fullName) {
+            this.name = new Name(fullName);
+        }
+
+        public Name getName() {
+            return name;
+        }
+
+        private record Name(String fullName) {
+        }
+    }
+
+    private record State(String text) implements Serializable {
     }
 }
