@@ -26,6 +26,8 @@ public class SpreadsheetView extends VerticalLayout {
     public SpreadsheetView() {
         setSizeFull();
         Spreadsheet spreadsheet = new Spreadsheet();
+        spreadsheet.createCell(1, 0, "Nicolaus");
+        spreadsheet.createCell(1, 1, "Copernicus");
         configureSpreadsheet(spreadsheet);
         var wrapper = new UnserializableComponentWrapper<>(spreadsheet,
                 this::serializer, this::deserializer);
