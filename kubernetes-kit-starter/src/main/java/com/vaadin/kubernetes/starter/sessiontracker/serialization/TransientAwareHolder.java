@@ -73,7 +73,7 @@ final class TransientAwareHolder implements Serializable {
     /**
      * Executes the given runnable making sure that Vaadin thread locals are
      * set, when they are available.
-     * 
+     *
      * @param runnable
      *            the action to execute.
      */

@@ -73,7 +73,7 @@ public class SessionInfo {
      * Gets the maximum amount of time an inactive session should be preserved
      * in the backed. A zero or negative value means the session should not be
      * evicted.
-     * 
+     *
      * @return the session time to live.
      */
     public Duration getTimeToLive() {

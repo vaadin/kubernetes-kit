@@ -15,6 +15,7 @@ import com.vaadin.flow.component.html.Header;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import com.vaadin.kubernetes.demo.views.spreadsheet.SpreadsheetView;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -59,6 +60,8 @@ public class MainLayout extends AppLayout {
         nav.addItem(new SideNavItem("PUSH Counter", PushCounterView.class,
                 new Icon("la", "la-plus-circle")));
         nav.addItem(new SideNavItem("List", ListView.class,
+                new Icon("la", "la-plus-circle")));
+        nav.addItem(new SideNavItem("Spreadsheet", SpreadsheetView.class,
                 new Icon("la", "la-plus-circle")));
 
         return nav;
