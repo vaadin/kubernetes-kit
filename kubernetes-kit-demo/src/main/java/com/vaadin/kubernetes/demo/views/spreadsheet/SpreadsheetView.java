@@ -1,73 +1,72 @@
 package com.vaadin.kubernetes.demo.views.spreadsheet;
 
-import jakarta.annotation.security.PermitAll;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.util.Locale;
+import java.util.Optional;
 
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
+import org.apache.poi.ss.util.CellRangeAddress;
 
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.spreadsheet.Spreadsheet;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.kubernetes.demo.views.MainLayout;
 import com.vaadin.kubernetes.starter.sessiontracker.UnserializableComponentWrapper;
 
-@Component
-@Scope("prototype")
-@Route(value = "Spreadsheet", layout = MainLayout.class)
 @PageTitle("Spreadsheet")
-@PermitAll
+@Route(value = "spreadsheet", layout = MainLayout.class)
+@AnonymousAllowed
 public class SpreadsheetView extends VerticalLayout {
 
     public SpreadsheetView() {
+        setSizeFull();
         Spreadsheet spreadsheet = new Spreadsheet();
-        spreadsheet.setLocale(Locale.getDefault());
-        spreadsheet.setHeight("600px");
-        spreadsheet.setWidth("1200px");
-        spreadsheet.createCell(1, 0, "Nicolaus");
-        spreadsheet.createCell(1, 1, "Copernicus");
-
+        configureSpreadsheet(spreadsheet);
         var wrapper = new UnserializableComponentWrapper<>(spreadsheet,
                 this::serializer, this::deserializer);
-        add(wrapper);
+        addAndExpand(wrapper);
     }
 
-    private SpreadsheetState serializer(Spreadsheet spreadsheet) {
-        var state = new SpreadsheetState();
-        state.setHeight(spreadsheet.getHeight());
-        state.setWidth(spreadsheet.getWidth());
-        state.setLocale(spreadsheet.getLocale());
-        var out = new ByteArrayOutputStream();
-        try {
-            spreadsheet.write(out);
+    private WorkbookData serializer(Spreadsheet sheet) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            sheet.write(baos);
+            String selection = Optional
+                    .ofNullable(sheet.getCellSelectionManager()
+                            .getSelectedCellRange())
+                    .map(CellRangeAddress::formatAsString).orElse(null);
+            return new WorkbookData(baos.toByteArray(), selection);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
-        var excel = out.toByteArray();
-        state.setExcel(excel);
-        return state;
     }
 
-    private Spreadsheet deserializer(SpreadsheetState state) {
-        var spreadsheet = new Spreadsheet();
-        spreadsheet.setHeight(state.getHeight());
-        spreadsheet.setWidth(state.getWidth());
-        spreadsheet.setLocale(state.getLocale());
-        var excel = state.getExcel();
-        var in = new ByteArrayInputStream(excel);
-        XSSFWorkbook workbook;
+    private Spreadsheet deserializer(WorkbookData data) {
         try {
-            workbook = new XSSFWorkbook(in);
+            Spreadsheet sheet = new Spreadsheet(
+                    new ByteArrayInputStream(data.data()));
+            if (data.selection() != null) {
+                sheet.setSelection(data.selection());
+            }
+            configureSpreadsheet(sheet);
+            return sheet;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new UncheckedIOException(e);
         }
-        spreadsheet.setWorkbook(workbook);
-        return spreadsheet;
+    }
+
+    private static void configureSpreadsheet(Spreadsheet sheet) {
+        sheet.setLocale(Locale.getDefault());
+        sheet.setWidth("800px");
+        sheet.createCell(1, 0, "Nicolaus");
+        sheet.createCell(1, 1, "Copernicus");
+    }
+
+    private record WorkbookData(byte[] data,
+            String selection) implements Serializable {
     }
 }
