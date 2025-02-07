@@ -102,8 +102,12 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
         getUI().map(UI::getSession).ifPresent(session -> {
             Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
             try {
-                component = deserializer.apply(state);
-                getElement().appendChild(component.getElement());
+                getElement().removeAllChildren();
+                if (state != null) {
+                    component = deserializer.apply(state);
+                    state = null;
+                    getElement().appendChild(component.getElement());
+                }
             } finally {
                 cleaner.run();
             }
