@@ -12,7 +12,6 @@ import org.apache.poi.ss.util.CellRangeAddress;
 
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.spreadsheet.Spreadsheet;
-import com.vaadin.flow.function.SerializableFunction;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
@@ -31,39 +30,35 @@ public class SpreadsheetView extends VerticalLayout {
         spreadsheet.createCell(1, 1, "Copernicus");
         configureSpreadsheet(spreadsheet);
         var wrapper = new UnserializableComponentWrapper<>(spreadsheet,
-                serializer(), deserializer());
+                SpreadsheetView::serializer, SpreadsheetView::deserializer);
         addAndExpand(wrapper);
     }
 
-    private static SerializableFunction<Spreadsheet, WorkbookData> serializer() {
-        return spreadsheet -> {
-            try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-                spreadsheet.write(baos);
-                String selection = Optional
-                        .ofNullable(spreadsheet.getCellSelectionManager()
-                                .getSelectedCellRange())
-                        .map(CellRangeAddress::formatAsString).orElse(null);
-                return new WorkbookData(baos.toByteArray(), selection);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        };
+    private static WorkbookData serializer(Spreadsheet sheet) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            sheet.write(baos);
+            String selection = Optional
+                    .ofNullable(sheet.getCellSelectionManager()
+                            .getSelectedCellRange())
+                    .map(CellRangeAddress::formatAsString).orElse(null);
+            return new WorkbookData(baos.toByteArray(), selection);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
-    private static SerializableFunction<WorkbookData, Spreadsheet> deserializer() {
-        return data -> {
-            try {
-                Spreadsheet sheet = new Spreadsheet(
-                        new ByteArrayInputStream(data.data()));
-                if (data.selection() != null) {
-                    sheet.setSelection(data.selection());
-                }
-                configureSpreadsheet(sheet);
-                return sheet;
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+    private static Spreadsheet deserializer(WorkbookData data) {
+        try {
+            Spreadsheet sheet = new Spreadsheet(
+                    new ByteArrayInputStream(data.data()));
+            if (data.selection() != null) {
+                sheet.setSelection(data.selection());
             }
-        };
+            configureSpreadsheet(sheet);
+            return sheet;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static void configureSpreadsheet(Spreadsheet sheet) {
