@@ -44,20 +44,24 @@ import com.vaadin.flow.internal.StateTree;
  * public CustomView() {
  *     Unserializable unserializable = new Unserializable();
  *     UnserializableComponentWrapper<State, Unserializable> wrapper = new UnserializableComponentWrapper<>(
- *             unserializable, this::serializer, this::deserializer);
+ *             unserializable, serializer(), deserializer());
  *     add(wrapper);
  * }
  *
- * private State serializer(Unserializable unserializable) {
- *     var state = new State();
- *     state.setX(unserializable.getX());
- *     return state;
+ * private static SerializableFunction<Unserializable, State> serializer() {
+ *     return unserializable -> {
+ *         var state = new State();
+ *         state.setX(unserializable.getX());
+ *         return state;
+ *     };
  * }
  *
- * private Unserializable deserializer(State state) {
- *     var unserializable = new Unserializable();
- *     unserializable.setX(state.getX());
- *     return unserializable;
+ * private static SerializableFunction<State, Unserializable> deserializer() {
+ *     return state -> {
+ *         var unserializable = new Unserializable();
+ *         unserializable.setX(state.getX());
+ *         return unserializable;
+ *     };
  * }
  * }
  * </pre>
