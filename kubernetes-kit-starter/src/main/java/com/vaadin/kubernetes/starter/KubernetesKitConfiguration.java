@@ -187,7 +187,7 @@ public class KubernetesKitConfiguration {
                     sessionSerializer);
             pushSessionTracker.setActiveSessionChecker(
                     sessionListener.activeSessionChecker());
-            return new FilterRegistrationBean<>(
+            FilterRegistrationBean<SessionTrackerFilter> registration = new FilterRegistrationBean<>(
                     sessionTrackerFilter(sessionSerializer)) {
                 @Override
                 protected FilterRegistration.Dynamic addRegistration(
@@ -196,6 +196,9 @@ public class KubernetesKitConfiguration {
                     return super.addRegistration(description, servletContext);
                 }
             };
+            registration.setAsyncSupported(true);
+            registration.setOrder(Integer.MIN_VALUE + 50);
+            return registration;
         }
 
         @Bean

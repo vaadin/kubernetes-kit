@@ -10,21 +10,15 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
 import java.io.Serializable;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.internal.CurrentInstance;
-import com.vaadin.flow.internal.ReflectTools;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionUtil;
 
 /**
  * A serializable class that holds information about an object to be
@@ -79,7 +73,7 @@ final class TransientAwareHolder implements Serializable {
     /**
      * Executes the given runnable making sure that Vaadin thread locals are
      * set, when they are available.
-     * 
+     *
      * @param runnable
      *            the action to execute.
      */
@@ -90,7 +84,7 @@ final class TransientAwareHolder implements Serializable {
         } else if (session != null) {
             instanceMap = CurrentInstance.setCurrent(session);
         }
-        Runnable cleaner = injectLock(session);
+        Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
         try {
             runnable.run();
         } finally {
@@ -99,36 +93,5 @@ final class TransientAwareHolder implements Serializable {
                 cleaner.run();
             }
         }
-    }
-
-    // VaadinSession lock is usually set by calling
-    // VaadinSession.refreshTransients(WrappedSession,VaadinService), but during
-    // deserialization none of the required objects are available.
-    // This method injects a temporary lock instance into the provided
-    // VaadinSession and returns a runnable that will remove it when executed.
-    private static Runnable injectLock(VaadinSession session) {
-        if (session != null) {
-            try {
-                Field field = VaadinSession.class.getDeclaredField("lock");
-                Lock lock = new ReentrantLock();
-                lock.lock();
-                ReflectTools.setJavaFieldValue(session, field, lock);
-                return () -> removeLock(session, field);
-            } catch (NoSuchFieldException e) {
-                getLogger().debug("Cannot access lock field on VaadinSession",
-                        e);
-            }
-        }
-        return () -> {
-        };
-    }
-
-    private static void removeLock(VaadinSession session, Field field) {
-        session.getLockInstance().unlock();
-        ReflectTools.setJavaFieldValue(session, field, null);
-    }
-
-    private static Logger getLogger() {
-        return LoggerFactory.getLogger(TransientAwareHolder.class);
     }
 }

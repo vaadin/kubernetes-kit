@@ -81,8 +81,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     private boolean handleRequest(VaadinSession vaadinSession,
             VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
-        String versionHeader = vaadinRequest
-                .getHeader(UPDATE_VERSION_HEADER);
+        String versionHeader = vaadinRequest.getHeader(UPDATE_VERSION_HEADER);
 
         vaadinSession.access(() -> {
 
