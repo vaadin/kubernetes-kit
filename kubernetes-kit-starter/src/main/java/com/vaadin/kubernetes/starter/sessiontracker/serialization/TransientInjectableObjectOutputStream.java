@@ -73,7 +73,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
  * @see TransientHandler
  * @see TransientDescriptor
  */
-public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
+public class TransientInjectableObjectOutputStream extends SerializationOutputStream {
 
     static final Pattern INSPECTION_REJECTION_PATTERN = Pattern
             .compile("^(javax?|jakarta|com\\.sun|sun\\.misc)\\..*");
@@ -173,6 +173,7 @@ public class TransientInjectableObjectOutputStream extends ObjectOutputStream {
         }
     }
 
+    @Override
     public void writeWithTransients(Object object) throws IOException {
         inspected.clear();
         tracking.clear();

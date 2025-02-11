@@ -1,5 +1,6 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
@@ -81,7 +82,8 @@ class SessionSerializerTest {
                 sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
                         ChronoUnit.MINUTES),
                 serializationCallback,
-                TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS);
+                TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS,
+                new TransientInjectableObjectStreamFactory());
 
         clusterSID = UUID.randomUUID().toString();
         httpSession = newHttpSession(clusterSID);
