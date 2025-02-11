@@ -9,8 +9,6 @@
  */
 package com.vaadin.kubernetes.starter;
 
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationStreamFactory;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import jakarta.servlet.FilterRegistration;
 import jakarta.servlet.ServletContext;
 
@@ -54,8 +52,10 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationStreamFactory;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 

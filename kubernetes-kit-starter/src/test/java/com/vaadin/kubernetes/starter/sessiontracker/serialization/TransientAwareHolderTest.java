@@ -16,16 +16,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.function.DeploymentConfiguration;
 import com.vaadin.flow.internal.CurrentInstance;
-import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.testbench.unit.internal.MockVaadin;
-import com.vaadin.testbench.unit.mocks.MockService;
-import com.vaadin.testbench.unit.mocks.MockVaadinSession;
 import com.vaadin.testbench.unit.mocks.MockedUI;
 
 public class TransientAwareHolderTest {

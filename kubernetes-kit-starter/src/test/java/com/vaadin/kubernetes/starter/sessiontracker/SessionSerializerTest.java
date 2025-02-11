@@ -1,6 +1,5 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
@@ -40,6 +39,7 @@ import com.vaadin.flow.server.startup.ApplicationConfiguration;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import com.vaadin.testbench.unit.mocks.MockedUI;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;

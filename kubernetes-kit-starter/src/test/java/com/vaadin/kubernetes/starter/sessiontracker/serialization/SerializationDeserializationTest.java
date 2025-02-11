@@ -1,6 +1,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
 import jakarta.activation.MimeType;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
@@ -8,9 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
-import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +20,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
+import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 
 @ContextConfiguration(classes = TestConfig.class)
 @ExtendWith(SpringExtension.class)

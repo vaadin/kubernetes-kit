@@ -5,13 +5,13 @@ import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
+import com.vaadin.flow.server.VaadinService;
+import com.vaadin.flow.server.auth.ViewAccessChecker;
+import com.vaadin.flow.shared.ui.Dependency;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SpringTransientHandler;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientDescriptor;
-import com.vaadin.flow.server.VaadinService;
-import com.vaadin.flow.server.auth.ViewAccessChecker;
-import com.vaadin.flow.shared.ui.Dependency;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

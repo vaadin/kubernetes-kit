@@ -9,7 +9,6 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
-import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -52,6 +51,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
+import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import com.vaadin.kubernetes.starter.ui.SessionDebugNotifier;
 
 import static com.vaadin.kubernetes.starter.SerializationProperties.DEFAULT_SERIALIZATION_TIMEOUT_MS;
