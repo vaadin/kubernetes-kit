@@ -4,10 +4,6 @@ import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import com.vaadin.kubernetes.demo.entity.Company;
-import com.vaadin.kubernetes.demo.services.CrmService;
-import com.vaadin.kubernetes.demo.services.HostInfo;
-import com.vaadin.kubernetes.demo.views.MainLayout;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H1;
@@ -21,6 +17,10 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.kubernetes.demo.entity.Company;
+import com.vaadin.kubernetes.demo.services.CrmService;
+import com.vaadin.kubernetes.demo.services.HostInfo;
+import com.vaadin.kubernetes.demo.views.MainLayout;
 
 @PageTitle("Counter")
 @Route(value = "counter", layout = MainLayout.class)

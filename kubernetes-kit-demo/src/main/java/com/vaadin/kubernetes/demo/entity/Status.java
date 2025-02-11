@@ -1,6 +1,7 @@
 package com.vaadin.kubernetes.demo.entity;
 
 import jakarta.persistence.Entity;
+
 import java.io.Serializable;
 
 @Entity
