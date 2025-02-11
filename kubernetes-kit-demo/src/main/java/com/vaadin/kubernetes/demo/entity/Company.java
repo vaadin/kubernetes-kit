@@ -3,6 +3,7 @@ package com.vaadin.kubernetes.demo.entity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
 import jakarta.validation.constraints.NotBlank;
+
 import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;

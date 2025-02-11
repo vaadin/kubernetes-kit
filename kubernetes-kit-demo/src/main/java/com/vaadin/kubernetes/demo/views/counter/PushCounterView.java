@@ -6,8 +6,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.vaadin.kubernetes.demo.services.HostInfo;
-import com.vaadin.kubernetes.demo.views.MainLayout;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -19,6 +17,8 @@ import com.vaadin.flow.component.html.UnorderedList;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.kubernetes.demo.services.HostInfo;
+import com.vaadin.kubernetes.demo.views.MainLayout;
 
 @PageTitle("Push Counter")
 @Route(value = "push-counter", layout = MainLayout.class)

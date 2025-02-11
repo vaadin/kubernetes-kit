@@ -9,15 +9,14 @@
  */
 package com.vaadin.kubernetes.starter.ui;
 
-import java.util.Optional;
-
 import jakarta.servlet.http.Cookie;
+
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
 import com.vaadin.flow.server.VaadinResponse;

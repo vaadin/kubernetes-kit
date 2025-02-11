@@ -2,9 +2,6 @@ package com.vaadin.kubernetes.demo.views.list;
 
 import java.util.List;
 
-import com.vaadin.kubernetes.demo.entity.Company;
-import com.vaadin.kubernetes.demo.entity.Contact;
-import com.vaadin.kubernetes.demo.entity.Status;
 import com.vaadin.flow.component.ComponentEvent;
 import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.Key;
@@ -19,6 +16,9 @@ import com.vaadin.flow.data.binder.BeanValidationBinder;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.ValidationException;
 import com.vaadin.flow.shared.Registration;
+import com.vaadin.kubernetes.demo.entity.Company;
+import com.vaadin.kubernetes.demo.entity.Contact;
+import com.vaadin.kubernetes.demo.entity.Status;
 
 public class ContactForm extends FormLayout {
     private Contact contact;

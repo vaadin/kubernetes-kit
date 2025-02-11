@@ -9,14 +9,14 @@
  */
 package com.vaadin.kubernetes.starter.ui;
 
+import elemental.json.Json;
+import elemental.json.JsonObject;
+
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Outcome;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Result;
-
-import elemental.json.Json;
-import elemental.json.JsonObject;
 
 @Tag("vaadin-session-debug-notifier")
 @JsModule("./components/session-debug-notifier.ts")

@@ -8,7 +8,7 @@ spring:
     redis:
       host: kubernetes-kit-redis-service
 vaadin:
-  whitelisted-packages: com.vaadin,org.vaadin,dev.hilla
+  allowed-packages: com.vaadin,org.vaadin,dev.hilla
   kubernetes:
     hazelcast:
       service-name: kubernetes-kit-hazelcast-service

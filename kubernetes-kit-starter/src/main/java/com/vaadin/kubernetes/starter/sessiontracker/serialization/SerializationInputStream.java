@@ -18,5 +18,6 @@ public abstract class SerializationInputStream extends ObjectInputStream {
         super(in);
     }
 
-    public abstract <T> T readWithTransients() throws IOException, ClassNotFoundException;
+    public abstract <T> T readWithTransients()
+            throws IOException, ClassNotFoundException;
 }
