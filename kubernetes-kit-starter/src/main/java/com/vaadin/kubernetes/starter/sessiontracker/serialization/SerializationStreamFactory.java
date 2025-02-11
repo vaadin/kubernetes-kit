@@ -15,12 +15,17 @@ import java.io.OutputStream;
 import java.util.function.Predicate;
 
 /**
- * Factory that is used to create new input / output streams for session (de-)serialization.
+ * Factory that is used to create new input / output streams for session
+ * (de-)serialization.
  *
  * @see TransientInjectableObjectStreamFactory
  **/
 public interface SerializationStreamFactory {
-    SerializationOutputStream createOutputStream(OutputStream baseOutputStream, TransientHandler transientHandler, Predicate<Class<?>> injectableFilter) throws IOException;
 
-    SerializationInputStream createInputStream(InputStream in, TransientHandler transientHandler) throws IOException;
+    SerializationOutputStream createOutputStream(OutputStream baseOutputStream,
+            TransientHandler transientHandler,
+            Predicate<Class<?>> injectableFilter) throws IOException;
+
+    SerializationInputStream createInputStream(InputStream in,
+            TransientHandler transientHandler) throws IOException;
 }

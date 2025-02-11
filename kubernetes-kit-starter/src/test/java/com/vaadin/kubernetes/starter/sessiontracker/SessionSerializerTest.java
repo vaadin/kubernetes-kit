@@ -81,8 +81,7 @@ class SessionSerializerTest {
         serializer = new SessionSerializer(connector, transientHandler,
                 sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
                         ChronoUnit.MINUTES),
-                serializationCallback,
-                TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS,
+                serializationCallback, TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS,
                 new TransientInjectableObjectStreamFactory());
 
         clusterSID = UUID.randomUUID().toString();

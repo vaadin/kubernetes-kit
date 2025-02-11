@@ -45,7 +45,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
  * @see TransientHandler
  * @see TransientDescriptor
  */
-public class TransientInjectableObjectInputStream extends SerializationInputStream {
+public class TransientInjectableObjectInputStream
+        extends SerializationInputStream {
 
     private final VarHandle passHandleHandle;
     private final MethodHandle handlesLookupObjectHandle;

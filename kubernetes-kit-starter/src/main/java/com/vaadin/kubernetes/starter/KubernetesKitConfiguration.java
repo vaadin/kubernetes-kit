@@ -131,20 +131,21 @@ public class KubernetesKitConfiguration {
 
         @Bean
         @ConditionalOnMissingBean
-        SerializationStreamFactory serializationStreamFactory(){
+        SerializationStreamFactory serializationStreamFactory() {
             return new TransientInjectableObjectStreamFactory();
         }
 
         @Bean
         SessionSerializer sessionSerializer(BackendConnector backendConnector,
-                                            TransientHandler transientInjector,
-                                            SessionSerializationCallback sessionSerializationCallback,
-                                            SessionExpirationPolicy sessionExpirationPolicy,
-                                            @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter,
-                                            SerializationStreamFactory serializationStreamFactory) {
+                TransientHandler transientInjector,
+                SessionSerializationCallback sessionSerializationCallback,
+                SessionExpirationPolicy sessionExpirationPolicy,
+                @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter,
+                SerializationStreamFactory serializationStreamFactory) {
             SessionSerializer sessionSerializer = new SessionSerializer(
                     backendConnector, transientInjector,
-                    sessionExpirationPolicy, sessionSerializationCallback, serializationStreamFactory);
+                    sessionExpirationPolicy, sessionSerializationCallback,
+                    serializationStreamFactory);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }

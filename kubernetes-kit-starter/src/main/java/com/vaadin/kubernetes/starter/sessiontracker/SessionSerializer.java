@@ -146,12 +146,13 @@ public class SessionSerializer
      *            when an error happens
      */
     public SessionSerializer(BackendConnector backendConnector,
-                             TransientHandler transientHandler,
-                             SessionExpirationPolicy sessionExpirationPolicy,
-                             SessionSerializationCallback sessionSerializationCallback,
-                             SerializationStreamFactory serializationStreamFactory) {
+            TransientHandler transientHandler,
+            SessionExpirationPolicy sessionExpirationPolicy,
+            SessionSerializationCallback sessionSerializationCallback,
+            SerializationStreamFactory serializationStreamFactory) {
         this(backendConnector, (sessionId, clusterKey) -> transientHandler,
-                sessionExpirationPolicy, sessionSerializationCallback, serializationStreamFactory);
+                sessionExpirationPolicy, sessionSerializationCallback,
+                serializationStreamFactory);
     }
 
     /**
@@ -180,10 +181,10 @@ public class SessionSerializer
      *            when an error happens
      */
     public SessionSerializer(BackendConnector backendConnector,
-                             BiFunction<String, String, TransientHandler> transientHandlerProvider,
-                             SessionExpirationPolicy sessionExpirationPolicy,
-                             SessionSerializationCallback sessionSerializationCallback,
-                             SerializationStreamFactory serializationStreamFactory) {
+            BiFunction<String, String, TransientHandler> transientHandlerProvider,
+            SessionExpirationPolicy sessionExpirationPolicy,
+            SessionSerializationCallback sessionSerializationCallback,
+            SerializationStreamFactory serializationStreamFactory) {
         this.backendConnector = backendConnector;
         this.handlerProvider = transientHandlerProvider;
         this.sessionSerializationCallback = sessionSerializationCallback;
@@ -194,11 +195,11 @@ public class SessionSerializer
 
     // Visible for test
     SessionSerializer(BackendConnector backendConnector,
-                      TransientHandler transientHandler,
-                      SessionExpirationPolicy sessionExpirationPolicy,
-                      SessionSerializationCallback sessionSerializationCallback,
-                      long optimisticSerializationTimeoutMs,
-                      SerializationStreamFactory serializationStreamFactory) {
+            TransientHandler transientHandler,
+            SessionExpirationPolicy sessionExpirationPolicy,
+            SessionSerializationCallback sessionSerializationCallback,
+            long optimisticSerializationTimeoutMs,
+            SerializationStreamFactory serializationStreamFactory) {
         this.backendConnector = backendConnector;
         this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
         this.sessionSerializationCallback = sessionSerializationCallback;
@@ -556,8 +557,10 @@ public class SessionSerializer
         long start = System.currentTimeMillis();
         String clusterKey = getClusterKey(attributes);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        TransientHandler transientHandler = handlerProvider.apply(sessionId, clusterKey);
-        try (SerializationOutputStream outStream = serializationStreamFactory.createOutputStream(out, transientHandler, injectableFilter)) {
+        TransientHandler transientHandler = handlerProvider.apply(sessionId,
+                clusterKey);
+        try (SerializationOutputStream outStream = serializationStreamFactory
+                .createOutputStream(out, transientHandler, injectableFilter)) {
             outStream.writeWithTransients(attributes);
             sessionSerializationCallback.onSerializationSuccess();
         } catch (Exception ex) {
@@ -589,9 +592,11 @@ public class SessionSerializer
                 .getContextClassLoader();
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         Map<String, Object> attributes;
-        TransientHandler transientHandler = handlerProvider.apply(sessionId, sessionInfo.getClusterKey());
+        TransientHandler transientHandler = handlerProvider.apply(sessionId,
+                sessionInfo.getClusterKey());
 
-        try (SerializationInputStream inStream = serializationStreamFactory.createInputStream(in, transientHandler)) {
+        try (SerializationInputStream inStream = serializationStreamFactory
+                .createInputStream(in, transientHandler)) {
             attributes = inStream.readWithTransients();
             sessionSerializationCallback.onDeserializationSuccess();
         } catch (Exception ex) {
