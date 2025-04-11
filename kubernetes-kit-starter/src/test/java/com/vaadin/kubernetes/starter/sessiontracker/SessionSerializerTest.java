@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.MockedStatic;
 import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.component.Component;
@@ -56,7 +55,6 @@ import static org.mockito.ArgumentMatchers.isNotNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -233,28 +231,22 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+        assertCurrentInstancesIsEmpty();
         verify(serializationCallback).onSerializationSuccess();
 
-        try (MockedStatic<CurrentInstance> mockedStatic = mockStatic(
-                CurrentInstance.class)) {
-            try {
-                serializer.deserialize(infoList.get(0), httpSession);
-            } catch (Exception e) {
-                fail(e);
-            }
-
-            mockedStatic.verify(() -> CurrentInstance.set(any(), any()),
-                    times(3));
-            mockedStatic.verify(() -> CurrentInstance.restoreInstances(any()),
-                    times(5));
-
-            verify(serializationCallback).onDeserializationSuccess();
-            Optional<Component> component = ui.getElement().getChildren()
-                    .toList().get(0).getChildren().toList().get(0)
-                    .getComponent();
-            assertThat(((Unserializable) component.get()).getName().fullName())
-                    .isEqualTo("Unserializable");
+        try {
+            serializer.deserialize(infoList.get(0), httpSession);
+        } catch (Exception e) {
+            fail(e);
         }
+
+        // TODO add this assert after the vaadin/flow#21277 change is available
+        // assertCurrentInstancesIsEmpty();
+        verify(serializationCallback).onDeserializationSuccess();
+        Optional<Component> component = ui.getElement().getChildren().toList()
+                .get(0).getChildren().toList().get(0).getComponent();
+        assertThat(((Unserializable) component.get()).getName().fullName())
+                .isEqualTo("Unserializable");
     }
 
     @Test
@@ -591,8 +583,30 @@ class SessionSerializerTest {
     private UnserializableComponentWrapper<State, Unserializable> createUnserializableComponentWrapper() {
         Unserializable unserializable = new Unserializable("Unserializable");
         return new UnserializableComponentWrapper<>(unserializable,
-                component -> new State(component.getName().fullName()),
-                state -> new Unserializable(state.text()));
+                SessionSerializerTest::unserializableComponentSerializer,
+                SessionSerializerTest::unserializableComponentDeserializer);
+    }
+
+    private static State unserializableComponentSerializer(
+            Unserializable unserializable) {
+        assertCurrentInstancesNotEmpty();
+        return new State(unserializable.getName().fullName());
+    }
+
+    private static Unserializable unserializableComponentDeserializer(
+            State state) {
+        assertCurrentInstancesNotEmpty();
+        return new Unserializable(state.text());
+    }
+
+    private static void assertCurrentInstancesNotEmpty() {
+        Assertions.assertNotNull(CurrentInstance.get(UI.class));
+        Assertions.assertNotNull(CurrentInstance.get(VaadinSession.class));
+    }
+
+    private static void assertCurrentInstancesIsEmpty() {
+        Assertions.assertNull(CurrentInstance.get(UI.class));
+        Assertions.assertNull(CurrentInstance.get(VaadinSession.class));
     }
 
     private static ConditionFactory await() {
