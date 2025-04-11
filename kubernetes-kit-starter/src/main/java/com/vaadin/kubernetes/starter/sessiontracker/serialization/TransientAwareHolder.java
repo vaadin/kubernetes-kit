@@ -89,6 +89,7 @@ final class TransientAwareHolder implements Serializable {
             runnable.run();
         } finally {
             if (instanceMap != null) {
+                CurrentInstance.clearAll();
                 CurrentInstance.restoreInstances(instanceMap);
                 cleaner.run();
             }

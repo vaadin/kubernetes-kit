@@ -144,6 +144,7 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
                     getElement().appendChild(component.getElement());
                 }
             } finally {
+                CurrentInstance.clearAll();
                 CurrentInstance.restoreInstances(instances);
                 cleaner.run();
             }
