@@ -24,12 +24,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.function.DeploymentConfiguration;
+import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.VaadinServletService;
@@ -54,6 +56,7 @@ import static org.mockito.ArgumentMatchers.isNotNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -232,16 +235,26 @@ class SessionSerializerTest {
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
         verify(serializationCallback).onSerializationSuccess();
 
-        try {
-            serializer.deserialize(infoList.get(0), httpSession);
-        } catch (Exception e) {
-            fail(e);
+        try (MockedStatic<CurrentInstance> mockedStatic = mockStatic(
+                CurrentInstance.class)) {
+            try {
+                serializer.deserialize(infoList.get(0), httpSession);
+            } catch (Exception e) {
+                fail(e);
+            }
+
+            mockedStatic.verify(() -> CurrentInstance.set(any(), any()),
+                    times(3));
+            mockedStatic.verify(() -> CurrentInstance.restoreInstances(any()),
+                    times(5));
+
+            verify(serializationCallback).onDeserializationSuccess();
+            Optional<Component> component = ui.getElement().getChildren()
+                    .toList().get(0).getChildren().toList().get(0)
+                    .getComponent();
+            assertThat(((Unserializable) component.get()).getName().fullName())
+                    .isEqualTo("Unserializable");
         }
-        verify(serializationCallback).onDeserializationSuccess();
-        Optional<Component> component = ui.getElement().getChildren().toList()
-                .get(0).getChildren().toList().get(0).getComponent();
-        assertThat(((Unserializable) component.get()).getName().fullName())
-                .isEqualTo("Unserializable");
     }
 
     @Test
