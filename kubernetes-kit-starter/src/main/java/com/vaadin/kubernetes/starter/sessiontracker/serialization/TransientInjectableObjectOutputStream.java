@@ -22,9 +22,11 @@ import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -33,6 +35,10 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.vaadin.flow.dom.Element;
+import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.kubernetes.starter.sessiontracker.UnserializableComponentWrapper;
+import com.vaadin.kubernetes.starter.sessiontracker.UnserializableComponentWrapperFoundException;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Track;
 
@@ -84,6 +90,7 @@ public class TransientInjectableObjectOutputStream
     private final TransientHandler inspector;
     private final IdentityHashMap<Object, TransientAwareHolder> inspected = new IdentityHashMap<>();
     private final Predicate<Class<?>> injectableFilter;
+    private final Set<UnserializableComponentWrapper<?, ?>> unserializableComponents = new HashSet<>();
 
     private final OutputStream outputStream;
     private final VarHandle depthHandle;
@@ -188,12 +195,15 @@ public class TransientInjectableObjectOutputStream
             trackingMode = true;
             writeObject(object);
             trackingMode = false;
+            unserializableComponents.forEach(
+                    UnserializableComponentWrapper::afterSerialization);
             // Append transient fields metadata
             writeObject(new ArrayList<>(inspected.values().stream()
                     .filter(Objects::nonNull).collect(Collectors.toList())));
             flush();
             writeTrackingMetadata();
         } finally {
+            unserializableComponents.clear();
             inspected.clear();
             tracking.clear();
             trackingMode = false;
@@ -241,6 +251,12 @@ public class TransientInjectableObjectOutputStream
     @Override
     protected Object replaceObject(Object obj) {
         obj = trackObject(obj);
+        if (obj instanceof Element element && element.getComponent().orElse(
+                null) instanceof UnserializableComponentWrapper<?, ?> wrapper) {
+            handleUnserializableComponentWrapper(wrapper);
+        } else if (obj instanceof UnserializableComponentWrapper<?, ?> wrapper) {
+            handleUnserializableComponentWrapper(wrapper);
+        }
         // Only application classes might need to be replaced
         if (trackingMode && obj != null) {
             Class<?> type = obj.getClass();
@@ -277,6 +293,18 @@ public class TransientInjectableObjectOutputStream
             }
         }
         return obj;
+    }
+
+    private void handleUnserializableComponentWrapper(
+            UnserializableComponentWrapper<?, ?> wrapper) {
+        if (VaadinSession.getCurrent() == null
+                || !VaadinSession.getCurrent().hasLock()) {
+            throw new UnserializableComponentWrapperFoundException(
+                    "Detached " + UnserializableComponentWrapper.class.getName()
+                            + " component detected.");
+        }
+        UnserializableComponentWrapper.beforeSerialization(wrapper);
+        unserializableComponents.add(wrapper);
     }
 
     /**

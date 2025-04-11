@@ -360,7 +360,7 @@ public class SessionSerializer
             unrecoverableError = true;
         } catch (IOException e) {
             getLogger().warn(
-                    "Optimistic serialization of session {} with distributed key {} failed",
+                    "Optimistic serialization of session {} with distributed key {} failed. Switching to pessimistic locking.",
                     sessionId, clusterKey, e);
         }
 
@@ -384,14 +384,12 @@ public class SessionSerializer
             lock.lock();
         }
         try {
-            beforeSerializePessimistic(attributes);
             return doSerialize(sessionId, timeToLive, attributes);
         } catch (Exception e) {
             getLogger().error(
                     "An error occurred during pessimistic serialization of session {} with distributed key {} ",
                     sessionId, clusterKey, e);
         } finally {
-            afterSerializePessimistic(attributes);
             for (ReentrantLock lock : locks) {
                 lock.unlock();
             }
@@ -422,16 +420,6 @@ public class SessionSerializer
                 lock.unlock();
             }
         }
-    }
-
-    private void beforeSerializePessimistic(Map<String, Object> attributes) {
-        getUIs(attributes)
-                .forEach(UnserializableComponentWrapper::beforeSerialization);
-    }
-
-    private void afterSerializePessimistic(Map<String, Object> attributes) {
-        getUIs(attributes)
-                .forEach(UnserializableComponentWrapper::afterSerialization);
     }
 
     private List<UI> getUIs(Map<String, Object> attributes) {
