@@ -142,6 +142,24 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     }
 
     /**
+     * Prepares the UI for serialization by removing unserializable components
+     * from the component tree.
+     * <p>
+     * The changes to the UI caused by the removal are silently ignored.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> Any detach listener registered on the wrapped
+     * components will be executed.
+     * <p>
+     * For internal use only.
+     *
+     * @param ui
+     *            the {@link UI} to prepare for serialization
+     */
+    static void beforeSerialization(UI ui) {
+        doWithWrapper(ui, UnserializableComponentWrapper::beforeSerialization);
+    }
+
+    /**
      * Prepares the UI for serialization by removing wrapped unserializable
      * component from the component tree.
      * <p>
@@ -153,7 +171,8 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
      * For internal use only.
      *
      * @param wrapper
-     *            the wrapper that contains the unserializable component
+     *            the wrapper that contains the unserializable component to
+     *            remove
      */
     public static void beforeSerialization(
             UnserializableComponentWrapper<?, ?> wrapper) {
@@ -162,8 +181,27 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     }
 
     /**
-     * Restores the UI adding by adding the unserializable component to the
-     * component tree using the wrapper.
+     * Restores the UI by adding the unserializable components to the component
+     * tree.
+     * <p>
+     * The changes to the UI caused by re-adding the components are silently
+     * ignored.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> Any attach listener registered on the wrapped
+     * components will be executed.
+     * <p>
+     * For internal use only.
+     *
+     * @param ui
+     *            the {@link UI} to prepare for serialization
+     */
+    static void afterSerialization(UI ui) {
+        doWithWrapper(ui, UnserializableComponentWrapper::afterSerialization);
+    }
+
+    /**
+     * Restores the UI by adding the unserializable component to the component
+     * tree using the wrapper.
      * <p>
      * The changes to the UI caused by re-adding the components are silently
      * ignored.
