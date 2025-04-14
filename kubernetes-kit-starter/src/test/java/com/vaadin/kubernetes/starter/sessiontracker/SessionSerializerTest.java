@@ -240,8 +240,7 @@ class SessionSerializerTest {
             fail(e);
         }
 
-        // TODO add this assert after the vaadin/flow#21277 change is available
-        // assertCurrentInstancesIsEmpty();
+        assertCurrentInstancesIsEmpty();
         verify(serializationCallback).onDeserializationSuccess();
         Optional<Component> component = ui.getElement().getChildren().toList()
                 .get(0).getChildren().toList().get(0).getComponent();
