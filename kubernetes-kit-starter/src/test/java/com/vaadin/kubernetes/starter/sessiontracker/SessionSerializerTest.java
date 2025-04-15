@@ -30,6 +30,7 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.function.DeploymentConfiguration;
+import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.VaadinServletService;
@@ -230,6 +231,7 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
+        assertCurrentInstancesIsEmpty();
         verify(serializationCallback).onSerializationSuccess();
 
         try {
@@ -237,6 +239,8 @@ class SessionSerializerTest {
         } catch (Exception e) {
             fail(e);
         }
+
+        assertCurrentInstancesIsEmpty();
         verify(serializationCallback).onDeserializationSuccess();
         Optional<Component> component = ui.getElement().getChildren().toList()
                 .get(0).getChildren().toList().get(0).getComponent();
@@ -578,8 +582,30 @@ class SessionSerializerTest {
     private UnserializableComponentWrapper<State, Unserializable> createUnserializableComponentWrapper() {
         Unserializable unserializable = new Unserializable("Unserializable");
         return new UnserializableComponentWrapper<>(unserializable,
-                component -> new State(component.getName().fullName()),
-                state -> new Unserializable(state.text()));
+                SessionSerializerTest::unserializableComponentSerializer,
+                SessionSerializerTest::unserializableComponentDeserializer);
+    }
+
+    private static State unserializableComponentSerializer(
+            Unserializable unserializable) {
+        assertCurrentInstancesNotEmpty();
+        return new State(unserializable.getName().fullName());
+    }
+
+    private static Unserializable unserializableComponentDeserializer(
+            State state) {
+        assertCurrentInstancesNotEmpty();
+        return new Unserializable(state.text());
+    }
+
+    private static void assertCurrentInstancesNotEmpty() {
+        Assertions.assertNotNull(CurrentInstance.get(UI.class));
+        Assertions.assertNotNull(CurrentInstance.get(VaadinSession.class));
+    }
+
+    private static void assertCurrentInstancesIsEmpty() {
+        Assertions.assertNull(CurrentInstance.get(UI.class));
+        Assertions.assertNull(CurrentInstance.get(VaadinSession.class));
     }
 
     private static ConditionFactory await() {
