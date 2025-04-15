@@ -12,6 +12,7 @@ package com.vaadin.kubernetes.starter.sessiontracker;
 import java.io.IOException;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -21,7 +22,9 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.dom.Element;
 import com.vaadin.flow.dom.ElementUtil;
 import com.vaadin.flow.function.SerializableFunction;
+import com.vaadin.flow.internal.CurrentInstance;
 import com.vaadin.flow.internal.StateTree;
+import com.vaadin.flow.server.VaadinSession;
 
 /**
  * A wrapper component that allows an otherwise unserializable {@link Component}
@@ -126,7 +129,12 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     }
 
     private void restoreComponent() {
-        getUI().map(UI::getSession).ifPresent(session -> {
+        getUI().ifPresent(ui -> {
+            VaadinSession session = ui.getSession();
+            Map<Class<?>, CurrentInstance> instances = CurrentInstance
+                    .getInstances();
+            CurrentInstance.set(UI.class, ui);
+            CurrentInstance.set(VaadinSession.class, session);
             Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
             try {
                 getElement().removeAllChildren();
@@ -136,6 +144,8 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
                     getElement().appendChild(component.getElement());
                 }
             } finally {
+                CurrentInstance.clearAll();
+                CurrentInstance.restoreInstances(instances);
                 cleaner.run();
             }
         });
