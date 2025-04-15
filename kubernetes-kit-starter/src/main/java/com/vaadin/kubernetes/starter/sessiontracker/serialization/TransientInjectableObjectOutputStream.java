@@ -297,14 +297,16 @@ public class TransientInjectableObjectOutputStream
 
     private void handleUnserializableComponentWrapper(
             UnserializableComponentWrapper<?, ?> wrapper) {
-        if (VaadinSession.getCurrent() == null
-                || !VaadinSession.getCurrent().hasLock()) {
-            throw new UnserializableComponentWrapperFoundException(
-                    "Detached " + UnserializableComponentWrapper.class.getName()
-                            + " component detected.");
+        if (!wrapper.isAttached()) {
+            if (VaadinSession.getCurrent() == null || !VaadinSession.getCurrent().hasLock()) {
+                throw new UnserializableComponentWrapperFoundException(
+                        "Detached "
+                                + UnserializableComponentWrapper.class.getName()
+                                + " component detected.");
+            }
+            UnserializableComponentWrapper.beforeSerialization(wrapper);
+            unserializableComponents.add(wrapper);
         }
-        UnserializableComponentWrapper.beforeSerialization(wrapper);
-        unserializableComponents.add(wrapper);
     }
 
     /**
