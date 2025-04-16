@@ -297,7 +297,8 @@ public class TransientInjectableObjectOutputStream
 
     private void handleUnserializableComponentWrapper(
             UnserializableComponentWrapper<?, ?> wrapper) {
-        if (!wrapper.isAttached()) {
+        if (!unserializableComponents.contains(wrapper)
+                && !wrapper.isAttached()) {
             if (VaadinSession.getCurrent() == null
                     || !VaadinSession.getCurrent().hasLock()) {
                 throw new UnserializableComponentWrapperFoundException(

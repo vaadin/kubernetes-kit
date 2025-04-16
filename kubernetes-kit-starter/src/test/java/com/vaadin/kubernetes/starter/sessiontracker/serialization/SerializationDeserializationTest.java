@@ -153,7 +153,7 @@ class SerializationDeserializationTest {
             TransientInjectableObjectOutputStream.newInstance(os, handler)
                     .writeWithTransients(ui);
             mockedStatic.verify(() -> UnserializableComponentWrapper
-                    .beforeSerialization(wrapper), times(2));
+                    .beforeSerialization(wrapper));
             mockedStatic.verify(() -> UnserializableComponentWrapper
                     .afterSerialization(wrapper));
         } finally {
