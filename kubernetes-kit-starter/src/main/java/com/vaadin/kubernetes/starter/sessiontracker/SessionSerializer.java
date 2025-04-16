@@ -360,8 +360,9 @@ public class SessionSerializer
             unrecoverableError = true;
         } catch (IOException e) {
             getLogger().warn(
-                    "Optimistic serialization of session {} with distributed key {} failed. Switching to pessimistic locking.",
+                    "Optimistic serialization of session {} with distributed key {} failed",
                     sessionId, clusterKey, e);
+            unrecoverableError = true;
         }
 
         pending.remove(sessionId);
