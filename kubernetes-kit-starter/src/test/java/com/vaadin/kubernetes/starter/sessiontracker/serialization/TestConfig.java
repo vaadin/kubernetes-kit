@@ -14,6 +14,9 @@ import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.vaadin.flow.component.Tag;
+import com.vaadin.kubernetes.starter.sessiontracker.UnserializableComponentWrapper;
+
 @Configuration
 @Import({ TestConfig.CtorInjectionTarget.class,
         TestConfig.PrototypeTarget.class })
@@ -181,5 +184,35 @@ class TestConfig {
         @Autowired
         @Qualifier("TRANSACTIONAL")
         transient TestService service;
+    }
+
+    static class UnserializableWrapper
+            extends UnserializableComponentWrapper<String, Unserializable> {
+
+        UnserializableWrapper(Unserializable component) {
+            super(component, UnserializableWrapper::serialize,
+                    UnserializableWrapper::deserialize);
+        }
+
+        static String serialize(Unserializable unserializable) {
+            return unserializable.getName();
+        }
+
+        static Unserializable deserialize(String name) {
+            return new Unserializable(name);
+        }
+    }
+
+    @Tag("unserializable-component")
+    static class Unserializable extends com.vaadin.flow.component.Component {
+        final String name;
+
+        Unserializable(String name) {
+            this.name = name;
+        }
+
+        String getName() {
+            return name;
+        }
     }
 }

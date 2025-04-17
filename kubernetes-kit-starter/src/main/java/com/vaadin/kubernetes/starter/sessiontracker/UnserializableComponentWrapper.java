@@ -152,26 +152,46 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
     }
 
     /**
-     * Prepares the UI for serialization, removing unserializable components
+     * Prepares the UI for serialization by removing unserializable components
      * from the component tree.
      * <p>
      * The changes to the UI caused by the removal are silently ignored.
      * <p>
      * <b>IMPORTANT NOTE:</b> Any detach listener registered on the wrapped
      * components will be executed.
+     * <p>
+     * For internal use only.
      *
      * @param ui
      *            the {@link UI} to prepare for serialization
      */
     static void beforeSerialization(UI ui) {
-        doWithWrapper(ui, wrapper -> {
-            wrapper.component.removeFromParent();
-            flush(wrapper);
-        });
+        doWithWrapper(ui, UnserializableComponentWrapper::beforeSerialization);
     }
 
     /**
-     * Restores the UI adding the unserializable components to the component
+     * Prepares the UI for serialization by removing wrapped unserializable
+     * component from the component tree.
+     * <p>
+     * The changes to the UI caused by the removal are silently ignored.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> Any detach listener registered on the wrapped
+     * components will be executed.
+     * <p>
+     * For internal use only.
+     *
+     * @param wrapper
+     *            the wrapper that contains the unserializable component to
+     *            remove
+     */
+    public static void beforeSerialization(
+            UnserializableComponentWrapper<?, ?> wrapper) {
+        wrapper.component.removeFromParent();
+        flush(wrapper);
+    }
+
+    /**
+     * Restores the UI by adding the unserializable components to the component
      * tree.
      * <p>
      * The changes to the UI caused by re-adding the components are silently
@@ -179,16 +199,36 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
      * <p>
      * <b>IMPORTANT NOTE:</b> Any attach listener registered on the wrapped
      * components will be executed.
+     * <p>
+     * For internal use only.
      *
      * @param ui
      *            the {@link UI} to prepare for serialization
      */
     static void afterSerialization(UI ui) {
-        doWithWrapper(ui, wrapper -> {
-            wrapper.state = null;
-            wrapper.getElement().appendChild(wrapper.component.getElement());
-            flush(wrapper);
-        });
+        doWithWrapper(ui, UnserializableComponentWrapper::afterSerialization);
+    }
+
+    /**
+     * Restores the UI by adding the unserializable component to the component
+     * tree using the wrapper.
+     * <p>
+     * The changes to the UI caused by re-adding the components are silently
+     * ignored.
+     * <p>
+     * <b>IMPORTANT NOTE:</b> Any attach listener registered on the wrapped
+     * components will be executed.
+     * <p>
+     * For internal use only.
+     *
+     * @param wrapper
+     *            the wrapper the unserializable component is added to
+     */
+    public static void afterSerialization(
+            UnserializableComponentWrapper<?, ?> wrapper) {
+        wrapper.state = null;
+        wrapper.getElement().appendChild(wrapper.component.getElement());
+        flush(wrapper);
     }
 
     private static void flush(UnserializableComponentWrapper<?, ?> wrapper) {
