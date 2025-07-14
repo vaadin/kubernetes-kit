@@ -291,8 +291,8 @@ public class SessionSerializer
         // Current session is immediately marked as 'serialization pending',
         // because if 'markSerializationStarted' is hanging, it does not make
         // sense to retry the operation instantly.
-        CompletableFuture.runAsync(
-                () -> backendConnector.markSerializationStarted(clusterKey),
+        CompletableFuture.runAsync(() -> backendConnector
+                .markSerializationStarted(clusterKey, timeToLive),
                 executorService).handle((unused, error) -> {
                     if (error != null) {
                         getLogger().debug(

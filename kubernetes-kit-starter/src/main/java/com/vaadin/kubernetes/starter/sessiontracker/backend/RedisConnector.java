@@ -41,9 +41,9 @@ public class RedisConnector implements BackendConnector {
             byte[] key = getKey(sessionInfo.getClusterKey());
             Duration timeToLive = sessionInfo.getTimeToLive();
             if (timeToLive.isZero() || timeToLive.isNegative()) {
-                connection.set(key, sessionInfo.getData());
+                connection.stringCommands().set(key, sessionInfo.getData());
             } else {
-                connection.set(key, sessionInfo.getData(),
+                connection.stringCommands().set(key, sessionInfo.getData(),
                         Expiration.from(timeToLive),
                         RedisStringCommands.SetOption.UPSERT);
             }
@@ -64,7 +64,7 @@ public class RedisConnector implements BackendConnector {
             waitForSerializationCompletion(clusterKey, "getting session",
                     connection);
 
-            byte[] data = connection.get(getKey(clusterKey));
+            byte[] data = connection.stringCommands().get(getKey(clusterKey));
             if (data == null) {
                 return null;
             }
@@ -80,12 +80,20 @@ public class RedisConnector implements BackendConnector {
     }
 
     @Override
-    public void markSerializationStarted(String clusterKey) {
+    public void markSerializationStarted(String clusterKey,
+            Duration timeToLive) {
         getLogger().debug("Marking serialization started for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
-            connection.set(getPendingKey(clusterKey),
-                    BackendUtil.b("" + System.currentTimeMillis()));
+            if (timeToLive.isZero() || timeToLive.isNegative()) {
+                connection.stringCommands().set(getPendingKey(clusterKey),
+                        BackendUtil.b("" + System.currentTimeMillis()));
+            } else {
+                connection.stringCommands().set(getPendingKey(clusterKey),
+                        BackendUtil.b("" + System.currentTimeMillis()),
+                        Expiration.from(timeToLive),
+                        RedisStringCommands.SetOption.UPSERT);
+            }
         }
     }
 
@@ -94,7 +102,7 @@ public class RedisConnector implements BackendConnector {
         getLogger().debug("Marking serialization complete for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
-            connection.del(getPendingKey(clusterKey));
+            connection.keyCommands().del(getPendingKey(clusterKey));
         }
     }
 
@@ -105,8 +113,8 @@ public class RedisConnector implements BackendConnector {
                 .getConnection()) {
             waitForSerializationCompletion(clusterKey, "deleting session",
                     connection);
-            connection.del(getKey(clusterKey));
-            connection.del(getPendingKey(clusterKey));
+            connection.keyCommands().del(getKey(clusterKey));
+            connection.keyCommands().del(getPendingKey(clusterKey));
         }
     }
 
@@ -117,12 +125,13 @@ public class RedisConnector implements BackendConnector {
     private void waitForSerializationCompletion(String clusterKey,
             String action, RedisConnection connection) {
         byte[] pendingKey = getPendingKey(clusterKey);
-        if (connection.exists(pendingKey)) {
+        if (Boolean.TRUE.equals(connection.keyCommands().exists(pendingKey))) {
             long timeout = System.currentTimeMillis() + 5000;
             getLogger().debug(
                     "Waiting for session to be serialized before {} {}", action,
                     clusterKey);
-            while (connection.exists(pendingKey)
+            while (Boolean.TRUE
+                    .equals(connection.keyCommands().exists(pendingKey))
                     && System.currentTimeMillis() < timeout) {
                 try {
                     Thread.sleep(1);

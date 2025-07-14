@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
+import java.time.Duration;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -58,7 +59,8 @@ class DebugBackendConnector implements BackendConnector,
     }
 
     @Override
-    public void markSerializationStarted(String clusterKey) {
+    public void markSerializationStarted(String clusterKey,
+            Duration timeToLive) {
         getJob(clusterKey).serializationStarted();
     }
 
