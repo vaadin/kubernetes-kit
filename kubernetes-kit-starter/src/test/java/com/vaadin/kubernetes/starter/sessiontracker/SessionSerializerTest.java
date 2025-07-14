@@ -88,7 +88,7 @@ class SessionSerializerTest {
 
         clusterSID = UUID.randomUUID().toString();
         httpSession = newHttpSession(clusterSID);
-        timeToLive = Duration.ofSeconds(5);
+        timeToLive = Duration.ofMinutes(35);
 
         vaadinService = new MockVaadinService();
         vaadinSession = vaadinService.newMockSession(httpSession);
