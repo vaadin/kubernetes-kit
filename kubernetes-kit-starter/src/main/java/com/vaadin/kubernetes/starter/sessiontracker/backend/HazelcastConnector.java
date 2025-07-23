@@ -80,6 +80,13 @@ public class HazelcastConnector implements BackendConnector {
     }
 
     @Override
+    public void markSerializationFailed(String clusterKey, Throwable error) {
+        getLogger().debug("Marking serialization failed for {}", clusterKey,
+                error);
+        sessions.forceUnlock(getPendingKey(clusterKey));
+    }
+
+    @Override
     public void deleteSession(String clusterKey) {
         getLogger().debug("Deleting session {}", clusterKey);
         waitForSerializationCompletion(clusterKey, "deleting");

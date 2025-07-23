@@ -313,6 +313,8 @@ public class SessionSerializer
                 }).whenComplete((unused, error) -> {
                     pending.remove(sessionId);
                     if (error != null) {
+                        backendConnector.markSerializationFailed(clusterKey,
+                                error);
                         getLogger().error("Serialization of session {} failed",
                                 sessionId, error);
                     }

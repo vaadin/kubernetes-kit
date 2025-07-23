@@ -71,6 +71,12 @@ class DebugBackendConnector implements BackendConnector,
     }
 
     @Override
+    public void markSerializationFailed(String clusterKey, Throwable error) {
+        Job job = getJob(clusterKey);
+        job.serializationFailed(new Exception(error));
+    }
+
+    @Override
     public TransientHandler apply(String sessionId, String clusterKey) {
         return handlers.computeIfAbsent(getJob(clusterKey),
                 DebugTransientHandler::new);

@@ -107,6 +107,16 @@ public class RedisConnector implements BackendConnector {
     }
 
     @Override
+    public void markSerializationFailed(String clusterKey, Throwable error) {
+        getLogger().debug("Marking serialization failed for {}", clusterKey,
+                error);
+        try (RedisConnection connection = redisConnectionFactory
+                .getConnection()) {
+            connection.keyCommands().del(getPendingKey(clusterKey));
+        }
+    }
+
+    @Override
     public void deleteSession(String clusterKey) {
         getLogger().debug("Deleting session for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory

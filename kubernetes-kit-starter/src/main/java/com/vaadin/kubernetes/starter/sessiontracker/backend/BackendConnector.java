@@ -21,4 +21,6 @@ public interface BackendConnector {
     void markSerializationStarted(String clusterKey, Duration timeToLive);
 
     void markSerializationComplete(String clusterKey);
+
+    void markSerializationFailed(String clusterKey, Throwable error);
 }
