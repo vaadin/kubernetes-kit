@@ -54,6 +54,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNotNull;
 import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -390,6 +391,31 @@ class SessionSerializerTest {
         verify(connector, never()).sendSession(any());
         verify(connector).markSerializationComplete(clusterSID);
         locks.forEach(l -> verify(l, times(1)).lock());
+    }
+
+    @Test
+    void serialize_runtimeException_pendingSessionKeyRemoved() {
+        Throwable throwable = new RuntimeException("error");
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID, timeToLive);
+
+        AtomicBoolean serializationFailed = new AtomicBoolean();
+        doAnswer(i -> serializationFailed.getAndSet(true)).when(connector)
+                .markSerializationFailed(eq(clusterSID), any());
+
+        doThrow(throwable).when(connector).sendSession(any());
+
+        vaadinSession.setLockTimestamps(10, 20);
+
+        serializer.serialize(httpSession);
+        await().atMost(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        await().atMost(500, MILLISECONDS).untilTrue(serializationFailed);
+        assertThrows(RuntimeException.class,
+                () -> connector.sendSession(any()));
+        verify(connector).markSerializationFailed(eq(clusterSID), any());
     }
 
     @Test

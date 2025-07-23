@@ -109,6 +109,15 @@ public class RedisConnectorTest {
     }
 
     @Test
+    void markSerializationFailed_sessionNotLocked() {
+        Throwable error = new RuntimeException("error");
+        connector.markSerializationFailed(clusterKey, error);
+
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
     void deleteSession_sessionNotLocked_sessionIsDeleted() {
         when(connection.keyCommands().exists(any(byte[].class)))
                 .thenReturn(false);

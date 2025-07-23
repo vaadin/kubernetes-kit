@@ -118,6 +118,15 @@ public class HazelcastConnectorTest {
     }
 
     @Test
+    void markSerializationFailed_sessionNotLocked() {
+        Throwable error = new RuntimeException("error");
+        connector.markSerializationFailed(clusterKey, error);
+
+        verify(sessionMap)
+                .forceUnlock(eq(HazelcastConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
     void deleteSession_sessionNotLocked_sessionIsDeleted()
             throws InterruptedException {
         when(sessionMap.tryLock(
