@@ -101,18 +101,19 @@ public class HazelcastConnectorTest {
     }
 
     @Test
-    void markSerializationStarted_withZeroTTL_sessionLocked() {
-        connector.markSerializationStarted(clusterKey, Duration.ofSeconds(0L));
+    void markSerializationStarted_sessionLocked() {
+        connector.markSerializationStarted(clusterKey, Duration.ofMinutes(0));
 
-        verify(sessionMap).lock(eq(HazelcastConnector.getPendingKey(clusterKey)));
+        verify(sessionMap)
+                .lock(eq(HazelcastConnector.getPendingKey(clusterKey)));
     }
 
     @Test
-    void markSerializationStarted_withValidTTL_sessionLocked() {
-        connector.markSerializationStarted(clusterKey, Duration.ofSeconds(35));
+    void markSerializationStarted_expiration_sessionLockedWithTimeToLive() {
+        connector.markSerializationStarted(clusterKey, Duration.ofMinutes(30));
 
         verify(sessionMap).lock(
-                eq(HazelcastConnector.getPendingKey(clusterKey)), eq(35L),
+                eq(HazelcastConnector.getPendingKey(clusterKey)), eq(30L * 60),
                 eq(TimeUnit.SECONDS));
     }
 

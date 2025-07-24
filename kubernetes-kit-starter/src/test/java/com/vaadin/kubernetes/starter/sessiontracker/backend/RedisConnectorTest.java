@@ -91,7 +91,16 @@ public class RedisConnectorTest {
 
     @Test
     void markSerializationStarted_sessionLocked() {
-        Duration timeToLive = Duration.ofMinutes(35);
+        Duration timeToLive = Duration.ofMinutes(0);
+        connector.markSerializationStarted(clusterKey, timeToLive);
+
+        verify(connection.stringCommands())
+                .set(aryEq(RedisConnector.getPendingKey(clusterKey)), any());
+    }
+
+    @Test
+    void markSerializationStarted_expiration_sessionLockedWithTimeToLive() {
+        Duration timeToLive = Duration.ofMinutes(30);
         connector.markSerializationStarted(clusterKey, timeToLive);
 
         verify(connection.stringCommands()).set(
