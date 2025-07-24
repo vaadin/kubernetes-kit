@@ -18,12 +18,6 @@ public interface BackendConnector {
 
     void deleteSession(String clusterKey);
 
-    /**
-     * @deprecated use {@link #markSerializationStarted(String, Duration)}
-     */
-    @Deprecated(since = "2.4", forRemoval = true)
-    void markSerializationStarted(String clusterKey);
-
     void markSerializationStarted(String clusterKey, Duration timeToLive);
 
     void markSerializationComplete(String clusterKey);
