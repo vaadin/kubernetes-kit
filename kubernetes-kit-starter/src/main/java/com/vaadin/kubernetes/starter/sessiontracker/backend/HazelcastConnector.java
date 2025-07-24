@@ -69,8 +69,12 @@ public class HazelcastConnector implements BackendConnector {
     public void markSerializationStarted(String clusterKey,
             Duration timeToLive) {
         getLogger().debug("Marking serialization started for {}", clusterKey);
-        sessions.lock(getPendingKey(clusterKey), timeToLive.toSeconds(),
-                TimeUnit.SECONDS);
+        if (timeToLive.isZero() || timeToLive.isNegative()) {
+            sessions.lock(getPendingKey(clusterKey));
+        } else {
+            sessions.lock(getPendingKey(clusterKey), timeToLive.toSeconds(),
+                    TimeUnit.SECONDS);
+        }
     }
 
     @Override

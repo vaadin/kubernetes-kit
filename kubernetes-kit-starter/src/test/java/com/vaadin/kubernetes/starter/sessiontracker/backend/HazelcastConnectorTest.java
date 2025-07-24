@@ -101,7 +101,14 @@ public class HazelcastConnectorTest {
     }
 
     @Test
-    void markSerializationStarted_sessionLocked() {
+    void markSerializationStarted_withZeroTTL_sessionLocked() {
+        connector.markSerializationStarted(clusterKey, Duration.ofSeconds(0L));
+
+        verify(sessionMap).lock(eq(HazelcastConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markSerializationStarted_withValidTTL_sessionLocked() {
         connector.markSerializationStarted(clusterKey, Duration.ofSeconds(35));
 
         verify(sessionMap).lock(
