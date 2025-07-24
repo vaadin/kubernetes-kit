@@ -9,6 +9,7 @@
     </parent>
 
     <artifactId>kubernetes-kit-starter</artifactId>
+    <name>Kubernetes Kit Starter</name>
 
     <properties>
         <cvdl.name>vaadin-kubernetes-kit</cvdl.name>
