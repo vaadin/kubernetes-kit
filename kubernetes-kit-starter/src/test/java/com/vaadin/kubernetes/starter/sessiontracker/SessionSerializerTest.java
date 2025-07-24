@@ -53,6 +53,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNotNull;
 import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -413,9 +414,8 @@ class SessionSerializerTest {
         verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().atMost(500, MILLISECONDS).untilTrue(serializationFailed);
-        assertThrows(RuntimeException.class,
-                () -> connector.sendSession(any()));
-        verify(connector).markSerializationFailed(eq(clusterSID), any());
+        verify(connector).markSerializationFailed(eq(clusterSID),
+                same(throwable));
     }
 
     @Test

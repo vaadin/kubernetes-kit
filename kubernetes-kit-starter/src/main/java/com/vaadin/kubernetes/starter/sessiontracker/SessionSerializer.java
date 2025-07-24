@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -313,6 +314,10 @@ public class SessionSerializer
                 }).whenComplete((unused, error) -> {
                     pending.remove(sessionId);
                     if (error != null) {
+                        if (error instanceof CompletionException
+                                && error.getCause() != null) {
+                            error = error.getCause();
+                        }
                         backendConnector.markSerializationFailed(clusterKey,
                                 error);
                         getLogger().error("Serialization of session {} failed",
