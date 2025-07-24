@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisKeyCommands;
 import org.springframework.data.redis.connection.RedisStringCommands;
 import org.springframework.data.redis.core.types.Expiration;
 
@@ -22,6 +23,8 @@ public class RedisConnectorTest {
     String clusterKey;
     RedisConnectionFactory factory;
     RedisConnection connection;
+    RedisStringCommands stringCommands;
+    RedisKeyCommands keyCommands;
     RedisConnector connector;
 
     @BeforeEach
@@ -30,6 +33,10 @@ public class RedisConnectorTest {
 
         factory = mock(RedisConnectionFactory.class);
         connection = mock(RedisConnection.class);
+        stringCommands = mock(RedisStringCommands.class);
+        keyCommands = mock(RedisKeyCommands.class);
+        when(connection.stringCommands()).thenReturn(stringCommands);
+        when(connection.keyCommands()).thenReturn(keyCommands);
         when(factory.getConnection()).thenReturn(connection);
 
         connector = new RedisConnector(factory);
@@ -42,7 +49,8 @@ public class RedisConnectorTest {
 
         connector.sendSession(sessionInfo);
 
-        verify(connection).set(aryEq(RedisConnector.getKey(clusterKey)),
+        verify(connection.stringCommands()).set(
+                aryEq(RedisConnector.getKey(clusterKey)),
                 aryEq(sessionInfo.getData()));
     }
 
@@ -53,7 +61,8 @@ public class RedisConnectorTest {
 
         connector.sendSession(sessionInfo);
 
-        verify(connection).set(aryEq(RedisConnector.getKey(clusterKey)),
+        verify(connection.stringCommands()).set(
+                aryEq(RedisConnector.getKey(clusterKey)),
                 aryEq(sessionInfo.getData()),
                 eq(Expiration.from(sessionInfo.getTimeToLive())),
                 eq(RedisStringCommands.SetOption.UPSERT));
@@ -61,58 +70,87 @@ public class RedisConnectorTest {
 
     @Test
     void getSession_sessionIsRetrieved() {
-        when(connection.exists(any(byte[].class))).thenReturn(false);
-
-        connector.getSession(clusterKey);
-
-        verify(connection).get(aryEq(RedisConnector.getKey(clusterKey)));
-    }
-
-    @Test
-    void getSession_serializationInProgress_waitsForSerialization() {
-        when(connection.exists(any(byte[].class))).thenReturn(true)
+        when(connection.keyCommands().exists(any(byte[].class)))
                 .thenReturn(false);
 
         connector.getSession(clusterKey);
 
-        verify(connection, times(2)).exists(any(byte[].class));
+        verify(connection.stringCommands())
+                .get(aryEq(RedisConnector.getKey(clusterKey)));
     }
 
     @Test
-    void markSerializationStarted_sessionLocked() {
-        connector.markSerializationStarted(clusterKey);
+    void getSession_serializationInProgress_waitsForSerialization() {
+        when(connection.keyCommands().exists(any(byte[].class)))
+                .thenReturn(true).thenReturn(false);
 
-        verify(connection).set(aryEq(RedisConnector.getPendingKey(clusterKey)),
-                any());
+        connector.getSession(clusterKey);
+
+        verify(connection.keyCommands(), times(2)).exists(any(byte[].class));
+    }
+
+    @Test
+    void markSerializationStarted_zeroExpiration_sessionLockedWithoutTimeToLive() {
+        Duration timeToLive = Duration.ofMinutes(0);
+        connector.markSerializationStarted(clusterKey, timeToLive);
+
+        verify(connection.stringCommands())
+                .set(aryEq(RedisConnector.getPendingKey(clusterKey)), any());
+    }
+
+    @Test
+    void markSerializationStarted_validExpiration_sessionLockedWithTimeToLive() {
+        Duration timeToLive = Duration.ofMinutes(30);
+        connector.markSerializationStarted(clusterKey, timeToLive);
+
+        verify(connection.stringCommands()).set(
+                aryEq(RedisConnector.getPendingKey(clusterKey)), any(),
+                eq(Expiration.from(timeToLive)),
+                eq(RedisStringCommands.SetOption.UPSERT));
     }
 
     @Test
     void markSerializationComplete_sessionNotLocked() {
         connector.markSerializationComplete(clusterKey);
 
-        verify(connection).del(aryEq(RedisConnector.getPendingKey(clusterKey)));
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markSerializationFailed_sessionNotLocked() {
+        Throwable error = new RuntimeException("error");
+        connector.markSerializationFailed(clusterKey, error);
+
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getPendingKey(clusterKey)));
     }
 
     @Test
     void deleteSession_sessionNotLocked_sessionIsDeleted() {
-        when(connection.exists(any(byte[].class))).thenReturn(false);
-
-        connector.deleteSession(clusterKey);
-
-        verify(connection).del(aryEq(RedisConnector.getKey(clusterKey)));
-        verify(connection).del(aryEq(RedisConnector.getPendingKey(clusterKey)));
-    }
-
-    @Test
-    void deleteSession_sessionLocked_waitsForSessionLock() {
-        when(connection.exists(any(byte[].class))).thenReturn(true)
+        when(connection.keyCommands().exists(any(byte[].class)))
                 .thenReturn(false);
 
         connector.deleteSession(clusterKey);
 
-        verify(connection, times(2)).exists(any(byte[].class));
-        verify(connection).del(aryEq(RedisConnector.getKey(clusterKey)));
-        verify(connection).del(aryEq(RedisConnector.getPendingKey(clusterKey)));
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getKey(clusterKey)));
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void deleteSession_sessionLocked_waitsForSessionLock() {
+        when(connection.keyCommands().exists(any(byte[].class)))
+                .thenReturn(true).thenReturn(false);
+
+        connector.deleteSession(clusterKey);
+
+        verify(connection.keyCommands(), times(2)).exists(any(byte[].class));
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getKey(clusterKey)));
+        verify(connection.keyCommands())
+                .del(aryEq(RedisConnector.getPendingKey(clusterKey)));
     }
 
 }

@@ -101,16 +101,34 @@ public class HazelcastConnectorTest {
     }
 
     @Test
-    void markSerializationStarted_sessionLocked() {
-        connector.markSerializationStarted(clusterKey);
+    void markSerializationStarted_zeroExpiration_sessionLockedWithoutTimeToLive() {
+        connector.markSerializationStarted(clusterKey, Duration.ofMinutes(0));
 
         verify(sessionMap)
                 .lock(eq(HazelcastConnector.getPendingKey(clusterKey)));
     }
 
     @Test
+    void markSerializationStarted_validExpiration_sessionLockedWithTimeToLive() {
+        connector.markSerializationStarted(clusterKey, Duration.ofMinutes(30));
+
+        verify(sessionMap).lock(
+                eq(HazelcastConnector.getPendingKey(clusterKey)), eq(30L * 60),
+                eq(TimeUnit.SECONDS));
+    }
+
+    @Test
     void markSerializationComplete_sessionNotLocked() {
         connector.markSerializationComplete(clusterKey);
+
+        verify(sessionMap)
+                .forceUnlock(eq(HazelcastConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markSerializationFailed_sessionNotLocked() {
+        Throwable error = new RuntimeException("error");
+        connector.markSerializationFailed(clusterKey, error);
 
         verify(sessionMap)
                 .forceUnlock(eq(HazelcastConnector.getPendingKey(clusterKey)));
