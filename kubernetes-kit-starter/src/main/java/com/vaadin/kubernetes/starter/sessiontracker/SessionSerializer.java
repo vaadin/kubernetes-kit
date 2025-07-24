@@ -627,9 +627,14 @@ public class SessionSerializer
     }
 
     void waitForSerialization() {
+        long lastLogTime = System.currentTimeMillis();
         while (!pending.isEmpty()) {
-            getLogger().info("Waiting for {} sessions to be serialized: {}",
-                    pending.size(), pending.keySet());
+            long now = System.currentTimeMillis();
+            if (now - lastLogTime >= 5000) { // 5 seconds
+                getLogger().info("Waiting for {} sessions to be serialized: {}",
+                        pending.size(), pending.keySet());
+                lastLogTime = now;
+            }
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
