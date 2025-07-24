@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -291,8 +292,8 @@ public class SessionSerializer
         // Current session is immediately marked as 'serialization pending',
         // because if 'markSerializationStarted' is hanging, it does not make
         // sense to retry the operation instantly.
-        CompletableFuture.runAsync(
-                () -> backendConnector.markSerializationStarted(clusterKey),
+        CompletableFuture.runAsync(() -> backendConnector
+                .markSerializationStarted(clusterKey, timeToLive),
                 executorService).handle((unused, error) -> {
                     if (error != null) {
                         getLogger().debug(
@@ -313,6 +314,12 @@ public class SessionSerializer
                 }).whenComplete((unused, error) -> {
                     pending.remove(sessionId);
                     if (error != null) {
+                        if (error instanceof CompletionException
+                                && error.getCause() != null) {
+                            error = error.getCause();
+                        }
+                        backendConnector.markSerializationFailed(clusterKey,
+                                error);
                         getLogger().error("Serialization of session {} failed",
                                 sessionId, error);
                     }

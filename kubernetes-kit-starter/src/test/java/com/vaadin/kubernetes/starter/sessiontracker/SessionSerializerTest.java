@@ -53,7 +53,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNotNull;
 import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -71,6 +73,7 @@ class SessionSerializerTest {
     private MockVaadinSession vaadinSession;
     private HttpSession httpSession;
     private String clusterSID;
+    private Duration timeToLive;
     private MockVaadinService vaadinService;
     private TransientHandler transientHandler;
 
@@ -87,6 +90,7 @@ class SessionSerializerTest {
 
         clusterSID = UUID.randomUUID().toString();
         httpSession = newHttpSession(clusterSID);
+        timeToLive = Duration.ofMinutes(35);
 
         vaadinService = new MockVaadinService();
         vaadinSession = vaadinService.newMockSession(httpSession);
@@ -103,7 +107,7 @@ class SessionSerializerTest {
     void serialize_optimisticLocking_sessionNotLocked() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
@@ -112,7 +116,7 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
         ArgumentCaptor<SessionInfo> sessionInfoCaptor = ArgumentCaptor
@@ -128,7 +132,7 @@ class SessionSerializerTest {
     void serialize_optimisticLocking_sessionLocked() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
@@ -138,7 +142,7 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().during(100, MILLISECONDS).untilFalse(serializationCompleted);
 
@@ -153,7 +157,7 @@ class SessionSerializerTest {
     void serialize_optimisticLocking_sessionChanged() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
@@ -165,7 +169,7 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().during(100, MILLISECONDS).untilFalse(serializationCompleted);
         // another request is locking the session
@@ -182,7 +186,7 @@ class SessionSerializerTest {
     void serialize_optimisticLocking_sessionLockRequired_immediatelySwitchToPessimisticLocking() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
@@ -199,7 +203,7 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().atMost(1000, MILLISECONDS)
                 .untilTrue(pessimisticLockingRequested);
@@ -255,7 +259,7 @@ class SessionSerializerTest {
         doAnswer(i -> serializationsCompleted.incrementAndGet()).when(connector)
                 .markSerializationComplete(clusterSID);
         doAnswer(i -> serializationsStarted.incrementAndGet()).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
 
         vaadinSession.setLockTimestamps(10, 20);
         // delay session serialization completion, so we can verify that a
@@ -274,7 +278,8 @@ class SessionSerializerTest {
                 .until(() -> serializationsStarted.get() == 1
                         && serializationsCompleted.get() == 1);
 
-        verify(connector, times(1)).markSerializationStarted(clusterSID);
+        verify(connector, times(1)).markSerializationStarted(clusterSID,
+                timeToLive);
         verify(connector, times(1)).sendSession(notNull());
         verify(connector, times(1)).markSerializationComplete(clusterSID);
     }
@@ -283,7 +288,7 @@ class SessionSerializerTest {
     void serialize_pessimisticLocking() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
@@ -294,7 +299,7 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().during(TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS + 100,
                 MILLISECONDS).untilFalse(serializationCompleted);
@@ -315,7 +320,7 @@ class SessionSerializerTest {
         List<SessionInfo> infoList = new ArrayList<>();
 
         doAnswer(i -> started.add(i.getArgument(0))).when(connector)
-                .markSerializationStarted(anyString());
+                .markSerializationStarted(anyString(), any());
         doAnswer(i -> infoList.add(i.getArgument(0))).when(connector)
                 .sendSession(any());
         doAnswer(i -> completed.add(i.getArgument(0))).when(connector)
@@ -347,7 +352,8 @@ class SessionSerializerTest {
         Assertions.assertIterableEquals(List.of(sid2, sid1), completed,
                 "Started completed");
 
-        verify(connector, times(2)).markSerializationStarted(anyString());
+        verify(connector, times(2)).markSerializationStarted(anyString(),
+                any());
         verify(connector, times(2)).sendSession(notNull());
         verify(connector, times(2)).markSerializationComplete(anyString());
     }
@@ -356,7 +362,7 @@ class SessionSerializerTest {
     void serialize_notSerializableException_notFallbackToPessimistic() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
-                .markSerializationStarted(clusterSID);
+                .markSerializationStarted(clusterSID, timeToLive);
 
         AtomicBoolean serializationCompleted = new AtomicBoolean();
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
@@ -380,12 +386,36 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().atMost(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
         await().atMost(500, MILLISECONDS).untilTrue(serializationCompleted);
         verify(connector, never()).sendSession(any());
         verify(connector).markSerializationComplete(clusterSID);
         locks.forEach(l -> verify(l, times(1)).lock());
+    }
+
+    @Test
+    void serialize_runtimeException_pendingSessionKeyRemoved() {
+        Throwable throwable = new RuntimeException("error");
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID, timeToLive);
+
+        AtomicBoolean serializationFailed = new AtomicBoolean();
+        doAnswer(i -> serializationFailed.getAndSet(true)).when(connector)
+                .markSerializationFailed(eq(clusterSID), any());
+
+        doThrow(throwable).when(connector).sendSession(any());
+
+        vaadinSession.setLockTimestamps(10, 20);
+
+        serializer.serialize(httpSession);
+        await().atMost(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        await().atMost(500, MILLISECONDS).untilTrue(serializationFailed);
+        verify(connector).markSerializationFailed(eq(clusterSID),
+                same(throwable));
     }
 
     @Test
@@ -397,7 +427,7 @@ class SessionSerializerTest {
             Thread.sleep(1000);
             latch.countDown();
             return null;
-        }).when(connector).markSerializationStarted(anyString());
+        }).when(connector).markSerializationStarted(anyString(), any());
         doAnswer(i -> {
             latch.countDown();
             return null;
@@ -410,7 +440,7 @@ class SessionSerializerTest {
                 "Execution should not be blocked by slow backend connector");
 
         latch.await();
-        verify(connector).markSerializationStarted(anyString());
+        verify(connector).markSerializationStarted(anyString(), any());
         verify(connector).sendSession(notNull());
         verify(connector).markSerializationComplete(anyString());
     }
@@ -424,7 +454,7 @@ class SessionSerializerTest {
             Thread.sleep(1000);
             serializationStarted.countDown();
             return null;
-        }).when(connector).markSerializationStarted(anyString());
+        }).when(connector).markSerializationStarted(anyString(), any());
         CountDownLatch serializationCompleted = new CountDownLatch(2);
         doAnswer(i -> {
             // Simulate slow backed
@@ -459,7 +489,8 @@ class SessionSerializerTest {
         serializationStarted.await();
 
         serializationCompleted.await();
-        verify(connector, times(2)).markSerializationStarted(anyString());
+        verify(connector, times(2)).markSerializationStarted(anyString(),
+                any());
         verify(connector, times(2)).sendSession(notNull());
         verify(connector, times(2)).markSerializationComplete(anyString());
     }
@@ -478,7 +509,7 @@ class SessionSerializerTest {
             } finally {
                 latch.countDown();
             }
-        }).when(connector).markSerializationStarted(anyString());
+        }).when(connector).markSerializationStarted(anyString(), any());
 
         Assertions.assertDoesNotThrow(() -> serializer.serialize(httpSession),
                 "Backend connector failure on start should not be propagated");
@@ -489,7 +520,8 @@ class SessionSerializerTest {
         serializer.serialize(httpSession);
 
         latch.await();
-        verify(connector, times(2)).markSerializationStarted(anyString());
+        verify(connector, times(2)).markSerializationStarted(anyString(),
+                any());
     }
 
     @Test
