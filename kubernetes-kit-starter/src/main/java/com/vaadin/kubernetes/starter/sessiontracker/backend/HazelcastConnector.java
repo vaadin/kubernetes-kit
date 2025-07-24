@@ -66,6 +66,12 @@ public class HazelcastConnector implements BackendConnector {
     }
 
     @Override
+    public void markSerializationStarted(String clusterKey) {
+        getLogger().debug("Marking serialization started for {}", clusterKey);
+        sessions.lock(getPendingKey(clusterKey));
+    }
+
+    @Override
     public void markSerializationStarted(String clusterKey,
             Duration timeToLive) {
         getLogger().debug("Marking serialization started for {}", clusterKey);

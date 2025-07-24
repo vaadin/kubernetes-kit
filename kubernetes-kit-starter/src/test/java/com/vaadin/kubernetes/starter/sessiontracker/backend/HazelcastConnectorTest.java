@@ -102,6 +102,14 @@ public class HazelcastConnectorTest {
 
     @Test
     void markSerializationStarted_sessionLocked() {
+        connector.markSerializationStarted(clusterKey);
+
+        verify(sessionMap)
+                .lock(eq(HazelcastConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markSerializationStarted_zeroExpiration_sessionLockedWithoutTimeToLive() {
         connector.markSerializationStarted(clusterKey, Duration.ofMinutes(0));
 
         verify(sessionMap)
@@ -109,7 +117,7 @@ public class HazelcastConnectorTest {
     }
 
     @Test
-    void markSerializationStarted_expiration_sessionLockedWithTimeToLive() {
+    void markSerializationStarted_validExpiration_sessionLockedWithTimeToLive() {
         connector.markSerializationStarted(clusterKey, Duration.ofMinutes(30));
 
         verify(sessionMap).lock(

@@ -59,6 +59,11 @@ class DebugBackendConnector implements BackendConnector,
     }
 
     @Override
+    public void markSerializationStarted(String clusterKey) {
+        getJob(clusterKey).serializationStarted();
+    }
+
+    @Override
     public void markSerializationStarted(String clusterKey,
             Duration timeToLive) {
         getJob(clusterKey).serializationStarted();

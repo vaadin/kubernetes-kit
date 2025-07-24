@@ -80,6 +80,16 @@ public class RedisConnector implements BackendConnector {
     }
 
     @Override
+    public void markSerializationStarted(String clusterKey) {
+        getLogger().debug("Marking serialization started for {}", clusterKey);
+        try (RedisConnection connection = redisConnectionFactory
+                .getConnection()) {
+            connection.set(getPendingKey(clusterKey),
+                    BackendUtil.b("" + System.currentTimeMillis()));
+        }
+    }
+
+    @Override
     public void markSerializationStarted(String clusterKey,
             Duration timeToLive) {
         getLogger().debug("Marking serialization started for {}", clusterKey);
