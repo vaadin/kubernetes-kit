@@ -9,6 +9,7 @@
     </parent>
 
     <artifactId>kubernetes-kit-demo</artifactId>
+    <name>Kubernetes Kit Demo</name>
 
     <properties>
         <maven.source.skip>true</maven.source.skip>

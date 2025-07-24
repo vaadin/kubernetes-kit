@@ -11,6 +11,7 @@
     <artifactId>kubernetes-kit</artifactId>
     <version>2.4-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <name>Kubernetes Kit</name>
 
     <licenses>
         <license>
