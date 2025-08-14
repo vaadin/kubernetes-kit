@@ -6,7 +6,6 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
 import com.vaadin.flow.server.VaadinService;
-import com.vaadin.flow.server.auth.ViewAccessChecker;
 import com.vaadin.flow.shared.ui.Dependency;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
@@ -28,7 +27,6 @@ class SerializationPropertiesTest {
         Predicate<Class<?>> filter = props.transientInjectableFilter();
 
         assertFalse(filter.test(VaadinService.class));
-        assertFalse(filter.test(ViewAccessChecker.class));
         assertFalse(filter.test(SpringTransientHandler.class));
 
         assertTrue(filter.test(Dependency.class));
@@ -46,7 +44,6 @@ class SerializationPropertiesTest {
         Predicate<Class<?>> filter = props.transientInjectableFilter();
 
         assertTrue(filter.test(VaadinService.class));
-        assertTrue(filter.test(ViewAccessChecker.class));
         assertTrue(filter.test(SpringTransientHandler.class));
 
         assertFalse(filter.test(Dependency.class));
@@ -59,8 +56,7 @@ class SerializationPropertiesTest {
         SerializationProperties.TransientsProperties props = new SerializationProperties()
                 .getTransients();
         props.getExcludePackages()
-                .addAll(List.of(ViewAccessChecker.class.getPackageName(),
-                        TransientDescriptor.class.getPackageName()));
+                .add(TransientDescriptor.class.getPackageName());
         props.getIncludePackages()
                 .addAll(List.of(VaadinService.class.getPackageName(),
                         SessionSerializer.class.getPackageName()));
@@ -72,7 +68,6 @@ class SerializationPropertiesTest {
         assertTrue(filter.test(PushSessionTracker.class));
 
         assertFalse(filter.test(SpringTransientHandler.class));
-        assertFalse(filter.test(ViewAccessChecker.class));
         assertFalse(filter.test(Dependency.class));
     }
 
@@ -87,7 +82,6 @@ class SerializationPropertiesTest {
         assertTrue(filter.test(SessionSerializer.class));
         assertTrue(filter.test(PushSessionTracker.class));
         assertTrue(filter.test(SpringTransientHandler.class));
-        assertTrue(filter.test(ViewAccessChecker.class));
         assertTrue(filter.test(Dependency.class));
     }
 

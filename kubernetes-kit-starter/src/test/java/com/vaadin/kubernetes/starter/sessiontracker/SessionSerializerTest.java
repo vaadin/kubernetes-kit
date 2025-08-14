@@ -714,7 +714,8 @@ class SessionSerializerTest {
                         withSettings().serializable());
                 when(deploymentConfiguration.isProductionMode())
                         .thenReturn(false);
-                session.setConfiguration(deploymentConfiguration);
+                when(session.getConfiguration())
+                        .thenReturn(deploymentConfiguration);
             } finally {
                 lock.unlock();
             }
