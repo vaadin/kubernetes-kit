@@ -9,11 +9,7 @@
  */
 package com.vaadin.kubernetes.starter;
 
-import com.vaadin.flow.internal.UsageStatistics;
-import com.vaadin.flow.server.ServiceInitEvent;
-import com.vaadin.flow.server.VaadinServiceInitListener;
-import com.vaadin.pro.licensechecker.BuildType;
-import com.vaadin.pro.licensechecker.LicenseChecker;
+import com.vaadin.flow.server.startup.BaseLicenseCheckerServiceInitListener;
 
 /**
  * Service initialization listener to verify the license.
@@ -21,22 +17,9 @@ import com.vaadin.pro.licensechecker.LicenseChecker;
  * @author Vaadin Ltd
  */
 public class LicenseCheckerServiceInitListener
-        implements VaadinServiceInitListener {
+        extends BaseLicenseCheckerServiceInitListener {
 
-    @Override
-    public void serviceInit(ServiceInitEvent event) {
-        final var service = event.getSource();
-        final var version = ProductUtils.getVersion();
-
-        UsageStatistics.markAsUsed(ProductUtils.PRODUCT_NAME, version);
-
-        // Check the license at runtime if in development mode
-        if (!service.getDeploymentConfiguration().isProductionMode()) {
-            // Using a null BuildType to allow trial licensing builds
-            // The variable is defined to avoid method signature ambiguity
-            BuildType buildType = null;
-            LicenseChecker.checkLicense(ProductUtils.PRODUCT_NAME, version,
-                    buildType);
-        }
+    protected LicenseCheckerServiceInitListener() {
+        super(ProductUtils.PRODUCT_NAME, ProductUtils.getVersion());
     }
 }
