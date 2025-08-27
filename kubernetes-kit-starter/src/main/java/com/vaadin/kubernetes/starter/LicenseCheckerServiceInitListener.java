@@ -19,7 +19,7 @@ import com.vaadin.flow.server.startup.BaseLicenseCheckerServiceInitListener;
 public class LicenseCheckerServiceInitListener
         extends BaseLicenseCheckerServiceInitListener {
 
-    protected LicenseCheckerServiceInitListener() {
+    public LicenseCheckerServiceInitListener() {
         super(ProductUtils.PRODUCT_NAME, ProductUtils.getVersion());
     }
 }
