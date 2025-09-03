@@ -20,7 +20,7 @@ public class LicenseCheckerServiceInitListener
         extends BaseLicenseCheckerServiceInitListener {
 
     /**
-     * Initializes a license checking mechanism for Kubernetes Kit using its
+     * Initializes a license-checking mechanism for Kubernetes Kit using its
      * product name and current version.
      */
     public LicenseCheckerServiceInitListener() {
