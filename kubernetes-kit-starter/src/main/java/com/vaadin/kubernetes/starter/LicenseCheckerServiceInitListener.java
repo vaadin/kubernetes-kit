@@ -19,7 +19,11 @@ import com.vaadin.flow.server.startup.BaseLicenseCheckerServiceInitListener;
 public class LicenseCheckerServiceInitListener
         extends BaseLicenseCheckerServiceInitListener {
 
-    protected LicenseCheckerServiceInitListener() {
+    /**
+     * Initializes a license-checking mechanism for Kubernetes Kit using its
+     * product name and current version.
+     */
+    public LicenseCheckerServiceInitListener() {
         super(ProductUtils.PRODUCT_NAME, ProductUtils.getVersion());
     }
 }
