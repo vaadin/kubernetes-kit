@@ -9,8 +9,8 @@
  */
 package com.vaadin.kubernetes.starter.ui;
 
-import elemental.json.Json;
-import elemental.json.JsonObject;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Tag;
@@ -24,7 +24,7 @@ public class SessionDebugNotifier extends Component {
 
     public void publishResults(Result result) {
         // Add serialization result to show notifications on browser
-        JsonObject propValue = Json.createObject();
+        ObjectNode propValue = JsonNodeFactory.instance.objectNode();
         // just to make sure property is always detected as changed since when
         // closing notification value is nullified only on client side
         propValue.put("timestamp", System.nanoTime());
