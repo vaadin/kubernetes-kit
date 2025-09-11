@@ -60,7 +60,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMod
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
 
 /**
- * This configuration bean is provided to auto-configure Vaadin apps to run in a
+ * This configuration bean is provided to autoconfigure Vaadin apps to run in a
  * clustered environment.
  */
 @AutoConfiguration
@@ -88,8 +88,10 @@ public class KubernetesKitConfiguration {
         }
 
         SessionTrackerFilter sessionTrackerFilter(
-                SessionSerializer sessionSerializer) {
-            return new SessionTrackerFilter(sessionSerializer, properties);
+                SessionSerializer sessionSerializer,
+                SessionListener sessionListener) {
+            return new SessionTrackerFilter(sessionSerializer, sessionListener,
+                    properties);
         }
 
         SessionListener sessionListener(BackendConnector backendConnector,
@@ -189,7 +191,7 @@ public class KubernetesKitConfiguration {
             pushSessionTracker.setActiveSessionChecker(
                     sessionListener.activeSessionChecker());
             FilterRegistrationBean<SessionTrackerFilter> registration = new FilterRegistrationBean<>(
-                    sessionTrackerFilter(sessionSerializer)) {
+                    sessionTrackerFilter(sessionSerializer, sessionListener)) {
                 @Override
                 protected FilterRegistration.Dynamic addRegistration(
                         String description, ServletContext servletContext) {

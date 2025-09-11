@@ -30,30 +30,33 @@ import com.vaadin.kubernetes.starter.KubernetesKitProperties;
 /**
  * An HTTP filter implementation that serializes and persists HTTP session on a
  * distributed storage at the end of the request.
- *
+ * <p>
  * This filter uses a {@link SessionSerializer} component to serialize and
  * persist the HTTP session. Furthermore, it should be used in combination with
  * {@link SessionListener}, the component responsible for retrieve the session
  * attributes from the distributed storage and populate the HTTP session.
- *
+ * <p>
  * A unique identifier is assigned to valid HTTP sessions and sent to the client
  * as a tracking HTTP Cookie. The same identifier is used to associate the
  * session within the distributed storage.
- *
+ * <p>
  * If the HTTP request has not a valid session but the tracking Cookie exists,
  * the filter forces the creation of a new HTTP session, that is then populated
  * with data from the distributed storage by {@link SessionListener}.
- *
+ * <p>
  * The filter acts only on requests handled by Vaadin Flow.
  */
 public class SessionTrackerFilter extends HttpFilter {
 
     private final transient SessionSerializer sessionSerializer;
+    private final transient SessionListener sessionListener;
     private final transient KubernetesKitProperties properties;
 
     public SessionTrackerFilter(SessionSerializer sessionSerializer,
+            SessionListener sessionListener,
             KubernetesKitProperties properties) {
         this.sessionSerializer = sessionSerializer;
+        this.sessionListener = sessionListener;
         this.properties = properties;
     }
 
@@ -87,6 +90,12 @@ public class SessionTrackerFilter extends HttpFilter {
         } finally {
             CurrentKey.clear();
         }
+    }
+
+    @Override
+    public void destroy() {
+        sessionListener.stop();
+        super.destroy();
     }
 
     private Consumer<Cookie> cookieConsumer(HttpServletRequest request) {
