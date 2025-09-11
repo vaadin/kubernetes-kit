@@ -107,7 +107,8 @@ public class SerializationDebugRequestHandler
         this.sessionSerializer = new SessionSerializer(debugBackendConnector,
                 debugBackendConnector, SessionExpirationPolicy.NEVER,
                 SessionSerializationCallback.DEFAULT,
-                new TransientInjectableObjectStreamFactory());
+                new TransientInjectableObjectStreamFactory(),
+                serializationProperties);
     }
 
     @Override
@@ -299,8 +300,8 @@ public class SerializationDebugRequestHandler
 
     private int getSerializationTimeout(SerializationProperties properties) {
         int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
-        if (properties != null && properties.getTimeout() > 0) {
-            timeout = properties.getTimeout();
+        if (properties != null && properties.getSerializationTimeout() > 0) {
+            timeout = properties.getSerializationTimeout();
         } else {
             String timeoutStr = System
                     .getProperty(SERIALIZATION_TIMEOUT_PROPERTY);

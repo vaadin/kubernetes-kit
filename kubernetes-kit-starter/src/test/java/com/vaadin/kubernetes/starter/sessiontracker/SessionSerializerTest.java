@@ -37,6 +37,7 @@ import com.vaadin.flow.server.VaadinServletService;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
@@ -76,17 +77,20 @@ class SessionSerializerTest {
     private Duration timeToLive;
     private MockVaadinService vaadinService;
     private TransientHandler transientHandler;
+    private SerializationProperties serializationProperties;
 
     @BeforeEach
     void setUp() {
         serializationCallback = mock(SessionSerializationCallback.class);
         connector = mock(BackendConnector.class);
         transientHandler = mock(TransientHandler.class);
+        serializationProperties = new SerializationProperties();
         serializer = new SessionSerializer(connector, transientHandler,
                 sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
                         ChronoUnit.MINUTES),
-                serializationCallback, TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS,
-                new TransientInjectableObjectStreamFactory());
+                serializationCallback,
+                new TransientInjectableObjectStreamFactory(),
+                serializationProperties);
 
         clusterSID = UUID.randomUUID().toString();
         httpSession = newHttpSession(clusterSID);

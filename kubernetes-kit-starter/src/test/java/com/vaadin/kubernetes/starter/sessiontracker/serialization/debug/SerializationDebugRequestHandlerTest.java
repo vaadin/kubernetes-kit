@@ -70,7 +70,7 @@ class SerializationDebugRequestHandlerTest {
     @BeforeEach
     void setUp() {
         SerializationProperties serializationProperties = new SerializationProperties();
-        serializationProperties.setTimeout(30000);
+        serializationProperties.setSerializationTimeout(30000);
         handler = new SerializationDebugRequestHandler(serializationProperties);
         httpSession = new MockHttpSession();
         VaadinService vaadinService = mock(VaadinService.class);
@@ -302,7 +302,7 @@ class SerializationDebugRequestHandlerTest {
     @Test
     void handleRequest_serializationTimeout_timeoutReported() {
         SerializationProperties properties = new SerializationProperties();
-        properties.setTimeout(100);
+        properties.setSerializationTimeout(100);
         handler = new SerializationDebugRequestHandler(properties);
 
         httpSession.setAttribute("OBJ1", new SlowSerialization());

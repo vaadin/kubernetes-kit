@@ -45,6 +45,7 @@ import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
 import com.vaadin.kubernetes.starter.ProductUtils;
+import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
@@ -112,8 +113,6 @@ public class SessionSerializer
         ProductUtils.markAsUsed(SessionSerializer.class.getSimpleName());
     }
 
-    private static final long OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
-
     private final ExecutorService executorService = Executors
             .newFixedThreadPool(4, new SerializationThreadFactory());
 
@@ -124,13 +123,13 @@ public class SessionSerializer
     // (sessionId, clusterKey) -> TransientHandler
     private final BiFunction<String, String, TransientHandler> handlerProvider;
 
-    private final long optimisticSerializationTimeoutMs;
-
     private final SessionSerializationCallback sessionSerializationCallback;
 
     private final SessionExpirationPolicy sessionExpirationPolicy;
 
     private final SerializationStreamFactory serializationStreamFactory;
+
+    private final SerializationProperties serializationProperties;
 
     private Predicate<Class<?>> injectableFilter = type -> true;
 
@@ -145,15 +144,18 @@ public class SessionSerializer
      * @param sessionSerializationCallback
      *            callbacks for successful serialization and deserialization or
      *            when an error happens
+     * @param serializationProperties
+     *            the serialization properties
      */
     public SessionSerializer(BackendConnector backendConnector,
             TransientHandler transientHandler,
             SessionExpirationPolicy sessionExpirationPolicy,
             SessionSerializationCallback sessionSerializationCallback,
-            SerializationStreamFactory serializationStreamFactory) {
+            SerializationStreamFactory serializationStreamFactory,
+            SerializationProperties serializationProperties) {
         this(backendConnector, (sessionId, clusterKey) -> transientHandler,
                 sessionExpirationPolicy, sessionSerializationCallback,
-                serializationStreamFactory);
+                serializationStreamFactory, serializationProperties);
     }
 
     /**
@@ -180,33 +182,21 @@ public class SessionSerializer
      * @param sessionSerializationCallback
      *            callbacks for successful serialization and deserialization or
      *            when an error happens
+     * @param serializationProperties
+     *            the serialization properties
      */
     public SessionSerializer(BackendConnector backendConnector,
             BiFunction<String, String, TransientHandler> transientHandlerProvider,
             SessionExpirationPolicy sessionExpirationPolicy,
             SessionSerializationCallback sessionSerializationCallback,
-            SerializationStreamFactory serializationStreamFactory) {
+            SerializationStreamFactory serializationStreamFactory,
+            SerializationProperties serializationProperties) {
         this.backendConnector = backendConnector;
         this.handlerProvider = transientHandlerProvider;
         this.sessionSerializationCallback = sessionSerializationCallback;
         this.sessionExpirationPolicy = sessionExpirationPolicy;
         this.serializationStreamFactory = serializationStreamFactory;
-        optimisticSerializationTimeoutMs = OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
-    }
-
-    // Visible for test
-    SessionSerializer(BackendConnector backendConnector,
-            TransientHandler transientHandler,
-            SessionExpirationPolicy sessionExpirationPolicy,
-            SessionSerializationCallback sessionSerializationCallback,
-            long optimisticSerializationTimeoutMs,
-            SerializationStreamFactory serializationStreamFactory) {
-        this.backendConnector = backendConnector;
-        this.optimisticSerializationTimeoutMs = optimisticSerializationTimeoutMs;
-        this.sessionSerializationCallback = sessionSerializationCallback;
-        this.sessionExpirationPolicy = sessionExpirationPolicy;
-        this.handlerProvider = (sessionId, clusterKey) -> transientHandler;
-        this.serializationStreamFactory = serializationStreamFactory;
+        this.serializationProperties = serializationProperties;
     }
 
     /**
@@ -334,7 +324,8 @@ public class SessionSerializer
         try {
             checkUnserializableWrappers(attributes);
             long start = System.currentTimeMillis();
-            long timeout = start + optimisticSerializationTimeoutMs;
+            long timeout = start + serializationProperties
+                    .getOptimisticSerializationTimeout();
             getLogger().debug(
                     "Optimistic serialization of session {} with distributed key {} started",
                     sessionId, clusterKey);
