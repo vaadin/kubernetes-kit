@@ -217,6 +217,53 @@ class SessionSerializerTest {
     }
 
     @Test
+    void serialize_optimisticTimeoutZeroOrNegative_immediatelySwitchToPessimisticLocking() {
+        // Set optimistic timeout to zero: should skip optimistic path entirely
+        serializationProperties.setOptimisticSerializationTimeout(0);
+
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID, timeToLive);
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        // Lock the Vaadin session to ensure optimistic would fail if attempted
+        vaadinSession.lock();
+        vaadinSession.setLockTimestamps(30, 20);
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        // Since optimistic timeout is zero, do not wait; immediately allow pessimistic to proceed
+        vaadinSession.unlock();
+        vaadinSession.setLockTimestamps(30, 40);
+
+        await().atMost(300, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector).sendSession(notNull());
+
+        // Now test with a negative timeout value as well
+        serializationProperties.setOptimisticSerializationTimeout(-1);
+        serializationStarted.set(false);
+        serializationCompleted.set(false);
+
+        // Lock again to reproduce the situation
+        vaadinSession.lock();
+        vaadinSession.setLockTimestamps(50, 40);
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector, times(2)).markSerializationStarted(clusterSID, timeToLive);
+
+        vaadinSession.unlock();
+        vaadinSession.setLockTimestamps(50, 60);
+
+        await().atMost(300, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector, times(2)).sendSession(notNull());
+    }
+
+    @Test
     void serialize_and_deserialize_unserializableComponent_usingUnserializableComponentWrapper() {
         UnserializableComponentWrapper<State, Unserializable> wrapper = createUnserializableComponentWrapper();
         vaadinSession.lock();
