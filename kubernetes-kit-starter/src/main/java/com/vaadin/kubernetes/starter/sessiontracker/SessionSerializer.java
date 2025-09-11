@@ -323,22 +323,25 @@ public class SessionSerializer
         String clusterKey = getClusterKey(attributes);
         try {
             checkUnserializableWrappers(attributes);
-            long start = System.currentTimeMillis();
-            long timeout = start + serializationProperties
-                    .getOptimisticSerializationTimeout();
-            getLogger().debug(
-                    "Optimistic serialization of session {} with distributed key {} started",
-                    sessionId, clusterKey);
-            while (System.currentTimeMillis() < timeout) {
-                SessionInfo info = serializeOptimisticLocking(sessionId,
-                        timeToLive, attributes);
-                if (info != null) {
-                    pending.remove(sessionId); // Is this a race condition?
-                    getLogger().debug(
-                            "Optimistic serialization of session {} with distributed key {} completed",
-                            sessionId, clusterKey);
-                    whenSerialized.accept(info);
-                    return;
+            if (serializationProperties
+                    .getOptimisticSerializationTimeout() > 0) {
+                long start = System.currentTimeMillis();
+                long timeout = start + serializationProperties
+                        .getOptimisticSerializationTimeout();
+                getLogger().debug(
+                        "Optimistic serialization of session {} with distributed key {} started",
+                        sessionId, clusterKey);
+                while (System.currentTimeMillis() < timeout) {
+                    SessionInfo info = serializeOptimisticLocking(sessionId,
+                            timeToLive, attributes);
+                    if (info != null) {
+                        pending.remove(sessionId); // Is this a race condition?
+                        getLogger().debug(
+                                "Optimistic serialization of session {} with distributed key {} completed",
+                                sessionId, clusterKey);
+                        whenSerialized.accept(info);
+                        return;
+                    }
                 }
             }
         } catch (PessimisticSerializationRequiredException e) {
@@ -376,8 +379,11 @@ public class SessionSerializer
 
     private SessionInfo serializePessimisticLocking(String sessionId,
             Duration timeToLive, Map<String, Object> attributes) {
-        long start = System.currentTimeMillis();
         String clusterKey = getClusterKey(attributes);
+        long start = System.currentTimeMillis();
+        getLogger().debug(
+                "Pessimistic serialization of session {} with distributed key {} started",
+                sessionId, clusterKey);
         Set<ReentrantLock> locks = getLocks(attributes);
         for (ReentrantLock lock : locks) {
             lock.lock();
