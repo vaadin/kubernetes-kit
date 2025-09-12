@@ -33,9 +33,9 @@ public class SerializationProperties {
 
     public static final int DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
 
-    private int serializationTimeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
+    private int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
 
-    private int optimisticSerializationTimeout = DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
+    private int optimisticTimeout = DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
 
     @NestedConfigurationProperty
     private final TransientsProperties transients = new TransientsProperties();
@@ -47,52 +47,53 @@ public class SerializationProperties {
      * @return the timeout in milliseconds to wait for the serialization to be
      *         completed, defaults to 30000 ms
      */
-    public int getSerializationTimeout() {
-        return serializationTimeout;
+    public int getTimeout() {
+        return timeout;
     }
 
     /**
      * Sets the timeout in milliseconds to wait for the serialization to be
      * completed.
      *
-     * @param serializationTimeout
+     * @param timeout
      *            the timeout in milliseconds to wait for the serialization to
      *            be completed, defaults to 30000 ms
      */
-    public void setSerializationTimeout(int serializationTimeout) {
-        this.serializationTimeout = serializationTimeout;
+    public void setTimeout(int timeout) {
+        this.timeout = timeout;
     }
 
     /**
      * Gets the timeout in milliseconds to wait for the optimistic serialization
      * to be completed.
      * <p>
-     * 0 or negative value means that the optimistic serialization is skipped
+     * 0 or negative value means that the optimistic serialization is disabled
      * and only the pessimistic serialization is performed. Pessimistic
      * serialization locks the Vaadin session during the serialization process.
+     * Disabling the optimistic serialization may affect the UI performance.
      *
      * @return the timeout in milliseconds to wait for the optimistic
      *         serialization to be completed, defaults to 30000 ms
      */
-    public int getOptimisticSerializationTimeout() {
-        return optimisticSerializationTimeout;
+    public int getOptimisticTimeout() {
+        return optimisticTimeout;
     }
 
     /**
      * Sets the timeout in milliseconds to wait for the optimistic serialization
      * to be completed.
      * <p>
-     * 0 or negative value means that the optimistic serialization is skipped
+     * 0 or negative value means that the optimistic serialization is disabled
      * and only the pessimistic serialization is performed. Pessimistic
      * serialization locks the Vaadin session during the serialization process.
+     * Disabling the optimistic serialization may affect the UI performance.
      *
-     * @param optimisticSerializationTimeout
+     * @param optimisticTimeout
      *            the timeout in milliseconds to wait for the optimistic
      *            serialization to be completed, defaults to 30000 ms
      */
-    public void setOptimisticSerializationTimeout(
-            int optimisticSerializationTimeout) {
-        this.optimisticSerializationTimeout = optimisticSerializationTimeout;
+    public void setOptimisticTimeout(int optimisticTimeout) {
+        this.optimisticTimeout = optimisticTimeout;
     }
 
     /**

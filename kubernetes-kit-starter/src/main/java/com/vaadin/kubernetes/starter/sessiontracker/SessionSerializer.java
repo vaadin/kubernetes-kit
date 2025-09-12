@@ -322,12 +322,11 @@ public class SessionSerializer
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            if (serializationProperties
-                    .getOptimisticSerializationTimeout() > 0) {
+            if (serializationProperties.getOptimisticTimeout() > 0) {
                 checkUnserializableWrappers(attributes);
                 long start = System.currentTimeMillis();
-                long timeout = start + serializationProperties
-                        .getOptimisticSerializationTimeout();
+                long timeout = start
+                        + serializationProperties.getOptimisticTimeout();
                 getLogger().debug(
                         "Optimistic serialization of session {} with distributed key {} started",
                         sessionId, clusterKey);

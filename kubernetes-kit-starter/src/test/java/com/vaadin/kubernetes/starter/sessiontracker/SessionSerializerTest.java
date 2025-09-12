@@ -219,7 +219,7 @@ class SessionSerializerTest {
     @Test
     void serialize_optimisticTimeoutZeroOrNegative_immediatelySwitchToPessimisticLocking() {
         // Set optimistic timeout to zero: should skip optimistic path entirely
-        serializationProperties.setOptimisticSerializationTimeout(0);
+        serializationProperties.setOptimisticTimeout(0);
 
         AtomicBoolean serializationStarted = new AtomicBoolean();
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
@@ -236,7 +236,8 @@ class SessionSerializerTest {
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
         verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
-        // Since optimistic timeout is zero, do not wait; immediately allow pessimistic to proceed
+        // Since optimistic timeout is zero, do not wait; immediately allow
+        // pessimistic to proceed
         vaadinSession.unlock();
         vaadinSession.setLockTimestamps(30, 40);
 
@@ -244,7 +245,7 @@ class SessionSerializerTest {
         verify(connector).sendSession(notNull());
 
         // Now test with a negative timeout value as well
-        serializationProperties.setOptimisticSerializationTimeout(-1);
+        serializationProperties.setOptimisticTimeout(-1);
         serializationStarted.set(false);
         serializationCompleted.set(false);
 
@@ -254,7 +255,8 @@ class SessionSerializerTest {
 
         serializer.serialize(httpSession);
         await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector, times(2)).markSerializationStarted(clusterSID, timeToLive);
+        verify(connector, times(2)).markSerializationStarted(clusterSID,
+                timeToLive);
 
         vaadinSession.unlock();
         vaadinSession.setLockTimestamps(50, 60);

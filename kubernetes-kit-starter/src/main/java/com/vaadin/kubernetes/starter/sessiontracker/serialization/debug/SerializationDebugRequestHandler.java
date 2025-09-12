@@ -300,8 +300,8 @@ public class SerializationDebugRequestHandler
 
     private int getSerializationTimeout(SerializationProperties properties) {
         int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
-        if (properties != null && properties.getSerializationTimeout() > 0) {
-            timeout = properties.getSerializationTimeout();
+        if (properties != null && properties.getTimeout() > 0) {
+            timeout = properties.getTimeout();
         } else {
             String timeoutStr = System
                     .getProperty(SERIALIZATION_TIMEOUT_PROPERTY);
