@@ -89,8 +89,8 @@ public class KubernetesKitConfiguration {
 
         SessionTrackerFilter sessionTrackerFilter(
                 SessionSerializer sessionSerializer, Runnable destroyCallback) {
-            return new SessionTrackerFilter(sessionSerializer, kubernetesKitProperties,
-                    destroyCallback);
+            return new SessionTrackerFilter(sessionSerializer,
+                    kubernetesKitProperties, destroyCallback);
         }
 
         SessionListener sessionListener(BackendConnector backendConnector,
