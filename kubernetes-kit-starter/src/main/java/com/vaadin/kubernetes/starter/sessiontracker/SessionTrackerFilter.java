@@ -49,15 +49,27 @@ import com.vaadin.kubernetes.starter.KubernetesKitProperties;
 public class SessionTrackerFilter extends HttpFilter {
 
     private final transient SessionSerializer sessionSerializer;
-    private final transient SessionListener sessionListener;
     private final transient KubernetesKitProperties properties;
+    private final transient Runnable destroyCallback;
 
+    /**
+     * Creates a new {@code SessionTrackerFilter}.
+     *
+     * @param sessionSerializer
+     *            the {@link SessionSerializer} used to serialize and
+     *            deserialize session data
+     * @param properties
+     *            the {@link KubernetesKitProperties} providing configuration
+     *            for the filter
+     * @param destroyCallback
+     *            a {@link Runnable} that will be executed when the filter is
+     *            being taken out of service
+     */
     public SessionTrackerFilter(SessionSerializer sessionSerializer,
-            SessionListener sessionListener,
-            KubernetesKitProperties properties) {
+            KubernetesKitProperties properties, Runnable destroyCallback) {
         this.sessionSerializer = sessionSerializer;
-        this.sessionListener = sessionListener;
         this.properties = properties;
+        this.destroyCallback = destroyCallback;
     }
 
     @Override
@@ -94,7 +106,7 @@ public class SessionTrackerFilter extends HttpFilter {
 
     @Override
     public void destroy() {
-        sessionListener.stop();
+        destroyCallback.run();
         super.destroy();
     }
 

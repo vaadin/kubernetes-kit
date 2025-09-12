@@ -47,7 +47,7 @@ public class SessionListener implements HttpSessionListener {
     private final BackendConnector sessionBackendConnector;
     private final SessionSerializer sessionSerializer;
     private final Set<String> activeSessions = ConcurrentHashMap.newKeySet();
-    private boolean stopSessionListener = false;
+    private boolean stopped = false;
 
     /**
      * Creates a new {@link SessionListener} instance.
@@ -67,7 +67,7 @@ public class SessionListener implements HttpSessionListener {
 
     @Override
     public void sessionCreated(HttpSessionEvent se) {
-        if (stopSessionListener) {
+        if (stopped) {
             return;
         }
         HttpSession session = se.getSession();
@@ -96,7 +96,7 @@ public class SessionListener implements HttpSessionListener {
 
     @Override
     public void sessionDestroyed(HttpSessionEvent se) {
-        if (stopSessionListener) {
+        if (stopped) {
             return;
         }
         HttpSession session = se.getSession();
@@ -135,11 +135,10 @@ public class SessionListener implements HttpSessionListener {
      * handling.
      */
     public void stop() {
-        stopSessionListener = true;
+        stopped = true;
     }
 
     static Logger getLogger() {
         return LoggerFactory.getLogger(SessionListener.class);
     }
-
 }
