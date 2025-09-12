@@ -107,7 +107,8 @@ public class SerializationDebugRequestHandler
         this.sessionSerializer = new SessionSerializer(debugBackendConnector,
                 debugBackendConnector, SessionExpirationPolicy.NEVER,
                 SessionSerializationCallback.DEFAULT,
-                new TransientInjectableObjectStreamFactory());
+                new TransientInjectableObjectStreamFactory(),
+                serializationProperties);
     }
 
     @Override
