@@ -31,7 +31,11 @@ public class SerializationProperties {
 
     public static final int DEFAULT_SERIALIZATION_TIMEOUT_MS = 30000;
 
+    public static final int DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
+
     private int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
+
+    private int optimisticTimeout = DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
 
     @NestedConfigurationProperty
     private final TransientsProperties transients = new TransientsProperties();
@@ -60,6 +64,39 @@ public class SerializationProperties {
     }
 
     /**
+     * Gets the timeout in milliseconds to wait for the optimistic serialization
+     * to be completed.
+     * <p>
+     * 0 or negative value means that the optimistic serialization is disabled
+     * and only the pessimistic serialization is performed. Pessimistic
+     * serialization locks the Vaadin session during the serialization process.
+     * Disabling the optimistic serialization may affect the UI performance.
+     *
+     * @return the timeout in milliseconds to wait for the optimistic
+     *         serialization to be completed, defaults to 30000 ms
+     */
+    public int getOptimisticTimeout() {
+        return optimisticTimeout;
+    }
+
+    /**
+     * Sets the timeout in milliseconds to wait for the optimistic serialization
+     * to be completed.
+     * <p>
+     * 0 or negative value means that the optimistic serialization is disabled
+     * and only the pessimistic serialization is performed. Pessimistic
+     * serialization locks the Vaadin session during the serialization process.
+     * Disabling the optimistic serialization may affect the UI performance.
+     *
+     * @param optimisticTimeout
+     *            the timeout in milliseconds to wait for the optimistic
+     *            serialization to be completed, defaults to 30000 ms
+     */
+    public void setOptimisticTimeout(int optimisticTimeout) {
+        this.optimisticTimeout = optimisticTimeout;
+    }
+
+    /**
      * Gets configuration for transient fields handling during serialization.
      *
      * @return configuration for transient fields handling.
@@ -73,20 +110,20 @@ public class SerializationProperties {
         private final Set<String> excludePackages = new HashSet<>();
 
         /**
-         * Gets a list of packages to consider during class inspection for
+         * Gets a set of packages to consider during class inspection for
          * injectable transient fields.
          *
-         * @return list of packages included in class inspection.
+         * @return set of packages included in class inspection.
          */
         public Set<String> getIncludePackages() {
             return includePackages;
         }
 
         /**
-         * Gets a list of packages to exclude from class inspection for
+         * Gets a set of packages to exclude from class inspection for
          * injectable transient fields.
          *
-         * @return list of packages excluded from class inspection.
+         * @return set of packages excluded from class inspection.
          */
         public Set<String> getExcludePackages() {
             return excludePackages;
@@ -95,10 +132,10 @@ public class SerializationProperties {
         /**
          * Gets a predicate that filters classes based on include/exclude
          * packages configuration.
-         *
+         * <p>
          * An empty inclusion list means all classes are included. Exclusion
          * rules have higher priority over inclusion rules.
-         *
+         * <p>
          * If no inclusion nor exclusion rules are configured all class are
          * eligible for inspection.
          *

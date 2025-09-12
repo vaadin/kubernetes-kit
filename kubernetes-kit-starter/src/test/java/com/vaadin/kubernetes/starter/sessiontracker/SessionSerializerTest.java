@@ -37,6 +37,7 @@ import com.vaadin.flow.server.VaadinServletService;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.SerializationProperties;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandler;
@@ -76,17 +77,20 @@ class SessionSerializerTest {
     private Duration timeToLive;
     private MockVaadinService vaadinService;
     private TransientHandler transientHandler;
+    private SerializationProperties serializationProperties;
 
     @BeforeEach
     void setUp() {
         serializationCallback = mock(SessionSerializationCallback.class);
         connector = mock(BackendConnector.class);
         transientHandler = mock(TransientHandler.class);
+        serializationProperties = new SerializationProperties();
         serializer = new SessionSerializer(connector, transientHandler,
                 sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
                         ChronoUnit.MINUTES),
-                serializationCallback, TEST_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS,
-                new TransientInjectableObjectStreamFactory());
+                serializationCallback,
+                new TransientInjectableObjectStreamFactory(),
+                serializationProperties);
 
         clusterSID = UUID.randomUUID().toString();
         httpSession = newHttpSession(clusterSID);
@@ -210,6 +214,55 @@ class SessionSerializerTest {
 
         await().atMost(1000, MILLISECONDS).untilTrue(serializationCompleted);
         verify(connector).sendSession(notNull());
+    }
+
+    @Test
+    void serialize_optimisticTimeoutZeroOrNegative_immediatelySwitchToPessimisticLocking() {
+        // Set optimistic timeout to zero: should skip optimistic path entirely
+        serializationProperties.setOptimisticTimeout(0);
+
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID, timeToLive);
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+
+        // Lock the Vaadin session to ensure optimistic would fail if attempted
+        vaadinSession.lock();
+        vaadinSession.setLockTimestamps(30, 20);
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        // Since optimistic timeout is zero, do not wait; immediately allow
+        // pessimistic to proceed
+        vaadinSession.unlock();
+        vaadinSession.setLockTimestamps(30, 40);
+
+        await().atMost(300, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector).sendSession(notNull());
+
+        // Now test with a negative timeout value as well
+        serializationProperties.setOptimisticTimeout(-1);
+        serializationStarted.set(false);
+        serializationCompleted.set(false);
+
+        // Lock again to reproduce the situation
+        vaadinSession.lock();
+        vaadinSession.setLockTimestamps(50, 40);
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector, times(2)).markSerializationStarted(clusterSID,
+                timeToLive);
+
+        vaadinSession.unlock();
+        vaadinSession.setLockTimestamps(50, 60);
+
+        await().atMost(300, MILLISECONDS).untilTrue(serializationCompleted);
+        verify(connector, times(2)).sendSession(notNull());
     }
 
     @Test

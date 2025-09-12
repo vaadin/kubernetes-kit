@@ -80,16 +80,16 @@ public class KubernetesKitConfiguration {
         private static final Predicate<Class<?>> TRANSIENT_INJECTABLE_VAADIN_EXCLUSIONS = type -> !type
                 .getPackageName().startsWith("com.vaadin.flow.internal");
 
-        final KubernetesKitProperties properties;
+        final KubernetesKitProperties kubernetesKitProperties;
 
         public VaadinReplicatedSessionConfiguration(
-                KubernetesKitProperties properties) {
-            this.properties = properties;
+                KubernetesKitProperties kubernetesKitProperties) {
+            this.kubernetesKitProperties = kubernetesKitProperties;
         }
 
         SessionTrackerFilter sessionTrackerFilter(
                 SessionSerializer sessionSerializer, Runnable destroyCallback) {
-            return new SessionTrackerFilter(sessionSerializer, properties,
+            return new SessionTrackerFilter(sessionSerializer, kubernetesKitProperties,
                     destroyCallback);
         }
 
@@ -115,7 +115,7 @@ public class KubernetesKitConfiguration {
         @Bean
         @ConditionalOnMissingBean
         SessionExpirationPolicy sessionExpirationPolicy() {
-            Duration duration = properties
+            Duration duration = kubernetesKitProperties
                     .getBackendSessionExpirationTolerance();
             if (duration != null) {
                 return sessionTimeout -> duration.plus(sessionTimeout,
@@ -142,11 +142,12 @@ public class KubernetesKitConfiguration {
                 SessionSerializationCallback sessionSerializationCallback,
                 SessionExpirationPolicy sessionExpirationPolicy,
                 @Autowired(required = false) @Qualifier(TRANSIENT_INJECTABLE_FILTER) Predicate<Class<?>> injectablesFilter,
-                SerializationStreamFactory serializationStreamFactory) {
+                SerializationStreamFactory serializationStreamFactory,
+                SerializationProperties serializationProperties) {
             SessionSerializer sessionSerializer = new SessionSerializer(
                     backendConnector, transientInjector,
                     sessionExpirationPolicy, sessionSerializationCallback,
-                    serializationStreamFactory);
+                    serializationStreamFactory, serializationProperties);
             if (injectablesFilter != null) {
                 sessionSerializer.setInjectableFilter(injectablesFilter);
             }
