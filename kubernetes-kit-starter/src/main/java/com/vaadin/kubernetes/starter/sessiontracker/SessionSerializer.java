@@ -322,9 +322,9 @@ public class SessionSerializer
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            checkUnserializableWrappers(attributes);
             if (serializationProperties
                     .getOptimisticSerializationTimeout() > 0) {
+                checkUnserializableWrappers(attributes);
                 long start = System.currentTimeMillis();
                 long timeout = start + serializationProperties
                         .getOptimisticSerializationTimeout();
