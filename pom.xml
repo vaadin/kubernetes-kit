@@ -43,7 +43,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <flow.version>24.9-SNAPSHOT</flow.version>
-        <testbench.version>9.2.2</testbench.version>
+        <testbench.version>9.5.0</testbench.version>
         <spring.boot.version>3.5.5</spring.boot.version>
         <maven.jar.version>3.3.0</maven.jar.version>
         <maven.source.version>3.2.1</maven.source.version>
