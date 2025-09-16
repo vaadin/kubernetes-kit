@@ -106,8 +106,9 @@ public class SessionTrackerFilter extends HttpFilter {
 
     @Override
     public void destroy() {
-        destroyCallback.run();
-        super.destroy();
+        if (destroyCallback != null) {
+            destroyCallback.run();
+        }
     }
 
     private Consumer<Cookie> cookieConsumer(HttpServletRequest request) {
