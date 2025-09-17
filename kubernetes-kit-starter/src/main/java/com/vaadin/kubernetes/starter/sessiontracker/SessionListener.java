@@ -26,15 +26,15 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 /**
  * An {@link HttpSessionListener} implementation that handles population and
  * destruction of session data stored on a distributed storage.
- *
+ * <p>
  * In presence of a tracking Cookie set by {@link SessionTrackerFilter}, on
  * session creation, the distributed storage is queried for persisted attributes
  * that are then used to populate the newly created {@link HttpSession}.
- *
+ * <p>
  * Data is fetched in binary format from the distributed storage by a
  * {@link BackendConnector} and then deserialized and copied into HTTP session
  * by {@link SessionSerializer}.
- *
+ * <p>
  * When HTTP session is destroyed, also relative data on distribute storage is
  * deleted by the backend connector.
  *
@@ -47,6 +47,7 @@ public class SessionListener implements HttpSessionListener {
     private final BackendConnector sessionBackendConnector;
     private final SessionSerializer sessionSerializer;
     private final Set<String> activeSessions = ConcurrentHashMap.newKeySet();
+    private boolean stopped = false;
 
     /**
      * Creates a new {@link SessionListener} instance.
@@ -66,6 +67,9 @@ public class SessionListener implements HttpSessionListener {
 
     @Override
     public void sessionCreated(HttpSessionEvent se) {
+        if (stopped) {
+            return;
+        }
         HttpSession session = se.getSession();
         getLogger().debug("Session with id {} created", session.getId());
         activeSessions.add(session.getId());
@@ -92,6 +96,9 @@ public class SessionListener implements HttpSessionListener {
 
     @Override
     public void sessionDestroyed(HttpSessionEvent se) {
+        if (stopped) {
+            return;
+        }
         HttpSession session = se.getSession();
         String sessionId = session.getId();
         activeSessions.remove(sessionId);
@@ -123,8 +130,15 @@ public class SessionListener implements HttpSessionListener {
         return activeSessions::contains;
     }
 
+    /**
+     * Stops this session listener to skip any further {@code HttpSessionEvent}
+     * handling.
+     */
+    public void stop() {
+        stopped = true;
+    }
+
     static Logger getLogger() {
         return LoggerFactory.getLogger(SessionListener.class);
     }
-
 }

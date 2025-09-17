@@ -9,9 +9,12 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker.push;
 
+import java.util.Collection;
 import java.util.function.Consumer;
 
 import org.atmosphere.cpr.AtmosphereResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.di.Lookup;
@@ -49,9 +52,23 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
     }
 
     private void notifyPushListeners(Consumer<PushSendListener> action) {
-        getUI().getSession().getService().getContext()
-                .getAttribute(Lookup.class).lookupAll(PushSendListener.class)
-                .forEach(action);
+        Collection<PushSendListener> pushSendListeners = null;
+        try {
+            pushSendListeners = getUI().getSession().getService().getContext()
+                    .getAttribute(Lookup.class)
+                    .lookupAll(PushSendListener.class);
+        } catch (IllegalStateException ex) {
+            Logger logger = LoggerFactory.getLogger(getClass());
+            String message = "Cannot get PushSendListener instances. Most likely application server is shutting down and the error can be ignored.";
+            if (logger.isTraceEnabled()) {
+                logger.trace(message, ex);
+            } else {
+                logger.debug(message);
+            }
+        }
+        if (pushSendListeners != null) {
+            pushSendListeners.forEach(action);
+        }
     }
 
     /**
