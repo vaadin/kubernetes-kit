@@ -38,8 +38,9 @@ import static org.mockito.Mockito.when;
 class SessionTrackerFilterTest {
 
     SessionSerializer serializer = mock(SessionSerializer.class);
+    Runnable destroyCallback = mock(Runnable.class);
     SessionTrackerFilter filter = new SessionTrackerFilter(serializer,
-            new KubernetesKitProperties());
+            new KubernetesKitProperties(), destroyCallback);
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -51,12 +52,6 @@ class SessionTrackerFilterTest {
 
     @Captor
     private ArgumentCaptor<Consumer<Cookie>> cookieConsumerArgumentCaptor;
-
-    @AfterEach
-    void assertFilterChainIsAlwaysExecuted()
-            throws ServletException, IOException {
-        verify(filterChain).doFilter(request, response);
-    }
 
     @Test
     void validHttpSession_UIDLRequest_sessionSerialized() throws Exception {
@@ -70,6 +65,7 @@ class SessionTrackerFilterTest {
         verify(serializer).serialize(httpSession);
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -84,6 +80,7 @@ class SessionTrackerFilterTest {
         verifyNoInteractions(serializer);
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -92,6 +89,7 @@ class SessionTrackerFilterTest {
         when(request.isRequestedSessionIdValid()).thenReturn(true);
         filter.doFilter(request, response, filterChain);
         verifyNoInteractions(serializer);
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -104,6 +102,7 @@ class SessionTrackerFilterTest {
         verifyNoInteractions(serializer);
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -118,6 +117,7 @@ class SessionTrackerFilterTest {
 
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -133,6 +133,7 @@ class SessionTrackerFilterTest {
         verifyNoInteractions(serializer);
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -155,6 +156,13 @@ class SessionTrackerFilterTest {
         assertTrue(cookie.isHttpOnly());
         assertEquals("contextpath", cookie.getPath());
         assertEquals("Strict", cookie.getAttribute("SameSite"));
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void filterDestroyed_destroyCallback_run() {
+        filter.destroy();
+        verify(destroyCallback).run();
     }
 
     private MockHttpSession setupHttpSession() {

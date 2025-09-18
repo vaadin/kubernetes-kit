@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 public class SessionListenerTest {
+
     @AfterEach
     void cleanUp() {
         CurrentKey.clear();
@@ -148,6 +149,22 @@ public class SessionListenerTest {
         Assertions.assertFalse(checker.test(sessionEvent.getSession().getId()),
                 "HTTP Session should not be active");
 
+    }
+
+    @Test
+    void sessionListenerStopped_sessionNotCreatedOrDestroyed() {
+        BackendConnector backendConnector = mock(BackendConnector.class);
+        SessionSerializer sessionSerializer = mock(SessionSerializer.class);
+        HttpSessionEvent sessionEvent = createSessionEvent();
+        SessionListener listener = new SessionListener(backendConnector,
+                sessionSerializer);
+        listener.stop();
+
+        listener.sessionCreated(sessionEvent);
+        verify(sessionEvent, never()).getSession();
+
+        listener.sessionDestroyed(sessionEvent);
+        verify(sessionEvent, never()).getSession();
     }
 
     private static HttpSessionEvent createSessionEvent() {
