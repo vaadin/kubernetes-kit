@@ -260,7 +260,10 @@ public class SessionSerializer implements
      */
     public void deserialize(SessionInfo sessionInfo, HttpSession session)
             throws Exception {
-        VaadinService.setCurrent(vaadinService);
+        VaadinService currentService = VaadinService.getCurrent();
+        if (currentService == null) {
+            VaadinService.setCurrent(vaadinService);
+        }
         try {
             Map<String, Object> values = doDeserialize(sessionInfo,
                     session.getId());
@@ -268,7 +271,9 @@ public class SessionSerializer implements
                 session.setAttribute(entry.getKey(), entry.getValue());
             }
         } finally {
-            VaadinService.setCurrent(null);
+            if (currentService == null) {
+                VaadinService.setCurrent(null);
+            }
         }
     }
 
