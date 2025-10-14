@@ -38,17 +38,18 @@
     </profiles>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>${maven.compiler.release}</maven.compiler.source>
+        <maven.compiler.target>${maven.compiler.release}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <flow.version>25.0-SNAPSHOT</flow.version>
         <testbench.version>10.0.0-alpha3</testbench.version>
-        <spring.boot.version>4.0.0-M1</spring.boot.version>
+        <spring.boot.version>4.0.0-M3</spring.boot.version>
         <maven.jar.version>3.3.0</maven.jar.version>
         <maven.source.version>3.2.1</maven.source.version>
         <maven.javadoc.version>3.4.1</maven.javadoc.version>
-        <maven.surefire.version>2.22.2</maven.surefire.version>
+        <maven.surefire.version>3.5.4</maven.surefire.version>
         <maven.formatter.version>2.20.0</maven.formatter.version>
     </properties>
 
