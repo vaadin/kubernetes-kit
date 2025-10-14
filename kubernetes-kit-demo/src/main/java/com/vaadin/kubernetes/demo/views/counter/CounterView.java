@@ -1,5 +1,6 @@
 package com.vaadin.kubernetes.demo.views.counter;
 
+import java.awt.*;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -12,6 +13,7 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.ListItem;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.UnorderedList;
+import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -60,7 +62,8 @@ public class CounterView extends VerticalLayout {
 
         add(counterHeading, hostnameHeading, ipAddressHeading, button,
                 new Button("Use Service", ev -> doSomethingWithService()));
-        addAndExpand(log);
+        Scroller logContainer = new Scroller(log);
+        addAndExpand(logContainer);
     }
 
     public CrmService getService() {
