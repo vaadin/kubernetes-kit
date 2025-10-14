@@ -41,6 +41,9 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.server.ServiceInitEvent;
+import com.vaadin.flow.server.VaadinService;
+import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
@@ -106,8 +109,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
  * In case of a server shutdown, it waits for pending session serializations to
  * complete.
  */
-public class SessionSerializer
-        implements ApplicationListener<ContextClosedEvent> {
+public class SessionSerializer implements
+        ApplicationListener<ContextClosedEvent>, VaadinServiceInitListener {
 
     static {
         ProductUtils.markAsUsed(SessionSerializer.class.getSimpleName());
@@ -132,6 +135,8 @@ public class SessionSerializer
     private final SerializationProperties serializationProperties;
 
     private Predicate<Class<?>> injectableFilter = type -> true;
+
+    private VaadinService vaadinService;
 
     /**
      * Creates a new {@link SessionSerializer}.
@@ -255,11 +260,20 @@ public class SessionSerializer
      */
     public void deserialize(SessionInfo sessionInfo, HttpSession session)
             throws Exception {
-        Map<String, Object> values = doDeserialize(sessionInfo,
-                session.getId());
-
-        for (Entry<String, Object> entry : values.entrySet()) {
-            session.setAttribute(entry.getKey(), entry.getValue());
+        VaadinService currentService = VaadinService.getCurrent();
+        if (currentService == null) {
+            VaadinService.setCurrent(vaadinService);
+        }
+        try {
+            Map<String, Object> values = doDeserialize(sessionInfo,
+                    session.getId());
+            for (Entry<String, Object> entry : values.entrySet()) {
+                session.setAttribute(entry.getKey(), entry.getValue());
+            }
+        } finally {
+            if (currentService == null) {
+                VaadinService.setCurrent(null);
+            }
         }
     }
 
@@ -646,7 +660,13 @@ public class SessionSerializer
         // the server has not shut down before this and made the session
         // unavailable
         waitForSerialization();
+        this.vaadinService = null;
         executorService.shutdown();
+    }
+
+    @Override
+    public void serviceInit(ServiceInitEvent event) {
+        this.vaadinService = event.getSource();
     }
 
     private static class SerializationThreadFactory implements ThreadFactory {

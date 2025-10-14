@@ -61,6 +61,44 @@ public class SessionUtil {
         };
     }
 
+    /**
+     * VaadinSession service field is usually set by calling
+     * {@link VaadinSession#refreshTransients(WrappedSession, VaadinService)},
+     * but during deserialization {@link WrappedSession} is not available and
+     * the call will fail when refreshing the session lock. This method gets the
+     * Vaadin service instance from {@link VaadinService#getCurrent()}, and if
+     * available injects it into the provided {@link VaadinSession}. The method
+     * returns a runnable that will unset the temporary service instance.
+     *
+     * @param session
+     *            the session to be injected with VaadinService
+     * @return a runnable that will remove the Vaadin service instance from the
+     *         VaadinSession when executed, or a no-op in case of any error
+     */
+    public static Runnable injectServiceIfNeeded(VaadinSession session) {
+        if (session != null && session.getService() == null) {
+            VaadinService service = VaadinService.getCurrent();
+            if (service != null) {
+                try {
+                    Field field = VaadinSession.class
+                            .getDeclaredField("service");
+                    ReflectTools.setJavaFieldValue(session, field, service);
+                    return () -> ReflectTools.setJavaFieldValue(session, field,
+                            null);
+                } catch (NoSuchFieldException e) {
+                    getLogger().debug(
+                            "Cannot access service field on VaadinSession", e);
+                }
+            } else {
+                getLogger().debug(
+                        "Cannot inject VaadinService into VaadinSession because not available on this thread");
+            }
+
+        }
+        return () -> {
+        };
+    }
+
     private static void removeLock(VaadinSession session, Field field) {
         session.getLockInstance().unlock();
         ReflectTools.setJavaFieldValue(session, field, null);

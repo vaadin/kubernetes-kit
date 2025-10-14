@@ -1,5 +1,6 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
+import com.vaadin.flow.server.ServiceInitEvent;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
@@ -31,6 +32,7 @@ import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.function.DeploymentConfiguration;
 import com.vaadin.flow.internal.CurrentInstance;
+import com.vaadin.flow.server.SessionLockCheckStrategy;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.VaadinServletService;
@@ -85,12 +87,6 @@ class SessionSerializerTest {
         connector = mock(BackendConnector.class);
         transientHandler = mock(TransientHandler.class);
         serializationProperties = new SerializationProperties();
-        serializer = new SessionSerializer(connector, transientHandler,
-                sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
-                        ChronoUnit.MINUTES),
-                serializationCallback,
-                new TransientInjectableObjectStreamFactory(),
-                serializationProperties);
 
         clusterSID = UUID.randomUUID().toString();
         httpSession = newHttpSession(clusterSID);
@@ -98,6 +94,14 @@ class SessionSerializerTest {
 
         vaadinService = new MockVaadinService();
         vaadinSession = vaadinService.newMockSession(httpSession);
+
+        serializer = new SessionSerializer(connector, transientHandler,
+                sessionTimeout -> Duration.ofSeconds(sessionTimeout).plus(5,
+                        ChronoUnit.MINUTES),
+                serializationCallback,
+                new TransientInjectableObjectStreamFactory(),
+                serializationProperties);
+        serializer.serviceInit(new ServiceInitEvent(vaadinService));
     }
 
     private static HttpSession newHttpSession(String clusterSID) {
@@ -709,6 +713,7 @@ class SessionSerializerTest {
          */
         public MockVaadinSession(VaadinService service) {
             super(service);
+            applyLockStrategy(SessionLockCheckStrategy.THROW);
         }
 
         @Override
@@ -733,6 +738,13 @@ class SessionSerializerTest {
     }
 
     private static class MockVaadinService extends VaadinServletService {
+
+        public MockVaadinService() {
+            super(null, mock(DeploymentConfiguration.class,
+                    withSettings().serializable()));
+            when(getDeploymentConfiguration().isProductionMode())
+                    .thenReturn(false);
+        }
 
         @Override
         protected VaadinContext constructVaadinContext() {
@@ -761,14 +773,6 @@ class SessionSerializerTest {
             try {
                 session.refreshTransients(wrappedSession, this);
                 storeSession(session, wrappedSession);
-
-                DeploymentConfiguration deploymentConfiguration = mock(
-                        DeploymentConfiguration.class,
-                        withSettings().serializable());
-                when(deploymentConfiguration.isProductionMode())
-                        .thenReturn(false);
-                when(session.getConfiguration())
-                        .thenReturn(deploymentConfiguration);
             } finally {
                 lock.unlock();
             }
