@@ -38,9 +38,9 @@ import static org.mockito.Mockito.when;
 class SessionTrackerFilterTest {
 
     SessionSerializer serializer = mock(SessionSerializer.class);
-    Runnable destroyCallback = mock(Runnable.class);
+    SessionListener sessionListener = mock(SessionListener.class);
     SessionTrackerFilter filter = new SessionTrackerFilter(serializer,
-            new KubernetesKitProperties(), destroyCallback);
+            new KubernetesKitProperties(), sessionListener);
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -162,7 +162,7 @@ class SessionTrackerFilterTest {
     @Test
     void filterDestroyed_destroyCallback_run() {
         filter.destroy();
-        verify(destroyCallback).run();
+        verify(sessionListener).stop();
     }
 
     private MockHttpSession setupHttpSession() {
