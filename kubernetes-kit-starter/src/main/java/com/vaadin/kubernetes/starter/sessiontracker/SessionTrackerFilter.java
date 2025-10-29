@@ -118,7 +118,8 @@ public class SessionTrackerFilter extends HttpFilter {
                             getLogger().debug(
                                     "Initiating session creation for cluster key {}",
                                     key);
-                            return sessionListener.mapSession(key, request)
+                            return sessionListener
+                                    .findExistingSession(key, request)
                                     .map(CompletableFuture::completedFuture)
                                     .orElseGet(() -> {
                                         CompletableFuture<String> newFuture = new CompletableFuture<>();
@@ -292,7 +293,7 @@ public class SessionTrackerFilter extends HttpFilter {
                 key, request.getRequestURI(), request.getRequestedSessionId());
         try {
             HttpSession session = request.getSession(true);
-            sessionListener.sessionCreated(key, session, request);
+            sessionListener.sessionAssociated(key, session, request);
             getLogger().debug("Session created successfully for cluster key {}",
                     key);
         } catch (RuntimeException e) {

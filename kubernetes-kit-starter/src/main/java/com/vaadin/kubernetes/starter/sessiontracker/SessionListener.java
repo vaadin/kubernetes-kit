@@ -32,6 +32,22 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 
 /**
+ * Records the creation of a session that is already associated with the given cluster key,
+ * tracking the original requested session identifier to detect concurrent requests that should
+ * wait for the completion of the current request to propagate the new session cookie to the client.
+ *
+ * @param clusterKey
+ *            The key identifying the session's associated cluster. Must not
+ *            be null.
+ * @param session
+ *            The HTTP session that has already been created and associated with the cluster key. Must not be null.
+ * @param request
+ *            The {@code HttpServletRequest} associated with the session.
+ *            Must not be null.
+ * @throws IllegalStateException if the session is not already associated with the given cluster key
+ */
+
+/**
  * An {@link HttpSessionListener} implementation that handles population and
  * destruction of session data stored on a distributed storage.
  * <p>
@@ -189,16 +205,21 @@ public class SessionListener implements HttpSessionListener,
     }
 
     /**
-     * Retrieves the session ID mapped to the given cluster key, if available.
+     * Finds an existing session associated with the provided cluster key and
+     * request. If a session corresponding to the provided requested session ID
+     * is found in the session creation request map, its session ID will be
+     * returned.
      *
      * @param clusterKey
-     *            the key used to identify a specific cluster in the session
-     *            context
-     * @return an {@code Optional} containing the session ID associated with the
-     *         given cluster key, or an empty {@code Optional} if no mapping
-     *         exists
+     *            the key identifying the session's associated cluster, must not
+     *            be null.
+     * @param request
+     *            the {@code HttpServletRequest} from which the requested
+     *            session ID will be obtained, must not be null.
+     * @return an {@code Optional} containing the session ID if an existing
+     *         session is found, or {@code Optional.empty()} if not.
      */
-    public Optional<String> mapSession(String clusterKey,
+    Optional<String> findExistingSession(String clusterKey,
             HttpServletRequest request) {
         String requestedSessionId = request.getRequestedSessionId();
         if (requestedSessionId == null) {
@@ -210,7 +231,22 @@ public class SessionListener implements HttpSessionListener,
                 .map(SessionCreationRequest::sessionId);
     }
 
-    public void sessionCreated(String clusterKey, HttpSession session,
+    /**
+     * Associates the cluster key with the given session, tracking the original
+     * requested session identifier to detect concurrent requests that should
+     * wait for the completion of the current request to propagate the new
+     * session cookie to the client.
+     *
+     * @param clusterKey
+     *            The key identifying the session's associated cluster. Must not
+     *            be null.
+     * @param session
+     *            The HTTP session that has been created. Must not be null.
+     * @param request
+     *            The {@code HttpServletRequest} associated with the session.
+     *            Must not be null.
+     */
+    void sessionAssociated(String clusterKey, HttpSession session,
             HttpServletRequest request) {
         Objects.requireNonNull(clusterKey, "clusterKey must not be null");
         Objects.requireNonNull(session, "session must not be null");
