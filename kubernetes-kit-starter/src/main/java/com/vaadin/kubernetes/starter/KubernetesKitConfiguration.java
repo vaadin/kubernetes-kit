@@ -88,9 +88,10 @@ public class KubernetesKitConfiguration {
         }
 
         SessionTrackerFilter sessionTrackerFilter(
-                SessionSerializer sessionSerializer, Runnable destroyCallback) {
+                SessionSerializer sessionSerializer,
+                SessionListener sessionListener) {
             return new SessionTrackerFilter(sessionSerializer,
-                    kubernetesKitProperties, destroyCallback);
+                    kubernetesKitProperties, sessionListener);
         }
 
         SessionListener sessionListener(BackendConnector backendConnector,
@@ -192,7 +193,8 @@ public class KubernetesKitConfiguration {
                     sessionListener.activeSessionChecker());
             FilterRegistrationBean<SessionTrackerFilter> registration = new FilterRegistrationBean<>(
                     sessionTrackerFilter(sessionSerializer,
-                            sessionListener::stop)) {
+                            // sessionListener::stop)) {
+                            sessionListener)) {
                 @Override
                 protected FilterRegistration.Dynamic addRegistration(
                         String description, ServletContext servletContext) {
