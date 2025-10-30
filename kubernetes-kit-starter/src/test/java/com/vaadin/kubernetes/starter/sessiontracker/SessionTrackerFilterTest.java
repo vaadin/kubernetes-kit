@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpSessionEvent;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -43,6 +45,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -195,8 +198,9 @@ class SessionTrackerFilterTest {
             return null;
         }).when(serializer).deserialize(any(), any());
 
-        var execution1 = createTestRequest(cookie);
-        var execution2 = createTestRequest(cookie);
+        String invalidSessionId = UUID.randomUUID().toString();
+        var execution1 = createTestRequest(cookie, invalidSessionId);
+        var execution2 = createTestRequest(cookie, invalidSessionId);
 
         CompletableFuture.allOf(
                 CompletableFuture.runAsync(() -> execution1.execute(filter)),
@@ -216,17 +220,54 @@ class SessionTrackerFilterTest {
         verify(sessionCreationExecution.chain).doFilter(
                 sessionCreationExecution.request(),
                 sessionCreationExecution.response());
+        verify(sessionCreationExecution.request).getSession(true);
+        assertThat(sessionCreationExecution.session()).doesNotHaveNullValue();
+        verify(sessionCreationExecution.response, never())
+                .sendRedirect(anyString(), anyInt());
+
         verify(waitingExecution.response).sendRedirect(anyString(), eq(307));
+        verify(waitingExecution.request, never()).getSession(true);
         verify(waitingExecution.chain, never()).doFilter(
                 waitingExecution.request(), waitingExecution.response());
+        assertThat(waitingExecution.session()).hasNullValue();
 
-        // Simulate the temporary redirect
-        var redirect = createTestRequest(cookie);
-        redirect.session().set(sessionCreationExecution.session().get());
+        // Simulate the temporary redirect still have the old session cookie
+        var redirect = createTestRequest(cookie, invalidSessionId);
         redirect.execute(filter);
+        verify(redirect.request, never()).getSession(true);
+        verify(redirect.response).sendRedirect(anyString(), eq(307));
+        verify(redirect.chain, never()).doFilter(waitingExecution.request(),
+                waitingExecution.response());
+        assertThat(redirect.session()).hasNullValue();
 
+        // Simulate the temporary redirect with the correct session cookie
+        redirect = createTestRequest(cookie,
+                sessionCreationExecution.session().get().getId());
+        redirect.execute(filter);
+        verify(redirect.request, never()).getSession(true);
         verify(redirect.chain).doFilter(redirect.request(),
                 redirect.response());
+        assertThat(redirect.session())
+                .hasValue(sessionCreationExecution.session().get());
+
+        // Simulate a request from a browser that has the same cluster key but a
+        // different requested session id
+        // Should never happen unless the session cookie is manually altered on
+        // the browser
+        // In this case we allow creation of a new session to prevent infinite
+        // redirect loop
+        var requestWithDifferentSessionRequestedId = createTestRequest(cookie,
+                "aDifferentSessionId");
+        requestWithDifferentSessionRequestedId.execute(filter);
+        verify(requestWithDifferentSessionRequestedId.response, never())
+                .sendRedirect(anyString(), anyInt());
+        verify(requestWithDifferentSessionRequestedId.request).getSession(true);
+        verify(requestWithDifferentSessionRequestedId.chain).doFilter(
+                requestWithDifferentSessionRequestedId.request(),
+                requestWithDifferentSessionRequestedId.response());
+        assertThat(requestWithDifferentSessionRequestedId.session())
+                .doesNotHaveNullValue()
+                .isNotSameAs(sessionCreationExecution.session().get());
 
     }
 
@@ -247,7 +288,9 @@ class SessionTrackerFilterTest {
     }
 
     record TestRequest(HttpServletRequest request, HttpServletResponse response,
-            AtomicReference<HttpSession> session, FilterChain chain) {
+            AtomicReference<HttpSession> session, String requestedSessionId,
+            FilterChain chain) {
+
         void execute(Filter filter) {
             try {
                 filter.doFilter(request, response, chain);
@@ -255,26 +298,56 @@ class SessionTrackerFilterTest {
                 throw new RuntimeException(e);
             }
         }
+
+        String currentSessionId() {
+            if (session.get() == null) {
+                return requestedSessionId;
+            }
+            return session.get().getId();
+        }
+
     }
 
-    private TestRequest createTestRequest(Cookie cookie) {
+    private final ConcurrentHashMap<String, HttpSession> sessionStore = new ConcurrentHashMap<>();
+
+    private TestRequest createTestRequest(Cookie cookie,
+            String requestedSessionId) {
         // lenient mock because stub calls might be hit or not
         HttpServletRequest request = mock(HttpServletRequest.class,
                 Mockito.withSettings().strictness(Strictness.LENIENT));
         HttpServletResponse response = mock(HttpServletResponse.class);
-        MockHttpSession httpSession = new MockHttpSession();
         AtomicReference<HttpSession> createdSession = new AtomicReference<>();
+        TestRequest testRequest = new TestRequest(request, response,
+                createdSession, requestedSessionId, mock(FilterChain.class));
+
         when(request.getSession(true)).thenAnswer(i -> {
-            createdSession.set(httpSession);
+            String sid = testRequest.requestedSessionId();
+            var session = sessionStore.get(sid);
+            if (session != null) {
+                return session;
+            }
+            MockHttpSession httpSession = new MockHttpSession();
+            sessionStore.put(httpSession.getId(), httpSession);
             sessionListener.sessionCreated(new HttpSessionEvent(httpSession));
+            testRequest.session().set(httpSession);
             return httpSession;
         });
-        when(request.getSession(false)).thenAnswer(i -> createdSession.get());
-        when(request.getRequestedSessionId()).thenReturn("invalidSessionID");
-        when(request.isRequestedSessionIdValid()).thenReturn(false);
+        when(request.getSession(false)).then(i -> {
+            HttpSession currentSession = testRequest.session().get();
+            if (currentSession != null) {
+                return currentSession;
+            }
+            HttpSession httpSession = sessionStore
+                    .get(testRequest.requestedSessionId());
+            testRequest.session().set(httpSession);
+            return httpSession;
+        });
+        when(request.getRequestedSessionId())
+                .then(i -> testRequest.requestedSessionId());
+        when(request.isRequestedSessionIdValid()).then(
+                i -> sessionStore.containsKey(testRequest.requestedSessionId));
         when(request.getCookies()).thenReturn(new Cookie[] { cookie });
 
-        return new TestRequest(request, response, createdSession,
-                mock(FilterChain.class));
+        return testRequest;
     }
 }
