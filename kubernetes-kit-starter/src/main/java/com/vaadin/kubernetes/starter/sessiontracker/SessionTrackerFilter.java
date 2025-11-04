@@ -18,10 +18,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.vaadin.flow.server.HandlerHelper.RequestType;
 import com.vaadin.flow.shared.ApplicationConstants;
@@ -51,6 +58,16 @@ public class SessionTrackerFilter extends HttpFilter {
     private final transient SessionSerializer sessionSerializer;
     private final transient KubernetesKitProperties properties;
     private final transient Runnable destroyCallback;
+    private final SessionListener sessionListener;
+
+    // Track which clients are currently creating sessions
+    private final ConcurrentHashMap<String, CompletableFuture<String>> pendingSessionCreation = new ConcurrentHashMap<>();
+
+    // Timeout for waiting threads (in seconds)
+    private static final long SESSION_CREATION_TIMEOUT_SECONDS = 30;
+
+    // Delay for session cookie to propagate to the client (in milliseconds)
+    private static final int SESSION_COOKIE_PROPAGATION_DELAY_MS = 500;
 
     /**
      * Creates a new {@code SessionTrackerFilter}.
@@ -61,15 +78,17 @@ public class SessionTrackerFilter extends HttpFilter {
      * @param properties
      *            the {@link KubernetesKitProperties} providing configuration
      *            for the filter
-     * @param destroyCallback
-     *            a {@link Runnable} that will be executed when the filter is
-     *            being taken out of service
+     * @param sessionListener
+     *            the {@link SessionListener} instance that tracks HTTP sessions
+     *            lifecycle.
      */
     public SessionTrackerFilter(SessionSerializer sessionSerializer,
-            KubernetesKitProperties properties, Runnable destroyCallback) {
+            KubernetesKitProperties properties,
+            SessionListener sessionListener) {
         this.sessionSerializer = sessionSerializer;
         this.properties = properties;
-        this.destroyCallback = destroyCallback;
+        this.destroyCallback = sessionListener::stop;
+        this.sessionListener = sessionListener;
     }
 
     @Override
@@ -77,15 +96,45 @@ public class SessionTrackerFilter extends HttpFilter {
             HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         String cookieName = properties.getClusterKeyCookieName();
+
+        AtomicReference<Boolean> replayRequestRequired = new AtomicReference<>(
+                false);
+
         SessionTrackerCookie.getValue(request, cookieName).ifPresent(key -> {
-            CurrentKey.set(key);
-            if (request.getSession(false) == null) {
-                // Cluster key set but no session, create one, so it can be
-                // imported if needed
-                getLogger().info("Creating session for cluster key {}", key);
-                request.getSession(true);
+            boolean sessionExists = request.getSession(false) != null;
+            if (!sessionExists) {
+                createOrWaitForSession(request, key, replayRequestRequired);
+            } else {
+                getLogger().debug(
+                        "Session already exists for cluster key {} on request {}",
+                        key, request.getRequestURI());
+                pendingSessionCreation.remove(key);
             }
         });
+
+        // If this is a waiting request, redirect to ensure it uses the new
+        // session ID
+        // The waiting thread only proceeds here after the first request has
+        // flushed its response
+        if (Boolean.TRUE.equals(replayRequestRequired.get())) {
+            String redirectUrl = buildRedirectUrl(request);
+            getLogger().debug(
+                    "Redirecting current request session ID {} to {} to use the new session ID",
+                    request.getRequestedSessionId(), redirectUrl);
+            //response.sendRedirect(redirectUrl, 307);
+            response.setStatus(307);
+            response.setHeader("Location", redirectUrl);
+            response.flushBuffer();
+            return;
+        }
+
+        // Process the request
+        CompletableFuture<String> futureToComplete = null;
+        String clusterKey = CurrentKey.get();
+        if (clusterKey != null) {
+            futureToComplete = pendingSessionCreation.get(clusterKey);
+        }
+
         try {
             HttpSession session = request.getSession(false);
 
@@ -99,8 +148,211 @@ public class SessionTrackerFilter extends HttpFilter {
                                     ApplicationConstants.REQUEST_TYPE_PARAMETER))) {
                 sessionSerializer.serialize(session);
             }
+
+            flushResponseAndUnlockPendingRequests(clusterKey, response, session,
+                    futureToComplete);
+        } catch (Exception e) {
+            // If an error occurs, propagate it to waiting threads
+            if (futureToComplete != null && !futureToComplete.isDone()) {
+                getLogger().error(
+                        "Error processing request for cluster key {}, notifying waiting threads",
+                        clusterKey, e);
+                futureToComplete.completeExceptionally(e);
+                pendingSessionCreation.remove(clusterKey);
+            }
+            throw e;
         } finally {
             CurrentKey.clear();
+        }
+    }
+
+    /**
+     * Handles the creation or waiting for the creation of an HTTP session
+     * associated with a unique cluster key. This method ensures that a session
+     * is created if not already initialized, or waits for the session creation
+     * process to complete if it is already in progress. The method uses
+     * concurrency control to handle simultaneous requests attempting to create
+     * or access a session.
+     *
+     * @param request
+     *            the {@code HttpServletRequest} associated with the incoming
+     *            HTTP request
+     * @param clusterKey
+     *            the unique identifier associated with a session group or
+     *            cluster
+     * @param replayRequestRequired
+     *            an {@code AtomicReference} indicating whether the current
+     *            request needs to be replayed; this might be needed if the
+     *            session ID changes after the response is generated
+     */
+    private void createOrWaitForSession(HttpServletRequest request,
+            String clusterKey, AtomicReference<Boolean> replayRequestRequired) {
+        getLogger().debug(
+                "Request with cluster key {} with requested session id {}: {}",
+                clusterKey, request.getRequestedSessionId(),
+                request.getRequestURI());
+
+        // Use AtomicReference to detect if we created the future
+        AtomicReference<CompletableFuture<String>> sessionCreatingFutureHolder = new AtomicReference<>();
+
+        // Atomically check if session creation is pending or initiate
+        // it
+        CompletableFuture<String> existingFuture = pendingSessionCreation
+                .computeIfAbsent(clusterKey, k -> {
+                    getLogger().debug(
+                            "Initiating session creation for cluster key {}",
+                            clusterKey);
+                    return sessionListener
+                            .findExistingSession(clusterKey, request)
+                            .map(CompletableFuture::completedFuture)
+                            .orElseGet(() -> {
+                                CompletableFuture<String> newFuture = new CompletableFuture<>();
+                                sessionCreatingFutureHolder.set(newFuture);
+                                return newFuture;
+                            });
+                });
+
+        // Check if this thread created the future (first request) or
+        // found an existing one (concurrent request)
+        if (sessionCreatingFutureHolder.get() != null) {
+            // This thread created the future - it's the first request
+            createOrWaitForSession(request, clusterKey, existingFuture);
+            // Note: completion happens after filter chain and
+            // serialization
+        } else {
+            // Concurrent request: wait for session creation to complete
+            replayRequestRequired.set(waitForSessionCreation(request,
+                    clusterKey, existingFuture));
+        }
+    }
+
+    /**
+     * Flushes the HTTP response and unlocks pending requests associated with a
+     * given cluster key. This method ensures the response buffer is flushed to
+     * send headers like Set-Cookie before completing the specified future,
+     * allowing waiting threads to proceed without other potential unnecessary
+     * delays.
+     *
+     * @param clusterKey
+     *            the unique identifier for the session group or cluster
+     * @param response
+     *            the {@code HttpServletResponse} to be flushed
+     * @param session
+     *            the current {@code HttpSession} associated with the cluster
+     *            key
+     * @param sessionCreationFuture
+     *            the {@code CompletableFuture} representing the ongoing session
+     *            creation process
+     */
+    private void flushResponseAndUnlockPendingRequests(String clusterKey,
+            HttpServletResponse response, HttpSession session,
+            CompletableFuture<String> sessionCreationFuture) {
+        // Complete the future after successfully processing and serializing
+        // the session.
+        // Flush the response buffer first to ensure the Set-Cookie header
+        // is sent to the browser
+        // before waiting threads proceed with their redirect. This
+        // eliminates the need for
+        // arbitrary Thread.sleep() delays and provides deterministic
+        // synchronization.
+        if (sessionCreationFuture != null && !sessionCreationFuture.isDone()) {
+            String newSessionId = session != null ? session.getId() : null;
+            try {
+                response.flushBuffer();
+                getLogger().debug(
+                        "Response flushed, completing session {} creation future for cluster key {}",
+                        newSessionId, clusterKey);
+            } catch (IOException e) {
+                getLogger().warn(
+                        "Failed to flush response for cluster key {}, completing future anyway",
+                        clusterKey, e);
+                // Continue to complete the future even if flush fails to
+                // avoid blocking waiting threads
+            }
+            // Delay the completion of the future to allow the browser to
+            // receive the new session ID
+            sessionCreationFuture.completeAsync(() -> newSessionId,
+                    CompletableFuture.delayedExecutor(
+                            SESSION_COOKIE_PROPAGATION_DELAY_MS,
+                            TimeUnit.MILLISECONDS));
+            pendingSessionCreation.remove(clusterKey);
+        }
+    }
+
+    /**
+     * Waits for the creation of a new HTTP session from a distributed
+     * environment. This method blocks until the session is created or a timeout
+     * occurs. It returns true if the current requested session is not the newly
+     * created, indicating that a redirect is required to replay the request
+     * with the correct session cookie.
+     *
+     * @param request
+     *            the HTTP request associated with the session creation
+     * @param key
+     *            the unique cluster key associated with the session
+     * @param sessionCreationFuture
+     *            a {@link CompletableFuture} representing the asynchronous
+     *            operation for session creation
+     * @return {@code true} if the session ID has changed and requires
+     *         redirection, {@code false} otherwise
+     * @throws RuntimeException
+     *             if a timeout occurs, the thread is interrupted, or an error
+     *             occurs during session creation
+     */
+    private boolean waitForSessionCreation(HttpServletRequest request,
+            String key, CompletableFuture<String> sessionCreationFuture) {
+        getLogger().debug(
+                "Waiting for session creation for cluster key {} on request {} with requested session id {}",
+                key, request.getRequestURI(), request.getRequestedSessionId());
+        try {
+            String newSessionId = sessionCreationFuture
+                    .get(SESSION_CREATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            getLogger().debug(
+                    "Session {} creation completed for cluster key {}, redirecting requested session {}",
+                    newSessionId, key, request.getRequestedSessionId());
+            return !newSessionId.equals(request.getRequestedSessionId());
+        } catch (TimeoutException e) {
+            getLogger().error(
+                    "Timeout waiting for session creation for cluster key {}",
+                    key);
+            pendingSessionCreation.remove(key);
+            throw new RuntimeException(
+                    "Timeout waiting for session creation for cluster key: "
+                            + key,
+                    e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            getLogger().error(
+                    "Interrupted while waiting for session creation for cluster key {}",
+                    key);
+            throw new RuntimeException(
+                    "Interrupted while waiting for session creation", e);
+        } catch (ExecutionException e) {
+            getLogger().error(
+                    "Error during session creation for cluster key {}", key,
+                    e.getCause());
+            throw new RuntimeException("Error during session creation",
+                    e.getCause());
+        }
+    }
+
+    private void createOrWaitForSession(HttpServletRequest request, String key,
+            CompletableFuture<String> existingFuture) {
+        CurrentKey.set(key);
+        getLogger().debug(
+                "Creating session for cluster key {} on request {} for requested session id {}",
+                key, request.getRequestURI(), request.getRequestedSessionId());
+        try {
+            HttpSession session = request.getSession(true);
+            sessionListener.sessionAssociated(key, session, request);
+            getLogger().debug("Session created successfully for cluster key {}",
+                    key);
+        } catch (RuntimeException e) {
+            getLogger().error("Failed to create session for cluster key {}",
+                    key, e);
+            pendingSessionCreation.remove(key);
+            existingFuture.completeExceptionally(e);
+            throw e;
         }
     }
 
@@ -124,6 +376,67 @@ public class SessionTrackerFilter extends HttpFilter {
                 cookie.setAttribute("SameSite", sameSite.attributeValue());
             }
         };
+    }
+
+    /**
+     * Builds a redirect URL that respects reverse proxy headers.
+     * <p>
+     * This method manually checks X-Forwarded-* headers commonly used by
+     * reverse proxies and load balancers to preserve the original request
+     * information, then uses Spring's {@link UriComponentsBuilder} to construct
+     * a well-formed URL.
+     * <p>
+     * Note: This implementation does not rely on
+     * {@link org.springframework.web.filter.ForwardedHeaderFilter} being
+     * configured, making it work in all deployment scenarios.
+     *
+     * @param request
+     *            the HTTP request
+     * @return the full redirect URL including scheme, host, port, path, and
+     *         query string
+     */
+    private String buildRedirectUrl(HttpServletRequest request) {
+        // Check for X-Forwarded-Proto header (common with reverse proxies)
+        String scheme = request.getHeader("X-Forwarded-Proto");
+        if (scheme == null || scheme.isEmpty()) {
+            scheme = request.getScheme();
+        }
+
+        // Check for X-Forwarded-Host header
+        String host = request.getHeader("X-Forwarded-Host");
+        if (host == null || host.isEmpty()) {
+            host = request.getHeader("Host");
+            if (host == null || host.isEmpty()) {
+                host = request.getServerName();
+            }
+        }
+
+        // Check for X-Forwarded-Port header
+        int port = -1;
+        String portHeader = request.getHeader("X-Forwarded-Port");
+        if (portHeader != null && !portHeader.isEmpty()) {
+            try {
+                port = Integer.parseInt(portHeader);
+            } catch (NumberFormatException e) {
+                // Ignore invalid port
+            }
+        }
+        if (port == -1) {
+            port = request.getServerPort();
+        }
+
+        // Use Spring's UriComponentsBuilder for clean URL construction
+        UriComponentsBuilder builder = UriComponentsBuilder.newInstance()
+                .scheme(scheme).host(host).port(port)
+                .path(request.getRequestURI());
+
+        // Add query string if present
+        String queryString = request.getQueryString();
+        if (queryString != null && !queryString.isEmpty()) {
+            builder.query(queryString);
+        }
+
+        return builder.build().toUriString();
     }
 
     private Logger getLogger() {
