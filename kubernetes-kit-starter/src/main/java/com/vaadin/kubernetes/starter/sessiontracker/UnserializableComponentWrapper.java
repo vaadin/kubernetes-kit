@@ -135,7 +135,9 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
                     .getInstances();
             CurrentInstance.set(UI.class, ui);
             CurrentInstance.set(VaadinSession.class, session);
-            Runnable cleaner = SessionUtil.injectLockIfNeeded(session);
+            Runnable lockCleaner = SessionUtil.injectLockIfNeeded(session);
+            Runnable serviceCleaner = SessionUtil
+                    .injectServiceIfNeeded(session);
             try {
                 getElement().removeAllChildren();
                 if (state != null) {
@@ -146,7 +148,8 @@ public class UnserializableComponentWrapper<S extends Serializable, T extends Co
             } finally {
                 CurrentInstance.clearAll();
                 CurrentInstance.restoreInstances(instances);
-                cleaner.run();
+                lockCleaner.run();
+                serviceCleaner.run();
             }
         });
     }
