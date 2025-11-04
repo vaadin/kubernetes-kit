@@ -32,22 +32,6 @@ import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionInfo;
 
 /**
- * Records the creation of a session that is already associated with the given cluster key,
- * tracking the original requested session identifier to detect concurrent requests that should
- * wait for the completion of the current request to propagate the new session cookie to the client.
- *
- * @param clusterKey
- *            The key identifying the session's associated cluster. Must not
- *            be null.
- * @param session
- *            The HTTP session that has already been created and associated with the cluster key. Must not be null.
- * @param request
- *            The {@code HttpServletRequest} associated with the session.
- *            Must not be null.
- * @throws IllegalStateException if the session is not already associated with the given cluster key
- */
-
-/**
  * An {@link HttpSessionListener} implementation that handles population and
  * destruction of session data stored on a distributed storage.
  * <p>
@@ -159,12 +143,13 @@ public class SessionListener implements HttpSessionListener,
     @Override
     public void sessionIdChanged(HttpSessionEvent event, String oldSessionId) {
         String newSessionId = event.getSession().getId();
-        sessionCreationRequestMap
-                .replaceAll((clusterKey,
-                        current) -> oldSessionId.equals(current.sessionId())
-                                ? new SessionCreationRequest(newSessionId,
-                                        current.requestedSessionId())
-                                : current);
+        sessionCreationRequestMap.replaceAll((clusterKey, current) -> {
+            if (oldSessionId.equals(current.sessionId())) {
+                return new SessionCreationRequest(newSessionId,
+                        current.requestedSessionId());
+            }
+            return current;
+        });
         String clusterKey = activeSessions.remove(oldSessionId);
         activeSessions.put(newSessionId, clusterKey);
     }
@@ -292,8 +277,4 @@ public class SessionListener implements HttpSessionListener,
             Set<String> requestedSessionId) {
     }
 
-    private record RequestedSession(String sessionId,
-            Set<String> requestedSessionId) {
-
-    }
 }

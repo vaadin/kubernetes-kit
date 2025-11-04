@@ -58,7 +58,7 @@ public class SessionTrackerFilter extends HttpFilter {
     private final transient SessionSerializer sessionSerializer;
     private final transient KubernetesKitProperties properties;
     private final transient Runnable destroyCallback;
-    private SessionListener sessionListener;
+    private final SessionListener sessionListener;
 
     // Track which clients are currently creating sessions
     private final ConcurrentHashMap<String, CompletableFuture<String>> pendingSessionCreation = new ConcurrentHashMap<>();
@@ -103,44 +103,7 @@ public class SessionTrackerFilter extends HttpFilter {
         SessionTrackerCookie.getValue(request, cookieName).ifPresent(key -> {
             boolean sessionExists = request.getSession(false) != null;
             if (!sessionExists) {
-                getLogger().debug(
-                        "Request with cluster key {} with requested session id {}: {}",
-                        key, request.getRequestedSessionId(),
-                        request.getRequestURI());
-
-                // Use AtomicReference to detect if we created the future
-                AtomicReference<CompletableFuture<String>> sessionCreatingFutureHolder = new AtomicReference<>();
-
-                // Atomically check if session creation is pending or initiate
-                // it
-                CompletableFuture<String> existingFuture = pendingSessionCreation
-                        .computeIfAbsent(key, k -> {
-                            getLogger().debug(
-                                    "Initiating session creation for cluster key {}",
-                                    key);
-                            return sessionListener
-                                    .findExistingSession(key, request)
-                                    .map(CompletableFuture::completedFuture)
-                                    .orElseGet(() -> {
-                                        CompletableFuture<String> newFuture = new CompletableFuture<>();
-                                        sessionCreatingFutureHolder
-                                                .set(newFuture);
-                                        return newFuture;
-                                    });
-                        });
-
-                // Check if this thread created the future (first request) or
-                // found an existing one (concurrent request)
-                if (sessionCreatingFutureHolder.get() != null) {
-                    // This thread created the future - it's the first request
-                    createNewSession(request, key, existingFuture);
-                    // Note: completion happens after filter chain and
-                    // serialization
-                } else {
-                    // Concurrent request: wait for session creation to complete
-                    replayRequestRequired.set(waitForSessionCreation(request,
-                            key, existingFuture));
-                }
+                createOrWaitForSession(request, key, replayRequestRequired);
             } else {
                 getLogger().debug(
                         "Session already exists for cluster key {} on request {}",
@@ -183,36 +146,8 @@ public class SessionTrackerFilter extends HttpFilter {
                 sessionSerializer.serialize(session);
             }
 
-            // Complete the future after successfully processing and serializing
-            // the session.
-            // Flush the response buffer first to ensure the Set-Cookie header
-            // is sent to the browser
-            // before waiting threads proceed with their redirect. This
-            // eliminates the need for
-            // arbitrary Thread.sleep() delays and provides deterministic
-            // synchronization.
-            if (futureToComplete != null && !futureToComplete.isDone()) {
-                try {
-                    response.flushBuffer();
-                    getLogger().debug(
-                            "Response flushed, completing session creation future for cluster key {}",
-                            clusterKey);
-                } catch (IOException e) {
-                    getLogger().warn(
-                            "Failed to flush response for cluster key {}, completing future anyway",
-                            clusterKey, e);
-                    // Continue to complete the future even if flush fails to
-                    // avoid blocking waiting threads
-                }
-                // Delay the completion of the future to allow the browser to
-                // receive the new session ID
-                String newSessionId = session != null ? session.getId() : null;
-                futureToComplete.completeAsync(() -> newSessionId,
-                        CompletableFuture.delayedExecutor(
-                                SESSION_COOKIE_PROPAGATION_DELAY_MS,
-                                TimeUnit.MILLISECONDS));
-                pendingSessionCreation.remove(clusterKey);
-            }
+            flushResponseAndUnlockPendingRequests(clusterKey, response, session,
+                    futureToComplete);
         } catch (Exception e) {
             // If an error occurs, propagate it to waiting threads
             if (futureToComplete != null && !futureToComplete.isDone()) {
@@ -225,6 +160,119 @@ public class SessionTrackerFilter extends HttpFilter {
             throw e;
         } finally {
             CurrentKey.clear();
+        }
+    }
+
+    /**
+     * Handles the creation or waiting for the creation of an HTTP session
+     * associated with a unique cluster key. This method ensures that a session
+     * is created if not already initialized, or waits for the session creation
+     * process to complete if it is already in progress. The method uses
+     * concurrency control to handle simultaneous requests attempting to create
+     * or access a session.
+     *
+     * @param request
+     *            the {@code HttpServletRequest} associated with the incoming
+     *            HTTP request
+     * @param clusterKey
+     *            the unique identifier associated with a session group or
+     *            cluster
+     * @param replayRequestRequired
+     *            an {@code AtomicReference} indicating whether the current
+     *            request needs to be replayed; this might be needed if the
+     *            session ID changes after the response is generated
+     */
+    private void createOrWaitForSession(HttpServletRequest request,
+            String clusterKey, AtomicReference<Boolean> replayRequestRequired) {
+        getLogger().debug(
+                "Request with cluster key {} with requested session id {}: {}",
+                clusterKey, request.getRequestedSessionId(),
+                request.getRequestURI());
+
+        // Use AtomicReference to detect if we created the future
+        AtomicReference<CompletableFuture<String>> sessionCreatingFutureHolder = new AtomicReference<>();
+
+        // Atomically check if session creation is pending or initiate
+        // it
+        CompletableFuture<String> existingFuture = pendingSessionCreation
+                .computeIfAbsent(clusterKey, k -> {
+                    getLogger().debug(
+                            "Initiating session creation for cluster key {}",
+                            clusterKey);
+                    return sessionListener
+                            .findExistingSession(clusterKey, request)
+                            .map(CompletableFuture::completedFuture)
+                            .orElseGet(() -> {
+                                CompletableFuture<String> newFuture = new CompletableFuture<>();
+                                sessionCreatingFutureHolder.set(newFuture);
+                                return newFuture;
+                            });
+                });
+
+        // Check if this thread created the future (first request) or
+        // found an existing one (concurrent request)
+        if (sessionCreatingFutureHolder.get() != null) {
+            // This thread created the future - it's the first request
+            createOrWaitForSession(request, clusterKey, existingFuture);
+            // Note: completion happens after filter chain and
+            // serialization
+        } else {
+            // Concurrent request: wait for session creation to complete
+            replayRequestRequired.set(waitForSessionCreation(request,
+                    clusterKey, existingFuture));
+        }
+    }
+
+    /**
+     * Flushes the HTTP response and unlocks pending requests associated with a
+     * given cluster key. This method ensures the response buffer is flushed to
+     * send headers like Set-Cookie before completing the specified future,
+     * allowing waiting threads to proceed without other potential unnecessary
+     * delays.
+     *
+     * @param clusterKey
+     *            the unique identifier for the session group or cluster
+     * @param response
+     *            the {@code HttpServletResponse} to be flushed
+     * @param session
+     *            the current {@code HttpSession} associated with the cluster
+     *            key
+     * @param sessionCreationFuture
+     *            the {@code CompletableFuture} representing the ongoing session
+     *            creation process
+     */
+    private void flushResponseAndUnlockPendingRequests(String clusterKey,
+            HttpServletResponse response, HttpSession session,
+            CompletableFuture<String> sessionCreationFuture) {
+        // Complete the future after successfully processing and serializing
+        // the session.
+        // Flush the response buffer first to ensure the Set-Cookie header
+        // is sent to the browser
+        // before waiting threads proceed with their redirect. This
+        // eliminates the need for
+        // arbitrary Thread.sleep() delays and provides deterministic
+        // synchronization.
+        if (sessionCreationFuture != null && !sessionCreationFuture.isDone()) {
+            String newSessionId = session != null ? session.getId() : null;
+            try {
+                response.flushBuffer();
+                getLogger().debug(
+                        "Response flushed, completing session {} creation future for cluster key {}",
+                        newSessionId, clusterKey);
+            } catch (IOException e) {
+                getLogger().warn(
+                        "Failed to flush response for cluster key {}, completing future anyway",
+                        clusterKey, e);
+                // Continue to complete the future even if flush fails to
+                // avoid blocking waiting threads
+            }
+            // Delay the completion of the future to allow the browser to
+            // receive the new session ID
+            sessionCreationFuture.completeAsync(() -> newSessionId,
+                    CompletableFuture.delayedExecutor(
+                            SESSION_COOKIE_PROPAGATION_DELAY_MS,
+                            TimeUnit.MILLISECONDS));
+            pendingSessionCreation.remove(clusterKey);
         }
     }
 
@@ -285,7 +333,7 @@ public class SessionTrackerFilter extends HttpFilter {
         }
     }
 
-    private void createNewSession(HttpServletRequest request, String key,
+    private void createOrWaitForSession(HttpServletRequest request, String key,
             CompletableFuture<String> existingFuture) {
         CurrentKey.set(key);
         getLogger().debug(
