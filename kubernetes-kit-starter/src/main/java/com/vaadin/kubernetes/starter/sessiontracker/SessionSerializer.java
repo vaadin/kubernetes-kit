@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.ByteArrayInputStream;
@@ -132,6 +133,8 @@ public class SessionSerializer
     private final SerializationProperties serializationProperties;
 
     private Predicate<Class<?>> injectableFilter = type -> true;
+
+    public volatile boolean forcePessimistic = false;
 
     /**
      * Creates a new {@link SessionSerializer}.
@@ -263,13 +266,36 @@ public class SessionSerializer
         }
     }
 
+    public HttpSession createHttpSession(String clusterKey,
+            HttpServletRequest request) {
+        backendConnector.markDeserializationStarted(clusterKey);
+        try {
+            HttpSession session = request.getSession(true);
+            backendConnector.markDeserializationComplete(clusterKey);
+            return session;
+        } catch (RuntimeException e) {
+            backendConnector.markDeserializationFailed(clusterKey, e);
+            throw e;
+        }
+    }
+
     private void queueSerialization(String sessionId, Duration timeToLive,
             Map<String, Object> attributes) {
         if (pending.containsKey(sessionId)) {
-            // This session will be serialized again soon enough
-            getLogger().debug(
-                    "Ignoring serialization request for session {} as the session is already being serialized",
-                    sessionId);
+            if (forcePessimistic) {
+                // Server shutdown block request to prevent changes to the UI
+                getLogger().debug(
+                        "Blocking serialization request for session {} during shutdown to prevent UI modification until the distributed session have been persisted",
+                        sessionId);
+                waitForSerialization();
+                getLogger().debug("Pending serializations completed");
+
+            } else {
+                // This session will be serialized again soon enough
+                getLogger().debug(
+                        "Ignoring serialization request for session {} as the session is already being serialized",
+                        sessionId);
+            }
             return;
         }
         String clusterKey = getClusterKey(attributes);
@@ -322,7 +348,8 @@ public class SessionSerializer
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            if (serializationProperties.getOptimisticTimeout() > 0) {
+            if (!forcePessimistic
+                    && serializationProperties.getOptimisticTimeout() > 0) {
                 checkUnserializableWrappers(attributes);
                 long start = System.currentTimeMillis();
                 long timeout = start
@@ -333,6 +360,10 @@ public class SessionSerializer
                 while (System.currentTimeMillis() < timeout) {
                     SessionInfo info = serializeOptimisticLocking(sessionId,
                             timeToLive, attributes);
+                    if (forcePessimistic) {
+                        throw new PessimisticSerializationRequiredException(
+                                "Forcing Pessimistic serialization (SHUTDOWN)");
+                    }
                     if (info != null) {
                         pending.remove(sessionId); // Is this a race condition?
                         getLogger().debug(
@@ -365,13 +396,22 @@ public class SessionSerializer
             unrecoverableError = true;
         }
 
-        pending.remove(sessionId);
+        if (!forcePessimistic) {
+            pending.remove(sessionId);
+        }
         SessionInfo sessionInfo = null;
-        if (!unrecoverableError) { // NOSONAR
-            // Serializing using optimistic locking failed for a long time so be
-            // pessimistic and get it done
-            sessionInfo = serializePessimisticLocking(sessionId, timeToLive,
-                    attributes);
+        try {
+            if (!unrecoverableError) { // NOSONAR
+                // Serializing using optimistic locking failed for a long time
+                // so be
+                // pessimistic and get it done
+                sessionInfo = serializePessimisticLocking(sessionId, timeToLive,
+                        attributes);
+            }
+        } finally {
+            if (forcePessimistic) {
+                pending.remove(sessionId);
+            }
         }
         whenSerialized.accept(sessionInfo);
     }
@@ -470,6 +510,10 @@ public class SessionSerializer
             long latestLockTime = findNewestLockTime(attributes);
             long latestUnlockTime = findNewestUnlockTime(attributes);
 
+            if (forcePessimistic) {
+                throw new PessimisticSerializationRequiredException(
+                        "Forcing Pessimistic serialization (SHUTDOWN)");
+            }
             if (latestLockTime > latestUnlockTime) {
                 // The session is locked
                 getLogger().trace(
@@ -622,7 +666,7 @@ public class SessionSerializer
         return LoggerFactory.getLogger(SessionSerializer.class);
     }
 
-    void waitForSerialization() {
+    public void waitForSerialization() {
         long lastLogTime = System.currentTimeMillis();
         while (!pending.isEmpty()) {
             long now = System.currentTimeMillis();
@@ -645,6 +689,7 @@ public class SessionSerializer
         // ensure that
         // the server has not shut down before this and made the session
         // unavailable
+        forcePessimistic = true;
         waitForSerialization();
         executorService.shutdown();
     }

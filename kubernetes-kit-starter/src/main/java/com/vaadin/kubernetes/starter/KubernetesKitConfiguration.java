@@ -187,6 +187,7 @@ public class KubernetesKitConfiguration {
                 BackendConnector backendConnector,
                 SessionSerializer sessionSerializer,
                 PushSessionTracker pushSessionTracker) {
+            backendConnector.onShutdown(sessionSerializer::waitForSerialization);
             SessionListener sessionListener = sessionListener(backendConnector,
                     sessionSerializer);
             pushSessionTracker.setActiveSessionChecker(

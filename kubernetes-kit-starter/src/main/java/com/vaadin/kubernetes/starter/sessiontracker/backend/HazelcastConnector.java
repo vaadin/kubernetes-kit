@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.vaadin.kubernetes.starter.ProductUtils;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionDeserializationPendingException;
 
 public class HazelcastConnector implements BackendConnector {
 
@@ -26,9 +27,29 @@ public class HazelcastConnector implements BackendConnector {
     }
 
     private final IMap<String, byte[]> sessions;
+    private Runnable shutdownCallback;
 
     public HazelcastConnector(HazelcastInstance hazelcastInstance) {
         sessions = hazelcastInstance.getMap("vaadin:sessions");
+        hazelcastInstance.getLifecycleService().addLifecycleListener(event -> {
+            if (shutdownCallback != null && event
+                    .getState() == com.hazelcast.core.LifecycleEvent.LifecycleState.SHUTTING_DOWN) {
+                try {
+                    getLogger().debug(
+                            "================================= Running shutdown callback for hazelcast....");
+                    shutdownCallback.run();
+                    getLogger().debug(
+                            "================================= Running shutdown callback for hazelcast DONE");
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onShutdown(Runnable callback) {
+        this.shutdownCallback = callback;
     }
 
     @Override
@@ -53,16 +74,51 @@ public class HazelcastConnector implements BackendConnector {
         getLogger().debug("Requesting session for {}", clusterKey);
 
         waitForSerializationCompletion(clusterKey, "getting session");
-
         byte[] data = sessions.get(getKey(clusterKey));
         if (data == null) {
             getLogger().debug("Session not found {}", clusterKey);
             return null;
         }
         SessionInfo sessionInfo = new SessionInfo(clusterKey, data);
-
         getLogger().debug("Received {}", sessionInfo);
         return sessionInfo;
+    }
+
+    @Override
+    public void markDeserializationStarted(String clusterKey) {
+        String deserializationPendingKey = getPendingKey(clusterKey)
+                + "-deserialization";
+        getLogger().debug("Checking deserialization lock {} for {}",
+                deserializationPendingKey, clusterKey);
+        if (sessions.isLocked(deserializationPendingKey)) {
+            getLogger().debug("Someone is already deserializing {}",
+                    clusterKey);
+            throw new SessionDeserializationPendingException(
+                    "Someone is already deserializing " + clusterKey);
+        }
+        sessions.lock(deserializationPendingKey);
+        getLogger().debug("Deserialization lock {} acquired for {}",
+                deserializationPendingKey, clusterKey);
+    }
+
+    @Override
+    public void markDeserializationComplete(String clusterKey) {
+        String deserializationPendingKey = getPendingKey(clusterKey)
+                + "-deserialization";
+        getLogger().debug(
+                "Releasing deserialization lock {} for {} after completion",
+                deserializationPendingKey, clusterKey);
+        sessions.forceUnlock(deserializationPendingKey);
+    }
+
+    @Override
+    public void markDeserializationFailed(String clusterKey, Throwable error) {
+        String deserializationPendingKey = getPendingKey(clusterKey)
+                + "-deserialization";
+        getLogger().debug(
+                "Releasing deserialization lock {} for {} after failure",
+                deserializationPendingKey, clusterKey, error);
+        sessions.forceUnlock(deserializationPendingKey);
     }
 
     @Override

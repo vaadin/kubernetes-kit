@@ -23,4 +23,14 @@ public interface BackendConnector {
     void markSerializationComplete(String clusterKey);
 
     void markSerializationFailed(String clusterKey, Throwable error);
+
+    default void markDeserializationStarted(String clusterKey) {}
+
+    default void markDeserializationComplete(String clusterKey) {}
+
+    default void markDeserializationFailed(String clusterKey, Throwable error) {}
+
+    default void onShutdown(Runnable callback) {
+        // Do nothing by default
+    }
 }

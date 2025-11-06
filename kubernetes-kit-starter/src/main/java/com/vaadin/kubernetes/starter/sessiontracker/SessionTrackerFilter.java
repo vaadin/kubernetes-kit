@@ -116,12 +116,20 @@ public class SessionTrackerFilter extends HttpFilter {
         // session ID
         // The waiting thread only proceeds here after the first request has
         // flushed its response
-        if (Boolean.TRUE.equals(replayRequestRequired.get())) {
+        boolean forcePessimistic = sessionSerializer.forcePessimistic;
+        if (forcePessimistic
+                || Boolean.TRUE.equals(replayRequestRequired.get())) {
             String redirectUrl = buildRedirectUrl(request);
-            getLogger().debug(
-                    "Redirecting current request session ID {} to {} to use the new session ID",
-                    request.getRequestedSessionId(), redirectUrl);
-            //response.sendRedirect(redirectUrl, 307);
+            if (forcePessimistic) {
+                getLogger().debug(
+                        "Redirecting current request session ID {} to {} to wait for pending serialization to complete",
+                        request.getRequestedSessionId(), redirectUrl);
+            } else {
+                getLogger().debug(
+                        "Redirecting current request session ID {} to {} to use the new session ID",
+                        request.getRequestedSessionId(), redirectUrl);
+            }
+            // response.sendRedirect(redirectUrl, 307);
             response.setStatus(307);
             response.setHeader("Location", redirectUrl);
             response.flushBuffer();
@@ -216,9 +224,15 @@ public class SessionTrackerFilter extends HttpFilter {
         // found an existing one (concurrent request)
         if (sessionCreatingFutureHolder.get() != null) {
             // This thread created the future - it's the first request
-            createOrWaitForSession(request, clusterKey, existingFuture);
-            // Note: completion happens after filter chain and
-            // serialization
+            try {
+                createOrWaitForSession(request, clusterKey, existingFuture);
+                // Note: completion happens after filter chain and
+                // serialization
+            } catch (SessionDeserializationPendingException e) {
+                // Another node is currently deserializing the session, lets replay the request when at least
+                // one node has completed the deserialization
+                replayRequestRequired.set(true);
+            }
         } else {
             // Concurrent request: wait for session creation to complete
             replayRequestRequired.set(waitForSessionCreation(request,
@@ -343,7 +357,8 @@ public class SessionTrackerFilter extends HttpFilter {
                 "Creating session for cluster key {} on request {} for requested session id {}",
                 key, request.getRequestURI(), request.getRequestedSessionId());
         try {
-            HttpSession session = request.getSession(true);
+            //HttpSession session = request.getSession(true);
+            HttpSession session = sessionSerializer.createHttpSession(key, request);
             sessionListener.sessionAssociated(key, session, request);
             getLogger().debug("Session created successfully for cluster key {}",
                     key);

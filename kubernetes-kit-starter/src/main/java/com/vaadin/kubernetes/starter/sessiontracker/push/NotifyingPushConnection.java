@@ -10,6 +10,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker.push;
 
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.atmosphere.cpr.AtmosphereResource;
@@ -49,6 +50,19 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
         super.sendMessage(message);
         AtmosphereResource resource = getResource();
         notifyPushListeners(listener -> listener.onMessageSent(resource));
+    }
+
+    @Override
+    public void push(boolean async) {
+        AtomicBoolean postpone = new AtomicBoolean(false);
+        notifyPushListeners(listener -> postpone.compareAndSet(false, listener.postponePush(getResource())));
+        if (postpone.get()) {
+            // send an empty message to prevent UI changes to be applied
+            // and pause the browser from sending other messages
+            super.sendMessage("for(;;);[]");
+        } else {
+            super.push(async);
+        }
     }
 
     private void notifyPushListeners(Consumer<PushSendListener> action) {

@@ -68,6 +68,11 @@ public class PushSessionTracker implements PushSendListener {
     }
 
     @Override
+    public boolean postponePush(AtmosphereResource resource) {
+        return sessionSerializer.forcePessimistic;
+    }
+
+    @Override
     public void onConnect(AtmosphereResource resource) {
         // The HTTP request associate to the resource might not be available
         // after connection for example because recycled by the servlet

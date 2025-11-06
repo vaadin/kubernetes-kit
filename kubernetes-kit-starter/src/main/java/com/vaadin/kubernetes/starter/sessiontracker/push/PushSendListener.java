@@ -42,4 +42,7 @@ public interface PushSendListener {
      */
     void onMessageSent(AtmosphereResource resource);
 
+    default boolean postponePush(AtmosphereResource resource) {
+        return false;
+    }
 }
