@@ -537,7 +537,7 @@ public class SessionSerializer implements
                                 .append(ui.getInternals().getServerSyncId())
                                 .append("]");
                     }
-                } catch (Exception ex) {
+                } catch (Throwable ex) {
                     // getting UIs may fail in development mode due to null lock
                     // (deserialization) or session not locked (serialization)
                     // ignoring for now since it is just a log
