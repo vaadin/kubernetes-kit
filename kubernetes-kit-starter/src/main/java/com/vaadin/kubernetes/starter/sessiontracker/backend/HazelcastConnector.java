@@ -69,12 +69,8 @@ public class HazelcastConnector implements BackendConnector {
     public void markSerializationStarted(String clusterKey,
             Duration timeToLive) {
         getLogger().debug("Marking serialization started for {}", clusterKey);
-        if (timeToLive.isZero() || timeToLive.isNegative()) {
-            sessions.lock(getPendingKey(clusterKey));
-        } else {
-            sessions.lock(getPendingKey(clusterKey), timeToLive.toSeconds(),
-                    TimeUnit.SECONDS);
-        }
+        String pendingKey = getPendingKey(clusterKey);
+        lockPendingKey(timeToLive, pendingKey);
     }
 
     @Override
@@ -91,12 +87,45 @@ public class HazelcastConnector implements BackendConnector {
     }
 
     @Override
+    public boolean markDeserializationStarted(String clusterKey,
+            Duration timeToLive) {
+        String pendingKey = getDeserializationPendingKey(clusterKey);
+        if (sessions.isLocked(pendingKey)) {
+            return false;
+        }
+        lockPendingKey(timeToLive, pendingKey);
+        return true;
+    }
+
+    @Override
+    public void markDeserializationComplete(String clusterKey) {
+        getLogger().debug("Marking deserialization complete for {}",
+                clusterKey);
+        sessions.forceUnlock(getDeserializationPendingKey(clusterKey));
+    }
+
+    @Override
+    public void markDeserializationFailed(String clusterKey, Throwable error) {
+        getLogger().debug("Marking deserialization failed for {}", clusterKey,
+                error);
+        sessions.forceUnlock(getDeserializationPendingKey(clusterKey));
+    }
+
+    @Override
     public void deleteSession(String clusterKey) {
         getLogger().debug("Deleting session {}", clusterKey);
         waitForSerializationCompletion(clusterKey, "deleting");
         sessions.delete(getKey(clusterKey));
         sessions.delete(getPendingKey(clusterKey));
         getLogger().debug("Session {} deleted", clusterKey);
+    }
+
+    private void lockPendingKey(Duration timeToLive, String pendingKey) {
+        if (timeToLive.isZero() || timeToLive.isNegative()) {
+            sessions.lock(pendingKey);
+        } else {
+            sessions.lock(pendingKey, timeToLive.toSeconds(), TimeUnit.SECONDS);
+        }
     }
 
     private void waitForSerializationCompletion(String clusterKey,
@@ -125,6 +154,10 @@ public class HazelcastConnector implements BackendConnector {
 
     static String getPendingKey(String clusterKey) {
         return "pending-" + clusterKey;
+    }
+
+    static String getDeserializationPendingKey(String clusterKey) {
+        return "pending-deserialization-" + clusterKey;
     }
 
     private static Logger getLogger() {

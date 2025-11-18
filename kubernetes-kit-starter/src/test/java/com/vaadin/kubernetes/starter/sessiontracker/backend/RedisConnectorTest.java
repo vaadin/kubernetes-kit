@@ -3,6 +3,7 @@ package com.vaadin.kubernetes.starter.sessiontracker.backend;
 import java.time.Duration;
 import java.util.UUID;
 
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -15,6 +16,7 @@ import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -151,6 +153,67 @@ public class RedisConnectorTest {
                 .del(aryEq(RedisConnector.getKey(clusterKey)));
         verify(connection.keyCommands())
                 .del(aryEq(RedisConnector.getPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markDeserializationStarted_notPending_returnTrue() {
+        when(connection.keyCommands().exists(any(byte[].class)))
+                .thenReturn(false);
+
+        Duration timeToLive = Duration.ofSeconds(60);
+        Assert.assertTrue(
+                connector.markDeserializationStarted(clusterKey, timeToLive));
+
+        verify(connection.stringCommands()).set(
+                aryEq(RedisConnector.getDeserializationPendingKey(clusterKey)),
+                any(), eq(Expiration.from(timeToLive)),
+                eq(RedisStringCommands.SetOption.UPSERT));
+
+    }
+
+    @Test
+    void markDeserializationStarted_zeroExpiration_deserializationLockedWithoutTimeToLive() {
+        when(connection.keyCommands().exists(any(byte[].class)))
+                .thenReturn(false);
+
+        Duration timeToLive = Duration.ofMinutes(0);
+        connector.markDeserializationStarted(clusterKey, timeToLive);
+
+        verify(connection.stringCommands()).set(
+                aryEq(RedisConnector.getDeserializationPendingKey(clusterKey)),
+                any());
+    }
+
+    @Test
+    void markDeserializationStarted_pending_returnFalse() {
+        when(connection.keyCommands().exists(any(byte[].class)))
+                .thenReturn(true);
+
+        Duration timeToLive = Duration.ofSeconds(60);
+        Assert.assertFalse(
+                connector.markDeserializationStarted(clusterKey, timeToLive));
+
+        verify(connection.stringCommands(), never()).set(
+                aryEq(RedisConnector.getDeserializationPendingKey(clusterKey)),
+                any(), eq(Expiration.from(timeToLive)),
+                eq(RedisStringCommands.SetOption.UPSERT));
+    }
+
+    @Test
+    void markDeserializationComplete_removePendingKey() {
+        connector.markDeserializationComplete(clusterKey);
+
+        verify(connection.keyCommands()).del(
+                aryEq(RedisConnector.getDeserializationPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markDeserializationFailed_removePendingKey() {
+        Throwable error = new RuntimeException("error");
+        connector.markDeserializationFailed(clusterKey, error);
+
+        verify(connection.keyCommands()).del(
+                aryEq(RedisConnector.getDeserializationPendingKey(clusterKey)));
     }
 
 }
