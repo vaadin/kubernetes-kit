@@ -30,7 +30,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -65,8 +64,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Serializ
  */
 @AutoConfiguration
 @ConditionalOnProperty(name = "auto-configure", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
-@AutoConfigureAfter({ SpringBootAutoConfiguration.class,
-        DataRedisAutoConfiguration.class })
+@AutoConfigureAfter(value = { SpringBootAutoConfiguration.class },
+        name = { "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration" })
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
