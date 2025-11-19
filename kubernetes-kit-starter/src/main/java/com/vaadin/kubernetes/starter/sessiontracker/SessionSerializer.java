@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
@@ -138,7 +139,7 @@ public class SessionSerializer implements
 
     private VaadinService vaadinService;
 
-    private volatile boolean stopped = false;
+    private final AtomicBoolean stopped = new AtomicBoolean(false);
 
     /**
      * Creates a new {@link SessionSerializer}.
@@ -227,7 +228,7 @@ public class SessionSerializer implements
      * @return whether the component is currently running
      */
     public boolean isRunning() {
-        return !stopped;
+        return !stopped.get();
     }
 
     /**
@@ -291,7 +292,7 @@ public class SessionSerializer implements
     private void queueSerialization(String sessionId, Duration timeToLive,
             Map<String, Object> attributes) {
         if (pending.containsKey(sessionId)) {
-            if (stopped) {
+            if (stopped.get()) {
                 // Server shutdown block request to prevent changes to the UI
                 getLogger().debug(
                         "Blocking serialization request for session {} during shutdown to prevent UI modification until the distributed session have been persisted",
@@ -358,7 +359,7 @@ public class SessionSerializer implements
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            if (!stopped
+            if (!stopped.get()
                     && serializationProperties.getOptimisticTimeout() > 0) {
                 checkUnserializableWrappers(attributes);
                 long start = System.currentTimeMillis();
@@ -368,7 +369,7 @@ public class SessionSerializer implements
                         "Optimistic serialization of session {} with distributed key {} started",
                         sessionId, clusterKey);
                 while (System.currentTimeMillis() < timeout) {
-                    if (stopped) {
+                    if (stopped.get()) {
                         throw new PessimisticSerializationRequiredException(
                                 "Forcing Pessimistic serialization (STOP)");
                     }
@@ -408,7 +409,7 @@ public class SessionSerializer implements
 
         // If the server is stopping, remove the pending key only after current
         // serialization completes to prevent new requests to be enqueued
-        if (!stopped) {
+        if (!stopped.get()) {
             pending.remove(sessionId);
         }
         SessionInfo sessionInfo = null;
@@ -421,7 +422,7 @@ public class SessionSerializer implements
                         attributes);
             }
         } finally {
-            if (stopped) {
+            if (stopped.get()) {
                 pending.remove(sessionId);
             }
         }
@@ -696,10 +697,13 @@ public class SessionSerializer implements
         // ensure that
         // the server has not shut down before this and made the session
         // unavailable
-        stopped = true;
-        waitForSerialization();
-        this.vaadinService = null;
-        executorService.shutdown();
+        if (stopped.compareAndSet(false, true)) {
+            getLogger().debug("Shutting down session serializer");
+            waitForSerialization();
+            this.vaadinService = null;
+            executorService.shutdown();
+            getLogger().debug("Session serializer shutdown complete");
+        }
     }
 
     @Override
