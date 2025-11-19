@@ -1,6 +1,5 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
-import com.vaadin.flow.server.ServiceInitEvent;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
@@ -13,10 +12,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import org.awaitility.Awaitility;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.mock.web.MockHttpSession;
 
 import com.vaadin.flow.component.Component;
@@ -32,6 +35,7 @@ import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.function.DeploymentConfiguration;
 import com.vaadin.flow.internal.CurrentInstance;
+import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.SessionLockCheckStrategy;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
@@ -367,6 +371,135 @@ class SessionSerializerTest {
 
         await().atMost(200, MILLISECONDS).untilTrue(serializationCompleted);
         verify(connector).sendSession(notNull());
+    }
+
+    @Test
+    void serialize_applicationAlreadyStopped_forcePessimisticLocking() {
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        doAnswer(i -> {
+            // Slow down serialization start to ensure a pending request exists
+            // before app gets stopped
+            Thread.sleep(100);
+            return serializationStarted.getAndSet(true);
+        }).when(connector).markSerializationStarted(clusterSID, timeToLive);
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+        doAnswer(i -> {
+            // Slow down serialization simulation to simplify assertions
+            Thread.sleep(100);
+            return null;
+        }).when(serializationCallback).onSerializationSuccess();
+
+        serializer.serialize(httpSession);
+
+        // Simulate stop asynchronously to prevent blocking the current thread
+        AtomicBoolean stopCompleted = new AtomicBoolean();
+        CompletableFuture
+                .runAsync(() -> serializer.onApplicationEvent(
+                        new ContextClosedEvent(mock(ApplicationContext.class))))
+                .whenComplete((r, e) -> stopCompleted.set(e == null));
+
+        await().until(() -> !serializer.isRunning());
+        await().atMost(300, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        // Expect serializer pessimistic locking happened almost immediately
+        await().alias("SessionSerializer should have locked the session")
+                .atMost(100, MILLISECONDS)
+                .until(() -> vaadinSession.isLocked());
+
+        await().alias("Serialization completed").atMost(200, MILLISECONDS)
+                .untilTrue(serializationCompleted);
+        await().alias("Stop completed").atMost(200, MILLISECONDS)
+                .untilTrue(stopCompleted);
+        verify(connector).sendSession(notNull());
+        Assertions.assertFalse(vaadinSession.isLocked(),
+                "Session lock acquired for pessimistic serialization should have been released");
+    }
+
+    @Test
+    void serialize_applicationStopped_pendingOptimisticSerialization_switchToPessimisticLocking() {
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        AtomicBoolean serializationInProgress = new AtomicBoolean();
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID, timeToLive);
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+        doAnswer(i -> {
+            serializationInProgress.set(true);
+            // Slow down serialization simulation to simplify assertions
+            Thread.sleep(100);
+            return null;
+        }).when(serializationCallback).onSerializationSuccess();
+
+        // vaadin session currently locked, should attempt optimistic
+        // serialization
+        vaadinSession.setLockTimestamps(30, 20);
+
+        serializer.serialize(httpSession);
+        await().during(50, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        // Unlock session to make serialization proceed
+        vaadinSession.setLockTimestamps(30, 40);
+        await().atMost(200, MILLISECONDS).untilTrue(serializationInProgress);
+        // Simulate a change to the session during serialization
+        vaadinSession.setLockTimestamps(41, 50);
+
+        // Simulate stop asynchronously to prevent blocking the current thread
+        AtomicBoolean stopCompleted = new AtomicBoolean();
+        CompletableFuture
+                .runAsync(() -> serializer.onApplicationEvent(
+                        new ContextClosedEvent(mock(ApplicationContext.class))))
+                .whenComplete((r, e) -> stopCompleted.set(e == null));
+
+        // Expect serializer to switch to pessimistic locking almost immediately
+        await().atMost(200, MILLISECONDS).until(() -> vaadinSession.isLocked());
+
+        await().alias("Serialization completed").atMost(200, MILLISECONDS)
+                .untilTrue(serializationCompleted);
+        await().alias("Stop completed").atMost(200, MILLISECONDS)
+                .untilTrue(stopCompleted);
+        verify(connector).sendSession(notNull());
+        Assertions.assertFalse(vaadinSession.isLocked(),
+                "Session lock acquired for pessimistic serialization should have been released");
+    }
+
+    @Test
+    void serialize_applicationStopped_serializationRequestWhilePendingSerialization_ignoreAndWaitForCompletion() {
+        AtomicBoolean serializationStarted = new AtomicBoolean();
+        AtomicBoolean serializationCompleted = new AtomicBoolean();
+        AtomicBoolean serializationInProgress = new AtomicBoolean();
+        doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
+                .markSerializationStarted(clusterSID, timeToLive);
+        doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
+                .markSerializationComplete(clusterSID);
+        doAnswer(i -> {
+            serializationInProgress.set(true);
+            // Slow down serialization simulation to simplify assertions
+            Thread.sleep(300);
+            return null;
+        }).when(serializationCallback).onSerializationSuccess();
+
+        serializer.serialize(httpSession);
+        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
+        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+
+        // Simulate stop asynchronously to prevent blocking the current thread
+        AtomicBoolean stopCompleted = new AtomicBoolean();
+        CompletableFuture
+                .runAsync(() -> serializer.onApplicationEvent(
+                        new ContextClosedEvent(mock(ApplicationContext.class))))
+                .whenComplete((r, e) -> stopCompleted.set(e == null));
+
+        await().until(() -> !serializer.isRunning());
+        // Enqueue another request, should wait until serialization completion.
+        serializer.serialize(httpSession);
+        Assertions.assertTrue(serializationCompleted.get(),
+                "Serialization completed");
+        Assertions.assertTrue(stopCompleted.get(), "Stop completed");
     }
 
     @Test
@@ -729,6 +862,10 @@ class SessionSerializerTest {
         @Override
         public long getLastUnlocked() {
             return lastUnlocked;
+        }
+
+        boolean isLocked() {
+            return (((ReentrantLock) getLockInstance()).isLocked());
         }
 
         void setLockTimestamps(long lastLocked, long lastUnlocked) {
