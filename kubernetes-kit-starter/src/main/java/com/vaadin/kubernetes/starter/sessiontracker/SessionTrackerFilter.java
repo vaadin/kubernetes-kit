@@ -95,32 +95,50 @@ public class SessionTrackerFilter extends HttpFilter {
     protected void doFilter(HttpServletRequest request,
             HttpServletResponse response, FilterChain chain)
             throws IOException, ServletException {
+
         String cookieName = properties.getClusterKeyCookieName();
 
         AtomicReference<Boolean> replayRequestRequired = new AtomicReference<>(
                 false);
 
-        SessionTrackerCookie.getValue(request, cookieName).ifPresent(key -> {
-            boolean sessionExists = request.getSession(false) != null;
-            if (!sessionExists) {
-                createOrWaitForSession(request, key, replayRequestRequired);
-            } else {
-                getLogger().debug(
-                        "Session already exists for cluster key {} on request {}",
-                        key, request.getRequestURI());
-                pendingSessionCreation.remove(key);
-            }
-        });
+        boolean serializerRunning = sessionSerializer.isRunning();
+        // prevent a session creation attempt on shutdown
+        if (serializerRunning) {
+            SessionTrackerCookie.getValue(request, cookieName)
+                    .ifPresent(key -> {
+                        boolean sessionExists = request
+                                .getSession(false) != null;
+                        if (!sessionExists) {
+                            createOrWaitForSession(request, key,
+                                    replayRequestRequired);
+                        } else {
+                            getLogger().debug(
+                                    "Session already exists for cluster key {} on request {}",
+                                    key, request.getRequestURI());
+                            pendingSessionCreation.remove(key);
+                        }
+                    });
+        }
 
         // If this is a waiting request, redirect to ensure it uses the new
-        // session ID
-        // The waiting thread only proceeds here after the first request has
-        // flushed its response
-        if (Boolean.TRUE.equals(replayRequestRequired.get())) {
+        // session ID; the waiting thread only proceeds here after the first
+        // request has flushed its response
+        // Redirect also if the server is shutting down, to prevent potential
+        // modifications to the VaadinSession; the SessionSerializer status
+        // is read again because stop happens asynchronously
+        serializerRunning = sessionSerializer.isRunning();
+        if (!serializerRunning
+                || Boolean.TRUE.equals(replayRequestRequired.get())) {
             String redirectUrl = buildRedirectUrl(request);
-            getLogger().debug(
-                    "Redirecting current request session ID {} to {} to use the new session ID",
-                    request.getRequestedSessionId(), redirectUrl);
+            if (!serializerRunning) {
+                getLogger().debug(
+                        "Redirecting current request session ID {} to {} because server is shutting down",
+                        request.getRequestedSessionId(), redirectUrl);
+            } else {
+                getLogger().debug(
+                        "Redirecting current request session ID {} to {} to use the new session ID",
+                        request.getRequestedSessionId(), redirectUrl);
+            }
             response.sendRedirect(redirectUrl, 307);
             return;
         }
