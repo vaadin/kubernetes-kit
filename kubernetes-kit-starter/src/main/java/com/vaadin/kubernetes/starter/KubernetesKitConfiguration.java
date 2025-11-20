@@ -65,8 +65,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Serializ
  */
 @AutoConfiguration
 @ConditionalOnProperty(name = "auto-configure", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
-@AutoConfigureAfter({ SpringBootAutoConfiguration.class,
-        DataRedisAutoConfiguration.class })
+@AutoConfigureAfter(SpringBootAutoConfiguration.class)
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
@@ -270,7 +269,8 @@ public class KubernetesKitConfiguration {
     }
 
     @AutoConfiguration
-    @ConditionalOnClass(RedisConnectionFactory.class)
+    @ConditionalOnClass(DataRedisAutoConfiguration.class)
+    @AutoConfigureAfter(DataRedisAutoConfiguration.class)
     public static class RedisConfiguration {
         @Bean
         @ConditionalOnBean(RedisConnectionFactory.class)
