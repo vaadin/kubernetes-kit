@@ -85,15 +85,8 @@ public class RedisConnector implements BackendConnector {
         getLogger().debug("Marking serialization started for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
                 .getConnection()) {
-            if (timeToLive.isZero() || timeToLive.isNegative()) {
-                connection.stringCommands().set(getPendingKey(clusterKey),
-                        BackendUtil.b("" + System.currentTimeMillis()));
-            } else {
-                connection.stringCommands().set(getPendingKey(clusterKey),
-                        BackendUtil.b("" + System.currentTimeMillis()),
-                        Expiration.from(timeToLive),
-                        RedisStringCommands.SetOption.UPSERT);
-            }
+            markOperationPending(connection, timeToLive,
+                    getPendingKey(clusterKey));
         }
     }
 
@@ -117,6 +110,45 @@ public class RedisConnector implements BackendConnector {
     }
 
     @Override
+    public boolean markDeserializationStarted(String clusterKey,
+            Duration timeToLive) {
+        getLogger().debug("Marking deserialization started for {}", clusterKey);
+
+        try (RedisConnection connection = redisConnectionFactory
+                .getConnection()) {
+            byte[] pendingKey = getDeserializationPendingKey(clusterKey);
+            if (Boolean.TRUE
+                    .equals(connection.keyCommands().exists(pendingKey))) {
+                return false;
+            }
+            markOperationPending(connection, timeToLive, pendingKey);
+        }
+        return true;
+    }
+
+    @Override
+    public void markDeserializationComplete(String clusterKey) {
+        getLogger().debug("Marking deserialization complete for {}",
+                clusterKey);
+        try (RedisConnection connection = redisConnectionFactory
+                .getConnection()) {
+            connection.keyCommands()
+                    .del(getDeserializationPendingKey(clusterKey));
+        }
+    }
+
+    @Override
+    public void markDeserializationFailed(String clusterKey, Throwable error) {
+        getLogger().debug("Marking deserialization failed for {}", clusterKey,
+                error);
+        try (RedisConnection connection = redisConnectionFactory
+                .getConnection()) {
+            connection.keyCommands()
+                    .del(getDeserializationPendingKey(clusterKey));
+        }
+    }
+
+    @Override
     public void deleteSession(String clusterKey) {
         getLogger().debug("Deleting session for {}", clusterKey);
         try (RedisConnection connection = redisConnectionFactory
@@ -128,8 +160,27 @@ public class RedisConnector implements BackendConnector {
         }
     }
 
+    // For backward compatibility use empty operation to identify serialization
+
     static byte[] getPendingKey(String clusterKey) {
         return BackendUtil.b("pending-" + clusterKey);
+    }
+
+    static byte[] getDeserializationPendingKey(String clusterKey) {
+        return BackendUtil.b("pending-deserialization-" + clusterKey);
+    }
+
+    private void markOperationPending(RedisConnection connection,
+            Duration timeToLive, byte[] pendingKey) {
+        if (timeToLive.isZero() || timeToLive.isNegative()) {
+            connection.stringCommands().set(pendingKey,
+                    BackendUtil.b("" + System.currentTimeMillis()));
+        } else {
+            connection.stringCommands().set(pendingKey,
+                    BackendUtil.b("" + System.currentTimeMillis()),
+                    Expiration.from(timeToLive),
+                    RedisStringCommands.SetOption.UPSERT);
+        }
     }
 
     private void waitForSerializationCompletion(String clusterKey,

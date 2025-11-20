@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -166,4 +167,60 @@ public class HazelcastConnectorTest {
         verify(sessionMap).delete(HazelcastConnector.getKey(clusterKey));
         verify(sessionMap).delete(HazelcastConnector.getPendingKey(clusterKey));
     }
+
+    @Test
+    void markDeserializationStarted_notPending_returnTrue() {
+        String pendingKey = HazelcastConnector
+                .getDeserializationPendingKey(clusterKey);
+        when(sessionMap.isLocked(pendingKey)).thenReturn(false);
+
+        Duration timeToLive = Duration.ofSeconds(60);
+        Assert.assertTrue(
+                connector.markDeserializationStarted(clusterKey, timeToLive));
+
+        verify(sessionMap).lock(eq(pendingKey), eq(60L), eq(TimeUnit.SECONDS));
+    }
+
+    @Test
+    void markDeserializationStarted_zeroExpiration_deserializationLockedWithoutTimeToLive() {
+        String pendingKey = HazelcastConnector
+                .getDeserializationPendingKey(clusterKey);
+        when(sessionMap.isLocked(pendingKey)).thenReturn(false);
+
+        Duration timeToLive = Duration.ofMinutes(0);
+        connector.markDeserializationStarted(clusterKey, timeToLive);
+
+        verify(sessionMap).lock(eq(pendingKey));
+    }
+
+    @Test
+    void markDeserializationStarted_pending_returnFalse() {
+        String pendingKey = HazelcastConnector
+                .getDeserializationPendingKey(clusterKey);
+        when(sessionMap.isLocked(pendingKey)).thenReturn(true);
+
+        Duration timeToLive = Duration.ofSeconds(60);
+        Assert.assertFalse(
+                connector.markDeserializationStarted(clusterKey, timeToLive));
+
+        verify(sessionMap, never()).lock(eq(pendingKey), anyLong(), any());
+    }
+
+    @Test
+    void markDeserializationComplete_removePendingKey() {
+        connector.markDeserializationComplete(clusterKey);
+
+        verify(sessionMap).forceUnlock(eq(
+                HazelcastConnector.getDeserializationPendingKey(clusterKey)));
+    }
+
+    @Test
+    void markDeserializationFailed_removePendingKey() {
+        Throwable error = new RuntimeException("error");
+        connector.markDeserializationFailed(clusterKey, error);
+
+        verify(sessionMap).forceUnlock(eq(
+                HazelcastConnector.getDeserializationPendingKey(clusterKey)));
+    }
+
 }
