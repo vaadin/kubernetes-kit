@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter;
 
+import com.vaadin.pro.licensechecker.Capability;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,8 @@ import com.vaadin.pro.licensechecker.LicenseChecker;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.text.MatchesPattern.matchesPattern;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
@@ -61,8 +64,9 @@ class LicenseCheckerServiceInitListenerTest {
 
         // Verify the license is checked
         BuildType buildType = null;
-        licenseChecker.verify(() -> LicenseChecker
-                .checkLicense(ProductUtils.PRODUCT_NAME, version, buildType));
+        licenseChecker.verify(() -> LicenseChecker.checkLicense(
+                eq(ProductUtils.PRODUCT_NAME), eq(version),
+                argThat(cap -> cap.has(Capability.PRE_TRIAL)), eq(buildType)));
     }
 
     @Test
