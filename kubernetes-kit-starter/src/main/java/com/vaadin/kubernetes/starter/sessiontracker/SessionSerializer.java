@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
@@ -41,6 +42,9 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.server.ServiceInitEvent;
+import com.vaadin.flow.server.VaadinService;
+import com.vaadin.flow.server.VaadinServiceInitListener;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedHttpSession;
 import com.vaadin.flow.server.WrappedSession;
@@ -106,8 +110,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
  * In case of a server shutdown, it waits for pending session serializations to
  * complete.
  */
-public class SessionSerializer
-        implements ApplicationListener<ContextClosedEvent> {
+public class SessionSerializer implements
+        ApplicationListener<ContextClosedEvent>, VaadinServiceInitListener {
 
     static {
         ProductUtils.markAsUsed(SessionSerializer.class.getSimpleName());
@@ -132,6 +136,10 @@ public class SessionSerializer
     private final SerializationProperties serializationProperties;
 
     private Predicate<Class<?>> injectableFilter = type -> true;
+
+    private VaadinService vaadinService;
+
+    private final AtomicBoolean stopped = new AtomicBoolean(false);
 
     /**
      * Creates a new {@link SessionSerializer}.
@@ -215,6 +223,15 @@ public class SessionSerializer
     }
 
     /**
+     * Check whether this component is currently running.
+     *
+     * @return whether the component is currently running
+     */
+    public boolean isRunning() {
+        return !stopped.get();
+    }
+
+    /**
      * Serializes the given HTTP session and stores data on a distributed
      * storage.
      *
@@ -255,21 +272,41 @@ public class SessionSerializer
      */
     public void deserialize(SessionInfo sessionInfo, HttpSession session)
             throws Exception {
-        Map<String, Object> values = doDeserialize(sessionInfo,
-                session.getId());
-
-        for (Entry<String, Object> entry : values.entrySet()) {
-            session.setAttribute(entry.getKey(), entry.getValue());
+        VaadinService currentService = VaadinService.getCurrent();
+        if (currentService == null) {
+            VaadinService.setCurrent(vaadinService);
+        }
+        try {
+            Map<String, Object> values = doDeserialize(sessionInfo,
+                    session.getId());
+            for (Entry<String, Object> entry : values.entrySet()) {
+                session.setAttribute(entry.getKey(), entry.getValue());
+            }
+        } finally {
+            if (currentService == null) {
+                VaadinService.setCurrent(null);
+            }
         }
     }
 
     private void queueSerialization(String sessionId, Duration timeToLive,
             Map<String, Object> attributes) {
         if (pending.containsKey(sessionId)) {
-            // This session will be serialized again soon enough
-            getLogger().debug(
-                    "Ignoring serialization request for session {} as the session is already being serialized",
-                    sessionId);
+            if (stopped.get()) {
+                // Server shutdown block request to prevent changes to the UI
+                getLogger().debug(
+                        "Blocking serialization request for session {} during shutdown to prevent UI modification until the distributed session have been persisted",
+                        sessionId);
+                waitForSerialization();
+                getLogger().debug(
+                        "Pending serializations of session {} completed",
+                        sessionId);
+            } else {
+                // This session will be serialized again soon enough
+                getLogger().debug(
+                        "Ignoring serialization request for session {} as the session is already being serialized",
+                        sessionId);
+            }
             return;
         }
         String clusterKey = getClusterKey(attributes);
@@ -322,7 +359,8 @@ public class SessionSerializer
         boolean unrecoverableError = false;
         String clusterKey = getClusterKey(attributes);
         try {
-            if (serializationProperties.getOptimisticTimeout() > 0) {
+            if (!stopped.get()
+                    && serializationProperties.getOptimisticTimeout() > 0) {
                 checkUnserializableWrappers(attributes);
                 long start = System.currentTimeMillis();
                 long timeout = start
@@ -331,6 +369,10 @@ public class SessionSerializer
                         "Optimistic serialization of session {} with distributed key {} started",
                         sessionId, clusterKey);
                 while (System.currentTimeMillis() < timeout) {
+                    if (stopped.get()) {
+                        throw new PessimisticSerializationRequiredException(
+                                "Forcing Pessimistic serialization (STOP)");
+                    }
                     SessionInfo info = serializeOptimisticLocking(sessionId,
                             timeToLive, attributes);
                     if (info != null) {
@@ -365,15 +407,27 @@ public class SessionSerializer
             unrecoverableError = true;
         }
 
-        pending.remove(sessionId);
+        // If the server is stopping, remove the pending key only after current
+        // serialization completes to prevent new requests to be enqueued
+        if (!stopped.get()) {
+            pending.remove(sessionId);
+        }
         SessionInfo sessionInfo = null;
-        if (!unrecoverableError) { // NOSONAR
-            // Serializing using optimistic locking failed for a long time so be
-            // pessimistic and get it done
-            sessionInfo = serializePessimisticLocking(sessionId, timeToLive,
-                    attributes);
+        try {
+            if (!unrecoverableError) { // NOSONAR
+                // Serializing using optimistic locking failed for a long time
+                // so be
+                // pessimistic and get it done
+                sessionInfo = serializePessimisticLocking(sessionId, timeToLive,
+                        attributes);
+            }
+        } finally {
+            if (stopped.get()) {
+                pending.remove(sessionId);
+            }
         }
         whenSerialized.accept(sessionInfo);
+
     }
 
     private SessionInfo serializePessimisticLocking(String sessionId,
@@ -469,7 +523,6 @@ public class SessionSerializer
         try {
             long latestLockTime = findNewestLockTime(attributes);
             long latestUnlockTime = findNewestUnlockTime(attributes);
-
             if (latestLockTime > latestUnlockTime) {
                 // The session is locked
                 getLogger().trace(
@@ -481,7 +534,6 @@ public class SessionSerializer
             SessionInfo info = doSerialize(sessionId, timeToLive, attributes);
 
             long latestUnlockTimeCheck = findNewestUnlockTime(attributes);
-
             if (latestUnlockTime != latestUnlockTimeCheck) {
                 // Somebody modified the session during serialization and the
                 // result cannot be used
@@ -645,8 +697,18 @@ public class SessionSerializer
         // ensure that
         // the server has not shut down before this and made the session
         // unavailable
-        waitForSerialization();
-        executorService.shutdown();
+        if (stopped.compareAndSet(false, true)) {
+            getLogger().debug("Shutting down session serializer");
+            waitForSerialization();
+            this.vaadinService = null;
+            executorService.shutdown();
+            getLogger().debug("Session serializer shutdown complete");
+        }
+    }
+
+    @Override
+    public void serviceInit(ServiceInitEvent event) {
+        this.vaadinService = event.getSource();
     }
 
     private static class SerializationThreadFactory implements ThreadFactory {
