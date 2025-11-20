@@ -77,6 +77,26 @@ class DebugBackendConnector implements BackendConnector,
     }
 
     @Override
+    public boolean markDeserializationStarted(String clusterKey,
+            Duration timeToLive) {
+        Job job = getJob(clusterKey);
+        job.deserializationStarted();
+        return true;
+    }
+
+    @Override
+    public void markDeserializationComplete(String clusterKey) {
+        Job job = getJob(clusterKey);
+        job.deserialized();
+    }
+
+    @Override
+    public void markDeserializationFailed(String clusterKey, Throwable error) {
+        Job job = getJob(clusterKey);
+        job.deserializationFailed(new Exception(error));
+    }
+
+    @Override
     public TransientHandler apply(String sessionId, String clusterKey) {
         return handlers.computeIfAbsent(getJob(clusterKey),
                 DebugTransientHandler::new);
