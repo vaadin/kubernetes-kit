@@ -33,9 +33,13 @@ public class SerializationProperties {
 
     public static final int DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
 
+    public static final int DEFAULT_OPTIMISTIC_SERIALIZATION_DELAY_MS = 10;
+
     private int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
 
     private int optimisticTimeout = DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
+
+    private int optimisticDelay = DEFAULT_OPTIMISTIC_SERIALIZATION_DELAY_MS;
 
     @NestedConfigurationProperty
     private final TransientsProperties transients = new TransientsProperties();
@@ -94,6 +98,34 @@ public class SerializationProperties {
      */
     public void setOptimisticTimeout(int optimisticTimeout) {
         this.optimisticTimeout = optimisticTimeout;
+    }
+
+    /**
+     * Gets the delay in milliseconds to wait between optimistic serialization
+     * attempts.
+     * <p>
+     * A value of 0 or negative means no delay is applied between attempts.
+     * Note that disabling the delay may increase CPU usage significantly.
+     *
+     * @return the delay in milliseconds between optimistic serialization
+     *         attempts (default: 10)
+     */
+    public int getOptimisticDelay() {
+        return optimisticDelay;
+    }
+
+    /**
+     * Sets the delay in milliseconds to wait between optimistic serialization
+     * attempts.
+     * <p>
+     * A value of 0 or negative means no delay is applied between attempts.
+     * Note that disabling the delay may increase CPU usage significantly.
+     *
+     * @param delay the delay in milliseconds between optimistic serialization
+     *              attempts (default: 10)
+     */
+    public void setOptimisticDelay(int delay) {
+        this.optimisticDelay = delay;
     }
 
     /**
