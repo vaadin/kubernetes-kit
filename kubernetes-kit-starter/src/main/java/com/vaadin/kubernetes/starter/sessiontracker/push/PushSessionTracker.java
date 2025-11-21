@@ -68,6 +68,11 @@ public class PushSessionTracker implements PushSendListener {
     }
 
     @Override
+    public boolean canPush() {
+        return sessionSerializer.isRunning();
+    }
+
+    @Override
     public void onConnect(AtmosphereResource resource) {
         // The HTTP request associate to the resource might not be available
         // after connection for example because recycled by the servlet
@@ -83,8 +88,14 @@ public class PushSessionTracker implements PushSendListener {
     @Override
     public void onMessageSent(AtmosphereResource resource) {
         HttpSession httpSession = resource.session(false);
-        if (httpSession != null
-                && activeSessionChecker.test(httpSession.getId())) {
+        if (httpSession == null) {
+            getLogger().debug(
+                    "Skipping session serialization. HTTP session not available");
+        } else if (!activeSessionChecker.test(httpSession.getId())) {
+            getLogger().debug(
+                    "Skipping session serialization. HTTP session {} not active",
+                    httpSession.getId());
+        } else {
             tryGetSerializationKey(resource).ifPresent(CurrentKey::set);
             if (CurrentKey.get() != null) {
                 getLogger().debug("Serializing session {} with key {}",
@@ -98,9 +109,6 @@ public class PushSessionTracker implements PushSendListener {
                 getLogger().debug(
                         "Skipping session serialization. Missing serialization key.");
             }
-        } else {
-            getLogger().debug(
-                    "Skipping session serialization. Session not available");
         }
     }
 

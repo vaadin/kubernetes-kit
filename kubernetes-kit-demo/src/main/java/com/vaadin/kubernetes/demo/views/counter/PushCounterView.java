@@ -3,6 +3,7 @@ package com.vaadin.kubernetes.demo.views.counter;
 import java.io.Serializable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -14,6 +15,8 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.ListItem;
 import com.vaadin.flow.component.html.UnorderedList;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -38,6 +41,8 @@ public class PushCounterView extends VerticalLayout {
     private final Button button = new Button("Increment");
 
     private final AtomicInteger counter = new AtomicInteger();
+
+    private transient ScheduledFuture<?> repeatedTaskFeature;
 
     public PushCounterView() {
         setSizeFull();
@@ -64,17 +69,41 @@ public class PushCounterView extends VerticalLayout {
             addLogEntry("Long Task " + currentCounter + " Started");
             UI ui = ev.getSource().getUI().get();
             executorService.schedule(
-                    () -> ui.access(() -> addLogEntry("Long Task "
-                            + currentCounter + " Completed. "
-                            + "Counter now is " + counter.incrementAndGet())),
+                    () -> ui.access(() -> count("Long Task " + currentCounter
+                            + " Completed. " + "Counter now is %d")),
                     10, TimeUnit.SECONDS);
+        });
+        Button repeatedTaskButton = new Button("Repeated task", ev -> {
+            if (repeatedTaskFeature != null) {
+                repeatedTaskFeature.cancel(true);
+                repeatedTaskFeature = null;
+                ev.getSource().setText("Repeated task");
+            } else {
+                ev.getSource().setText("Stop repeated task");
+                int currentCounter = counter.get();
+                addLogEntry("Repeated Task " + currentCounter + " Started");
+                UI ui = ev.getSource().getUI().get();
+                repeatedTaskFeature = executorService.scheduleWithFixedDelay(
+                        () -> ui.access(
+                                () -> count("Repeated Task " + currentCounter
+                                        + " Completed. " + "Counter now is %s")),
+                        1, 1, TimeUnit.SECONDS);
+            }
         });
 
         count();
 
         add(counterHeading, hostnameHeading, ipAddressHeading, button,
-                longActionButton, backgroundTaskButton);
-        addAndExpand(log);
+                new HorizontalLayout(longActionButton, backgroundTaskButton,
+                        repeatedTaskButton));
+        Scroller logContainer = new Scroller(log);
+        addAndExpand(logContainer);
+
+        addDetachListener(ev -> {
+            if (repeatedTaskFeature != null) {
+                repeatedTaskFeature.cancel(true);
+            }
+        });
     }
 
     private void addLogEntry(String text) {
@@ -91,15 +120,20 @@ public class PushCounterView extends VerticalLayout {
     }
 
     private void count() {
-        final var entry = new CountEntry(counter.incrementAndGet(),
-                HostInfo.getHostname(), HostInfo.getIpAddress());
+        count("%2$s (%3$s) %1$d");
+    }
+
+    private void count(String message) {
+        int newValue = counter.incrementAndGet();
+        final var entry = new CountEntry(newValue, HostInfo.getHostname(),
+                HostInfo.getIpAddress());
 
         counterHeading.setText(Integer.toString(entry.getCount()));
         hostnameHeading.setText(entry.getHostname());
         ipAddressHeading.setText(entry.getIpAddress());
 
-        final var item = new ListItem(entry.getHostname() + " ("
-                + entry.getIpAddress() + ") " + entry.getCount());
+        final var item = new ListItem(String.format(message, entry.getCount(),
+                entry.getHostname(), entry.getIpAddress()));
         log.addComponentAsFirst(item);
     }
 

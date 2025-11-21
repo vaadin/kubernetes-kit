@@ -42,4 +42,22 @@ public interface PushSendListener {
      */
     void onMessageSent(AtmosphereResource resource);
 
+    /**
+     * Determines if a push operation should be performed or not.
+     * <p>
+     * This method is invoked before the actual push operation is performed.
+     * Implementors can decide to block the operation and thus postpone the
+     * application of pending changes to the UI. Preventing PUSH is useful, for
+     * example, when a server is shutting down, to prevent disalignments between
+     * the server and the client while the session is transferred to another
+     * server.
+     * <p>
+     * The default implementation always returns {@literal true}.
+     *
+     * @return {@literal true} if the current push operation should be
+     *         performed, {@literal false} otherwise.
+     */
+    default boolean canPush() {
+        return true;
+    }
 }
