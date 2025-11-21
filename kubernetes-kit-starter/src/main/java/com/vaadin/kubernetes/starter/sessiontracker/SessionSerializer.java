@@ -245,7 +245,7 @@ public class SessionSerializer
      *         deserialization process could not be started or an exception
      *         occurred.
      */
-    public HttpSession createHttpSession(String clusterKey,
+    HttpSession createHttpSession(String clusterKey,
             HttpServletRequest request) {
         HttpSession newSession = null;
         boolean canDeserialize = backendConnector
