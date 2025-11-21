@@ -362,6 +362,7 @@ public class SessionSerializer implements
             if (!stopped.get()
                     && serializationProperties.getOptimisticTimeout() > 0) {
                 checkUnserializableWrappers(attributes);
+                long delay = serializationProperties.getOptimisticDelay();
                 long start = System.currentTimeMillis();
                 long timeout = start
                         + serializationProperties.getOptimisticTimeout();
@@ -382,6 +383,18 @@ public class SessionSerializer implements
                                 sessionId, clusterKey);
                         whenSerialized.accept(info);
                         return;
+                    }
+                    if (delay > 0) {
+                        try {
+                            // Introduce a small delay to reduce CPU usage
+                            Thread.sleep(delay);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            getLogger().debug("Optimistic serialization interrupted for session {} with distributed key {}",
+                                    sessionId, clusterKey);
+                            // Exit loop and fall through to pessimistic serialization
+                            break;
+                        }
                     }
                 }
             }
