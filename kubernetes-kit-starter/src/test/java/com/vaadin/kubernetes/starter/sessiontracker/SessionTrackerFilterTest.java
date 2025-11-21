@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -45,7 +46,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -54,6 +54,7 @@ import static org.mockito.Mockito.when;
 class SessionTrackerFilterTest {
 
     SessionSerializer serializer = mock(SessionSerializer.class);
+    AtomicBoolean serializerRunning = new AtomicBoolean(true);
     BackendConnector backendConnector = Mockito.mock(BackendConnector.class);
     SessionListener sessionListener = spy(
             new SessionListener(backendConnector, serializer));
@@ -72,9 +73,10 @@ class SessionTrackerFilterTest {
     private ArgumentCaptor<Consumer<Cookie>> cookieConsumerArgumentCaptor;
 
     @BeforeEach
-    void mockBackendConnector() {
+    void setupMocks() {
         when(backendConnector.getSession(any()))
                 .thenReturn(new SessionInfo("TEST", new byte[0]));
+        when(serializer.isRunning()).then(i -> serializerRunning.get());
     }
 
     @Test
@@ -101,7 +103,7 @@ class SessionTrackerFilterTest {
         MockHttpSession httpSession = setupHttpSession();
         filter.doFilter(request, response, filterChain);
 
-        verifyNoInteractions(serializer);
+        verify(serializer, never()).serialize(any(HttpSession.class));
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
         verify(filterChain).doFilter(request, response);
@@ -114,7 +116,7 @@ class SessionTrackerFilterTest {
         setupHttpSession();
         when(request.isRequestedSessionIdValid()).thenReturn(true);
         filter.doFilter(request, response, filterChain);
-        verifyNoInteractions(serializer);
+        verify(serializer, never()).serialize(any(HttpSession.class));
         verify(filterChain).doFilter(request, response);
     }
 
@@ -125,7 +127,7 @@ class SessionTrackerFilterTest {
         MockHttpSession httpSession = setupHttpSession();
         filter.doFilter(request, response, filterChain);
 
-        verifyNoInteractions(serializer);
+        verify(serializer, never()).serialize(any(HttpSession.class));
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
         verify(filterChain).doFilter(request, response);
@@ -160,7 +162,7 @@ class SessionTrackerFilterTest {
         MockHttpSession httpSession = setupHttpSession();
         filter.doFilter(request, response, filterChain);
 
-        verifyNoInteractions(serializer);
+        verify(serializer, never()).serialize(any(HttpSession.class));
         assertThat(httpSession.getAttribute(CurrentKey.COOKIE_NAME))
                 .isEqualTo(cookie.getValue());
         verify(filterChain).doFilter(request, response);
@@ -269,6 +271,23 @@ class SessionTrackerFilterTest {
                 .doesNotHaveNullValue()
                 .isNotSameAs(sessionCreationExecution.session().get());
 
+    }
+
+    @Test
+    void doFilter_sessionSerializerStopped_rejectIncomingRequests()
+            throws Exception {
+        setupCookie();
+        when(request.getParameter(ApplicationConstants.REQUEST_TYPE_PARAMETER))
+                .thenReturn(HandlerHelper.RequestType.UIDL.getIdentifier());
+        when(request.isRequestedSessionIdValid()).thenReturn(true);
+        MockHttpSession httpSession = setupHttpSession();
+        serializerRunning.set(false);
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(response).sendRedirect(anyString(), eq(307));
+        verify(serializer, never()).serialize(httpSession);
+        verify(filterChain, never()).doFilter(request, response);
     }
 
     @Test
