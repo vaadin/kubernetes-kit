@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationListener;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.context.event.ContextClosedEvent;
 
 import com.vaadin.flow.component.UI;
@@ -108,10 +109,12 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
  * </ul>
  *
  * In case of a server shutdown, it waits for pending session serializations to
- * complete.
+ * complete. The class implements {@link SmartLifecycle} to using the default
+ * phase to be notified early about shutdown, so it can complete its work before
+ * other service and beans like the {@link BackendConnector} are stopped.
  */
-public class SessionSerializer implements
-        ApplicationListener<ContextClosedEvent>, VaadinServiceInitListener {
+public class SessionSerializer
+        implements VaadinServiceInitListener, SmartLifecycle {
 
     static {
         ProductUtils.markAsUsed(SessionSerializer.class.getSimpleName());
@@ -222,11 +225,7 @@ public class SessionSerializer implements
         this.injectableFilter = injectableFilter;
     }
 
-    /**
-     * Check whether this component is currently running.
-     *
-     * @return whether the component is currently running
-     */
+    @Override
     public boolean isRunning() {
         return !stopped.get();
     }
@@ -705,17 +704,18 @@ public class SessionSerializer implements
     }
 
     @Override
-    public void onApplicationEvent(ContextClosedEvent event) {
-        // This is using a context closed event and not a predestroy hook to
-        // ensure that
-        // the server has not shut down before this and made the session
-        // unavailable
+    public void start() {
+        // no-op
+    }
+
+    @Override
+    public void stop() {
         if (stopped.compareAndSet(false, true)) {
             getLogger().debug("Shutting down session serializer");
             waitForSerialization();
             this.vaadinService = null;
             executorService.shutdown();
-            getLogger().debug("Session serializer shutdown complete");
+            getLogger().debug("Session serializer shutdown completed");
         }
     }
 
