@@ -101,45 +101,35 @@ public class SessionTrackerFilter extends HttpFilter {
         AtomicReference<Boolean> replayRequestRequired = new AtomicReference<>(
                 false);
 
-        boolean serializerRunning = sessionSerializer.isRunning();
         // prevent a session creation attempt on shutdown
-        if (serializerRunning) {
-            SessionTrackerCookie.getValue(request, cookieName)
-                    .ifPresent(key -> {
-                        boolean sessionExists = request
-                                .getSession(false) != null;
-                        if (!sessionExists) {
-                            createOrWaitForSession(request, key,
-                                    replayRequestRequired);
-                        } else {
-                            getLogger().debug(
-                                    "Session already exists for cluster key {} on request {}",
-                                    key, request.getRequestURI());
-                            pendingSessionCreation.remove(key);
-                        }
-                    });
+        var trackerCookie = SessionTrackerCookie.getValue(request, cookieName);
+        if (trackerCookie.isPresent() && sessionSerializer.isRunning()) {
+            var key = trackerCookie.get();
+            if (request.getSession(false) == null) {
+                createOrWaitForSession(request, key, replayRequestRequired);
+            } else {
+                getLogger().debug(
+                        "Session already exists for cluster key {} on request {}",
+                        key, request.getRequestURI());
+                pendingSessionCreation.remove(key);
+            }
+        }
+
+        // Force redirect if the server is shutting down, to prevent potential
+        // modifications to the VaadinSession; the SessionSerializer status
+        // is read again because stop happens asynchronously
+        if (!sessionSerializer.isRunning()) {
+            forceRequestReply(request, response,
+                    "Redirecting current request session ID {} to {} because server is shutting down");
+            return;
         }
 
         // If this is a waiting request, redirect to ensure it uses the new
         // session ID; the waiting thread only proceeds here after the first
         // request has flushed its response
-        // Redirect also if the server is shutting down, to prevent potential
-        // modifications to the VaadinSession; the SessionSerializer status
-        // is read again because stop happens asynchronously
-        serializerRunning = sessionSerializer.isRunning();
-        if (!serializerRunning
-                || Boolean.TRUE.equals(replayRequestRequired.get())) {
-            String redirectUrl = buildRedirectUrl(request);
-            if (!serializerRunning) {
-                getLogger().debug(
-                        "Redirecting current request session ID {} to {} because server is shutting down",
-                        request.getRequestedSessionId(), redirectUrl);
-            } else {
-                getLogger().debug(
-                        "Redirecting current request session ID {} to {} to use the new session ID",
-                        request.getRequestedSessionId(), redirectUrl);
-            }
-            response.sendRedirect(redirectUrl, 307);
+        if (Boolean.TRUE.equals(replayRequestRequired.get())) {
+            forceRequestReply(request, response,
+                    "Redirecting current request session ID {} to {} to use the new session ID");
             return;
         }
 
@@ -179,6 +169,14 @@ public class SessionTrackerFilter extends HttpFilter {
         } finally {
             CurrentKey.clear();
         }
+    }
+
+    private void forceRequestReply(HttpServletRequest request,
+            HttpServletResponse response, String message) throws IOException {
+        String redirectUrl = buildRedirectUrl(request);
+        getLogger().debug(message, request.getRequestedSessionId(),
+                redirectUrl);
+        response.sendRedirect(redirectUrl, 307);
     }
 
     /**
