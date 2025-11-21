@@ -114,7 +114,7 @@ public class SerializationDebugRequestHandler
     @Override
     public void onApplicationEvent(ContextClosedEvent event) {
         debugBackendConnector.shutdown();
-        sessionSerializer.onApplicationEvent(event);
+        sessionSerializer.stop();
     }
 
     @Override
