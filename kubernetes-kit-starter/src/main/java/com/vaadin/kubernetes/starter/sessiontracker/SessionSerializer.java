@@ -9,6 +9,7 @@
  */
 package com.vaadin.kubernetes.starter.sessiontracker;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.ByteArrayInputStream;
@@ -228,6 +229,40 @@ public class SessionSerializer
     @Override
     public boolean isRunning() {
         return !stopped.get();
+    }
+
+    /**
+     * Creates a new HTTP session associated with the given cluster key. This
+     * method attempts to mark the deserialization process as started and, if
+     * successful, creates a new session using the provided request.
+     *
+     * @param clusterKey
+     *            the distributed storage key associated with the session to be
+     *            created.
+     * @param request
+     *            the HttpServletRequest used to create the HTTP session.
+     * @return the newly created HTTP session, or {@code null} if the
+     *         deserialization process could not be started or an exception
+     *         occurred.
+     */
+    HttpSession createHttpSession(String clusterKey,
+            HttpServletRequest request) {
+        HttpSession newSession = null;
+        boolean canDeserialize = backendConnector
+                .markDeserializationStarted(clusterKey, Duration.ofMillis(
+                        serializationProperties.getDeserializationLockTimeout()));
+        if (canDeserialize) {
+            try {
+                newSession = request.getSession(true);
+                backendConnector.markDeserializationComplete(clusterKey);
+            } catch (Exception ex) {
+                getLogger().debug(
+                        "Failed to create HttpSession for cluster key {}",
+                        clusterKey, ex);
+                backendConnector.markDeserializationFailed(clusterKey, ex);
+            }
+        }
+        return newSession;
     }
 
     /**

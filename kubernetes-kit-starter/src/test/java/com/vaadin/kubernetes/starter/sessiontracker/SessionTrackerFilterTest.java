@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -63,17 +64,19 @@ class SessionTrackerFilterTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
-
     FilterChain filterChain = mock(FilterChain.class);
 
     Cookie cookie = new Cookie(CurrentKey.COOKIE_NAME,
             UUID.randomUUID().toString());
+    ConcurrentHashMap<String, HttpSession> sessionStore = new ConcurrentHashMap<>();
 
     @Captor
     private ArgumentCaptor<Consumer<Cookie>> cookieConsumerArgumentCaptor;
 
     @BeforeEach
     void setupMocks() {
+        when(backendConnector.markDeserializationStarted(anyString(), any()))
+                .thenReturn(true);
         when(backendConnector.getSession(any()))
                 .thenReturn(new SessionInfo("TEST", new byte[0]));
         when(serializer.isRunning()).then(i -> serializerRunning.get());
@@ -141,7 +144,7 @@ class SessionTrackerFilterTest {
         when(request.getSession(false)).thenReturn(null, httpSession);
         when(request.getSession(true)).thenReturn(httpSession);
         when(request.isRequestedSessionIdValid()).thenReturn(false);
-        when(request.getSession(true)).thenAnswer(i -> {
+        when(serializer.createHttpSession(anyString(), any())).thenAnswer(i -> {
             sessionListener.sessionCreated(new HttpSessionEvent(httpSession));
             return httpSession;
         });
@@ -192,6 +195,25 @@ class SessionTrackerFilterTest {
     }
 
     @Test
+    void notExistingSession_trackedCookiePresent_pendingDeserialization_sessionNotInitialized()
+            throws Exception {
+        boolean pendingSessionCreation = true;
+
+        setupCookie();
+        String invalidSessionId = UUID.randomUUID().toString();
+        var execution = createTestRequest(cookie, invalidSessionId,
+                pendingSessionCreation);
+
+        execution.execute(filter);
+
+        verify(execution.response).sendRedirect(anyString(), eq(307));
+        verify(execution.request, never()).getSession(true);
+        verify(execution.chain, never()).doFilter(execution.request(),
+                execution.response());
+        assertThat(execution.session()).hasNullValue();
+    }
+
+    @Test
     void notExistingSession_trackedCookiePresent_concurrentRequest_sessionInitialized()
             throws Exception {
         // Slow down deserialization to simulate concurrent requests
@@ -222,13 +244,11 @@ class SessionTrackerFilterTest {
         verify(sessionCreationExecution.chain).doFilter(
                 sessionCreationExecution.request(),
                 sessionCreationExecution.response());
-        verify(sessionCreationExecution.request).getSession(true);
         assertThat(sessionCreationExecution.session()).doesNotHaveNullValue();
         verify(sessionCreationExecution.response, never())
                 .sendRedirect(anyString(), anyInt());
 
         verify(waitingExecution.response).sendRedirect(anyString(), eq(307));
-        verify(waitingExecution.request, never()).getSession(true);
         verify(waitingExecution.chain, never()).doFilter(
                 waitingExecution.request(), waitingExecution.response());
         assertThat(waitingExecution.session()).hasNullValue();
@@ -263,7 +283,6 @@ class SessionTrackerFilterTest {
         requestWithDifferentSessionRequestedId.execute(filter);
         verify(requestWithDifferentSessionRequestedId.response, never())
                 .sendRedirect(anyString(), anyInt());
-        verify(requestWithDifferentSessionRequestedId.request).getSession(true);
         verify(requestWithDifferentSessionRequestedId.chain).doFilter(
                 requestWithDifferentSessionRequestedId.request(),
                 requestWithDifferentSessionRequestedId.response());
@@ -327,10 +346,14 @@ class SessionTrackerFilterTest {
 
     }
 
-    private final ConcurrentHashMap<String, HttpSession> sessionStore = new ConcurrentHashMap<>();
-
     private TestRequest createTestRequest(Cookie cookie,
             String requestedSessionId) {
+        return createTestRequest(cookie, requestedSessionId, false);
+    }
+
+    private TestRequest createTestRequest(Cookie cookie,
+            String requestedSessionId, boolean pendingSessionCreation) {
+
         // lenient mock because stub calls might be hit or not
         HttpServletRequest request = mock(HttpServletRequest.class,
                 Mockito.withSettings().strictness(Strictness.LENIENT));
@@ -338,19 +361,24 @@ class SessionTrackerFilterTest {
         AtomicReference<HttpSession> createdSession = new AtomicReference<>();
         TestRequest testRequest = new TestRequest(request, response,
                 createdSession, requestedSessionId, mock(FilterChain.class));
-
-        when(request.getSession(true)).thenAnswer(i -> {
-            String sid = testRequest.requestedSessionId();
-            var session = sessionStore.get(sid);
-            if (session != null) {
-                return session;
+        when(request.getRequestURI()).thenReturn("/test-" + UUID.randomUUID());
+        doAnswer(i -> {
+            if (!pendingSessionCreation) {
+                String sid = testRequest.requestedSessionId();
+                var session = sessionStore.get(sid);
+                if (session != null) {
+                    return session;
+                }
+                MockHttpSession httpSession = new MockHttpSession();
+                sessionStore.put(httpSession.getId(), httpSession);
+                sessionListener
+                        .sessionCreated(new HttpSessionEvent(httpSession));
+                testRequest.session().set(httpSession);
+                return httpSession;
+            } else {
+                return null;
             }
-            MockHttpSession httpSession = new MockHttpSession();
-            sessionStore.put(httpSession.getId(), httpSession);
-            sessionListener.sessionCreated(new HttpSessionEvent(httpSession));
-            testRequest.session().set(httpSession);
-            return httpSession;
-        });
+        }).when(serializer).createHttpSession(anyString(), same(request));
         when(request.getSession(false)).then(i -> {
             HttpSession currentSession = testRequest.session().get();
             if (currentSession != null) {

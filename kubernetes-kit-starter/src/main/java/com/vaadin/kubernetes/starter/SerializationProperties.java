@@ -31,11 +31,15 @@ public class SerializationProperties {
 
     public static final int DEFAULT_SERIALIZATION_TIMEOUT_MS = 30000;
 
+    public static final int DEFAULT_DESERIALIZATION_LOCK_TIMEOUT_MS = 10000;
+
     public static final int DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS = 30000;
 
     public static final int DEFAULT_OPTIMISTIC_SERIALIZATION_DELAY_MS = 10;
 
     private int timeout = DEFAULT_SERIALIZATION_TIMEOUT_MS;
+
+    private int deserializationLockTimeout = DEFAULT_DESERIALIZATION_LOCK_TIMEOUT_MS;
 
     private int optimisticTimeout = DEFAULT_OPTIMISTIC_SERIALIZATION_TIMEOUT_MS;
 
@@ -65,6 +69,29 @@ public class SerializationProperties {
      */
     public void setTimeout(int timeout) {
         this.timeout = timeout;
+    }
+
+    /**
+     * Gets the timeout in milliseconds to wait for the deserialization lock to
+     * be released if the deserialization is not completed.
+     *
+     * @return the timeout in milliseconds to wait for the deserialization to be
+     *         completed, defaults to 10000 ms
+     */
+    public int getDeserializationLockTimeout() {
+        return deserializationLockTimeout;
+    }
+
+    /**
+     * Sets the timeout in milliseconds to wait for the deserialization lock to
+     * be released if the deserialization is not completed.
+     *
+     * @param timeout
+     *            the timeout in milliseconds to wait for the deserialization to
+     *            be completed, defaults to 10000 ms
+     */
+    public void setDeserializationLockTimeout(int timeout) {
+        this.deserializationLockTimeout = timeout;
     }
 
     /**
@@ -104,8 +131,8 @@ public class SerializationProperties {
      * Gets the delay in milliseconds to wait between optimistic serialization
      * attempts.
      * <p>
-     * A value of 0 or negative means no delay is applied between attempts.
-     * Note that disabling the delay may increase CPU usage significantly.
+     * A value of 0 or negative means no delay is applied between attempts. Note
+     * that disabling the delay may increase CPU usage significantly.
      *
      * @return the delay in milliseconds between optimistic serialization
      *         attempts (default: 10)
@@ -118,11 +145,12 @@ public class SerializationProperties {
      * Sets the delay in milliseconds to wait between optimistic serialization
      * attempts.
      * <p>
-     * A value of 0 or negative means no delay is applied between attempts.
-     * Note that disabling the delay may increase CPU usage significantly.
+     * A value of 0 or negative means no delay is applied between attempts. Note
+     * that disabling the delay may increase CPU usage significantly.
      *
-     * @param delay the delay in milliseconds between optimistic serialization
-     *              attempts (default: 10)
+     * @param delay
+     *            the delay in milliseconds between optimistic serialization
+     *            attempts (default: 10)
      */
     public void setOptimisticDelay(int delay) {
         this.optimisticDelay = delay;
