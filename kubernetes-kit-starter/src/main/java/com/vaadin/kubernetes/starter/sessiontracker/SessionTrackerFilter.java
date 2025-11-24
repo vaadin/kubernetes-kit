@@ -370,6 +370,10 @@ public class SessionTrackerFilter extends HttpFilter {
                 getLogger().debug(
                         "Session {} successfully created for cluster key {}",
                         session.getId(), key);
+            } else {
+                getLogger().debug(
+                        "Another request is already processing deserialization for cluster key {}",
+                        key);
             }
             return session;
         } catch (RuntimeException e) {
