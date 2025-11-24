@@ -108,7 +108,7 @@ public class SessionTrackerFilter extends HttpFilter {
             if (request.getSession(false) == null) {
                 createOrWaitForSession(request, key, replayRequestRequired);
             } else {
-                getLogger().debug(
+                getLogger().trace(
                         "Session already exists for cluster key {} on request {}",
                         key, request.getRequestURI());
                 pendingSessionCreation.remove(key);
@@ -229,9 +229,16 @@ public class SessionTrackerFilter extends HttpFilter {
         // found an existing one (concurrent request)
         if (sessionCreatingFutureHolder.get() != null) {
             // This thread created the future - it's the first request
-            createOrWaitForSession(request, clusterKey, existingFuture);
             // Note: completion happens after filter chain and
             // serialization
+            HttpSession newSession = createOrWaitForSession(request, clusterKey,
+                    existingFuture);
+            if (newSession == null) {
+                // The session was not created, another request is already
+                // processing deserialziation
+                // redirect to the same URL, and try again later
+                replayRequestRequired.set(true);
+            }
         } else {
             // Concurrent request: wait for session creation to complete
             replayRequestRequired.set(waitForSessionCreation(request,
@@ -349,17 +356,26 @@ public class SessionTrackerFilter extends HttpFilter {
         }
     }
 
-    private void createOrWaitForSession(HttpServletRequest request, String key,
-            CompletableFuture<String> existingFuture) {
+    private HttpSession createOrWaitForSession(HttpServletRequest request,
+            String key, CompletableFuture<String> existingFuture) {
         CurrentKey.set(key);
         getLogger().debug(
                 "Creating session for cluster key {} on request {} for requested session id {}",
                 key, request.getRequestURI(), request.getRequestedSessionId());
         try {
-            HttpSession session = request.getSession(true);
-            sessionListener.sessionAssociated(key, session, request);
-            getLogger().debug("Session created successfully for cluster key {}",
-                    key);
+            HttpSession session = sessionSerializer.createHttpSession(key,
+                    request);
+            if (session != null) {
+                sessionListener.sessionAssociated(key, session, request);
+                getLogger().debug(
+                        "Session {} successfully created for cluster key {}",
+                        session.getId(), key);
+            } else {
+                getLogger().debug(
+                        "Another request is already processing deserialization for cluster key {}",
+                        key);
+            }
+            return session;
         } catch (RuntimeException e) {
             getLogger().error("Failed to create session for cluster key {}",
                     key, e);
