@@ -66,13 +66,13 @@ public class ClusterSupport implements VaadinServiceInitListener {
     public void serviceInit(ServiceInitEvent serviceInitEvent) {
         appVersion = System.getenv(ENV_APP_VERSION);
         if (appVersion == null) {
-            getLogger().error(
+            getLogger().debug(
                     "Missing environment variable 'APP_VERSION'. ClusterSupport service not initialized.");
             return;
         }
         getLogger().info(
-                "ClusterSupport service initialized. Registering RequestHandler with Application Version: "
-                        + appVersion);
+                "ClusterSupport service initialized. Registering RequestHandler with Application Version: {}",
+                appVersion);
 
         // Register a generic request handler for all the requests
         serviceInitEvent.addRequestHandler(this::handleRequest);
@@ -95,9 +95,9 @@ public class ClusterSupport implements VaadinServiceInitListener {
                     // when the proxy is not setting the update version header
                     if (versionHeader == null || versionHeader.isEmpty()
                             || appVersion.equals(versionHeader)) {
-                        getLogger().info("Removing notifier: updateVersion="
-                                + versionHeader + ", appVersion=" + appVersion
-                                + ", session=" + session.getId());
+                        getLogger().info(
+                                "Removing notifier: updateVersion={}, appVersion={}, session={}",
+                                versionHeader, appVersion, session.getId());
                         ui.remove(versionNotifier.get());
                     }
                 } else if (versionHeader != null && !versionHeader.isEmpty()
@@ -107,9 +107,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
                             versionHeader);
                     notifier.addSwitchVersionEventListener(
                             this::onComponentEvent);
-                    getLogger().info("Notifying version update: updateVersion="
-                            + versionHeader + ", appVersion=" + appVersion
-                            + ", session=" + session.getId());
+                    getLogger().info("Notifying version update: updateVersion={}, appVersion={}, session={}",
+                            versionHeader, appVersion, session.getId());
                     ui.add(notifier);
                 }
             });
@@ -135,7 +134,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
         // cookie and invalidate the session
         removeStickyClusterCookie();
         WrappedSession session = VaadinRequest.getCurrent().getWrappedSession();
-        getLogger().debug("Invalidating session " + session.getId());
+        getLogger().debug("Invalidating session {}", session.getId());
         session.invalidate();
     }
 
