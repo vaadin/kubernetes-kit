@@ -393,8 +393,7 @@ class SessionSerializerTest {
         // Simulate stop asynchronously to prevent blocking the current thread
         AtomicBoolean stopCompleted = new AtomicBoolean();
         CompletableFuture
-                .runAsync(() -> serializer.onApplicationEvent(
-                        new ContextClosedEvent(mock(ApplicationContext.class))))
+                .runAsync(() -> serializer.stop())
                 .whenComplete((r, e) -> stopCompleted.set(e == null));
 
         await().until(() -> !serializer.isRunning());
@@ -448,8 +447,7 @@ class SessionSerializerTest {
         // Simulate stop asynchronously to prevent blocking the current thread
         AtomicBoolean stopCompleted = new AtomicBoolean();
         CompletableFuture
-                .runAsync(() -> serializer.onApplicationEvent(
-                        new ContextClosedEvent(mock(ApplicationContext.class))))
+                .runAsync(() -> serializer.stop())
                 .whenComplete((r, e) -> stopCompleted.set(e == null));
 
         // Expect serializer to switch to pessimistic locking almost immediately
@@ -487,8 +485,7 @@ class SessionSerializerTest {
         // Simulate stop asynchronously to prevent blocking the current thread
         AtomicBoolean stopCompleted = new AtomicBoolean();
         CompletableFuture
-                .runAsync(() -> serializer.onApplicationEvent(
-                        new ContextClosedEvent(mock(ApplicationContext.class))))
+                .runAsync(() -> serializer.stop())
                 .whenComplete((r, e) -> stopCompleted.set(e == null));
 
         await().until(() -> !serializer.isRunning());
