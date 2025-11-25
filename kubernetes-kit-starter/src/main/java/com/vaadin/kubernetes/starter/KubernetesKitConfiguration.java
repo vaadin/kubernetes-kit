@@ -268,12 +268,11 @@ public class KubernetesKitConfiguration {
 
     }
 
-    @AutoConfiguration
     @ConditionalOnClass(DataRedisAutoConfiguration.class)
-    @AutoConfigureAfter(DataRedisAutoConfiguration.class)
+    @AutoConfiguration(after = DataRedisAutoConfiguration.class)
     public static class RedisConfiguration {
+
         @Bean
-        @ConditionalOnBean(RedisConnectionFactory.class)
         @ConditionalOnMissingBean
         RedisConnector redisConnector(RedisConnectionFactory factory) {
             return new RedisConnector(factory);
