@@ -4,8 +4,11 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
+import com.hazelcast.spi.properties.ClusterProperty;
+import com.hazelcast.spi.properties.HazelcastProperty;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +36,12 @@ public class HazelcastConnectorTest {
 
         sessionMap = mock(IMap.class);
 
+        // disable shutdown hook to prevent logs from being flooded with warning messages
+        Config hazelcastConfig = new Config();
+        hazelcastConfig.getProperties().setProperty(ClusterProperty.SHUTDOWNHOOK_ENABLED.getName(), "false");
+
         hazelcastInstance = mock(HazelcastInstance.class);
+        when(hazelcastInstance.getConfig()).thenReturn(hazelcastConfig);
         when(hazelcastInstance.<String, byte[]> getMap(anyString()))
                 .thenReturn(sessionMap);
 
