@@ -30,8 +30,6 @@ import com.vaadin.flow.server.WrappedSession;
  * events from the cluster running the Vaadin application.
  */
 public class ClusterSupport implements VaadinServiceInitListener {
-    @Serial
-    private static final long serialVersionUID = 1L;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterSupport.class);
 
