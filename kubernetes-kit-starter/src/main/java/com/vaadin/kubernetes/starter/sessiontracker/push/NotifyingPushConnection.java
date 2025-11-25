@@ -29,6 +29,8 @@ import com.vaadin.flow.server.communication.PushConnectionFactory;
  */
 public class NotifyingPushConnection extends AtmospherePushConnection {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(NotifyingPushConnection.class);
+
     /**
      * Creates an instance connected to the given UI.
      *
@@ -53,7 +55,7 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
         if (canPush.get()) {
             super.push(async);
         } else {
-            getLogger().debug("Push operation postponed by a PushSendListener");
+            LOGGER.debug("Push operation postponed by a PushSendListener");
         }
     }
 
@@ -71,21 +73,16 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
                     .getAttribute(Lookup.class)
                     .lookupAll(PushSendListener.class);
         } catch (IllegalStateException ex) {
-            Logger logger = getLogger();
             String message = "Cannot get PushSendListener instances. Most likely application server is shutting down and the error can be ignored.";
-            if (logger.isTraceEnabled()) {
-                logger.trace(message, ex);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(message, ex);
             } else {
-                logger.debug(message);
+                LOGGER.debug(message);
             }
         }
         if (pushSendListeners != null) {
             pushSendListeners.forEach(action);
         }
-    }
-
-    private Logger getLogger() {
-        return LoggerFactory.getLogger(getClass());
     }
 
     /**
