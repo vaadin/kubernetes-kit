@@ -137,4 +137,13 @@ class PushSessionTrackerTest {
         verify(sessionSerializer).serialize(eq(httpSession));
         assertNull(CurrentKey.get());
     }
+
+    @Test
+    void canPush_serializerStopped_preventPush() {
+        when(sessionSerializer.isRunning()).thenReturn(true, false);
+        Assertions.assertTrue(sessionTracker.canPush(),
+                "Expected push to be allowed when session serialized is running");
+        Assertions.assertFalse(sessionTracker.canPush(),
+                "Expected push to be prevented when session serialized is stopped");
+    }
 }
