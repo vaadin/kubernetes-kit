@@ -1,5 +1,6 @@
 package com.vaadin.kubernetes.starter.sessiontracker;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
@@ -796,6 +797,58 @@ class SessionSerializerTest {
                 () -> serializer.deserialize(sessionInfo, httpSession));
 
         verify(serializationCallback).onDeserializationError(any());
+    }
+
+    @Test
+    void createHttpSession_noPendingDeserialization_createsSession() {
+        when(connector.markDeserializationStarted(eq(clusterSID), any()))
+                .thenReturn(true);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getSession(true)).thenReturn(httpSession);
+
+        HttpSession newSession = serializer.createHttpSession(clusterSID,
+                request);
+
+        Assertions.assertSame(httpSession, newSession);
+        verify(connector).markDeserializationStarted(eq(clusterSID), any());
+        verify(connector).markDeserializationComplete(eq(clusterSID));
+        verify(connector, never()).markDeserializationFailed(eq(clusterSID),
+                any());
+    }
+
+    @Test
+    void createHttpSession_sessionCreationFailure_notifyConnector() {
+        when(connector.markDeserializationStarted(eq(clusterSID), any()))
+                .thenReturn(true);
+
+        RuntimeException exception = new RuntimeException("BOOM!");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getSession(true)).thenThrow(exception);
+
+        HttpSession newSession = serializer.createHttpSession(clusterSID,
+                request);
+
+        Assertions.assertNull(newSession);
+        verify(connector).markDeserializationStarted(eq(clusterSID), any());
+        verify(connector, never()).markDeserializationComplete(eq(clusterSID));
+        verify(connector).markDeserializationFailed(clusterSID, exception);
+    }
+
+    @Test
+    void createHttpSession_pendingDeserialization_getsNull() {
+        when(connector.markDeserializationStarted(eq(clusterSID), any()))
+                .thenReturn(false);
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getSession(true)).thenReturn(httpSession);
+
+        HttpSession newSession = serializer.createHttpSession(clusterSID,
+                request);
+
+        Assertions.assertNull(newSession);
+        verify(connector).markDeserializationStarted(eq(clusterSID), any());
+        verify(connector, never()).markDeserializationComplete(eq(clusterSID));
+        verify(connector, never()).markDeserializationFailed(eq(clusterSID),
+                any());
     }
 
     private UnserializableComponentWrapper<State, Unserializable> createUnserializableComponentWrapper() {

@@ -34,6 +34,8 @@ import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerCookie;
  */
 public class PushSessionTracker implements PushSendListener {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(PushSessionTracker.class);
+
     private final SessionSerializer sessionSerializer;
 
     private Predicate<String> activeSessionChecker = id -> true;
@@ -68,6 +70,11 @@ public class PushSessionTracker implements PushSendListener {
     }
 
     @Override
+    public boolean canPush() {
+        return sessionSerializer.isRunning();
+    }
+
+    @Override
     public void onConnect(AtmosphereResource resource) {
         // The HTTP request associate to the resource might not be available
         // after connection for example because recycled by the servlet
@@ -83,11 +90,17 @@ public class PushSessionTracker implements PushSendListener {
     @Override
     public void onMessageSent(AtmosphereResource resource) {
         HttpSession httpSession = resource.session(false);
-        if (httpSession != null
-                && activeSessionChecker.test(httpSession.getId())) {
+        if (httpSession == null) {
+            LOGGER.debug(
+                    "Skipping session serialization. HTTP session not available");
+        } else if (!activeSessionChecker.test(httpSession.getId())) {
+            LOGGER.debug(
+                    "Skipping session serialization. HTTP session {} not active",
+                    httpSession.getId());
+        } else {
             tryGetSerializationKey(resource).ifPresent(CurrentKey::set);
             if (CurrentKey.get() != null) {
-                getLogger().debug("Serializing session {} with key {}",
+                LOGGER.debug("Serializing session {} with key {}",
                         httpSession.getId(), CurrentKey.get());
                 try {
                     sessionSerializer.serialize(httpSession);
@@ -95,12 +108,9 @@ public class PushSessionTracker implements PushSendListener {
                     CurrentKey.clear();
                 }
             } else {
-                getLogger().debug(
+                LOGGER.debug(
                         "Skipping session serialization. Missing serialization key.");
             }
-        } else {
-            getLogger().debug(
-                    "Skipping session serialization. Session not available");
         }
     }
 
@@ -123,7 +133,7 @@ public class PushSessionTracker implements PushSendListener {
                                 clusterCookieName)
                         .orElse(null);
             } catch (Exception ex) {
-                getLogger().debug("Cannot get serialization key from request",
+                LOGGER.debug("Cannot get serialization key from request",
                         ex);
             }
         }
@@ -132,15 +142,11 @@ public class PushSessionTracker implements PushSendListener {
                 key = SessionTrackerCookie.getFromSession(httpSession)
                         .orElse(null);
             } catch (Exception ex) {
-                getLogger().debug("Cannot get serialization key from session",
+                LOGGER.debug("Cannot get serialization key from session",
                         ex);
             }
         }
         return Optional.ofNullable(key);
-    }
-
-    private Logger getLogger() {
-        return LoggerFactory.getLogger(getClass());
     }
 
 }

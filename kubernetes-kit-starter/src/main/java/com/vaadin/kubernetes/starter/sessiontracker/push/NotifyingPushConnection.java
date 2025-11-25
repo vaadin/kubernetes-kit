@@ -10,6 +10,7 @@
 package com.vaadin.kubernetes.starter.sessiontracker.push;
 
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import org.atmosphere.cpr.AtmosphereResource;
@@ -28,6 +29,8 @@ import com.vaadin.flow.server.communication.PushConnectionFactory;
  */
 public class NotifyingPushConnection extends AtmospherePushConnection {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(NotifyingPushConnection.class);
+
     /**
      * Creates an instance connected to the given UI.
      *
@@ -45,6 +48,18 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
     }
 
     @Override
+    public void push(boolean async) {
+        AtomicBoolean canPush = new AtomicBoolean(true);
+        notifyPushListeners(
+                listener -> canPush.compareAndSet(true, listener.canPush()));
+        if (canPush.get()) {
+            super.push(async);
+        } else {
+            LOGGER.debug("Push operation postponed by a PushSendListener");
+        }
+    }
+
+    @Override
     protected void sendMessage(String message) {
         super.sendMessage(message);
         AtmosphereResource resource = getResource();
@@ -58,12 +73,11 @@ public class NotifyingPushConnection extends AtmospherePushConnection {
                     .getAttribute(Lookup.class)
                     .lookupAll(PushSendListener.class);
         } catch (IllegalStateException ex) {
-            Logger logger = LoggerFactory.getLogger(getClass());
             String message = "Cannot get PushSendListener instances. Most likely application server is shutting down and the error can be ignored.";
-            if (logger.isTraceEnabled()) {
-                logger.trace(message, ex);
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(message, ex);
             } else {
-                logger.debug(message);
+                LOGGER.debug(message);
             }
         }
         if (pushSendListeners != null) {
