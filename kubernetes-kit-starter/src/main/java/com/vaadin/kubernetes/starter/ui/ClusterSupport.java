@@ -11,6 +11,7 @@ package com.vaadin.kubernetes.starter.ui;
 
 import jakarta.servlet.http.Cookie;
 
+import java.io.Serial;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -29,7 +30,10 @@ import com.vaadin.flow.server.WrappedSession;
  * events from the cluster running the Vaadin application.
  */
 public class ClusterSupport implements VaadinServiceInitListener {
+    @Serial
     private static final long serialVersionUID = 1L;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClusterSupport.class);
 
     /**
      * Version environment variable name.
@@ -66,11 +70,11 @@ public class ClusterSupport implements VaadinServiceInitListener {
     public void serviceInit(ServiceInitEvent serviceInitEvent) {
         appVersion = System.getenv(ENV_APP_VERSION);
         if (appVersion == null) {
-            getLogger().debug(
+            LOGGER.debug(
                     "Missing environment variable 'APP_VERSION'. ClusterSupport service not initialized.");
             return;
         }
-        getLogger().info(
+        LOGGER.info(
                 "ClusterSupport service initialized. Registering RequestHandler with Application Version: {}",
                 appVersion);
 
@@ -95,7 +99,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
                     // when the proxy is not setting the update version header
                     if (versionHeader == null || versionHeader.isEmpty()
                             || appVersion.equals(versionHeader)) {
-                        getLogger().info(
+                        LOGGER.info(
                                 "Removing notifier: updateVersion={}, appVersion={}, session={}",
                                 versionHeader, appVersion, session.getId());
                         ui.remove(versionNotifier.get());
@@ -107,7 +111,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
                             versionHeader);
                     notifier.addSwitchVersionEventListener(
                             this::onComponentEvent);
-                    getLogger().info("Notifying version update: updateVersion={}, appVersion={}, session={}",
+                    LOGGER.info("Notifying version update: updateVersion={}, appVersion={}, session={}",
                             versionHeader, appVersion, session.getId());
                     ui.add(notifier);
                 }
@@ -123,6 +127,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
             // Do nothing if switch version listener prevents switching
             if (!switchVersionListener.nodeSwitch(VaadinRequest.getCurrent(),
                     VaadinResponse.getCurrent())) {
+                LOGGER.debug("Application version switch prevented by switch listener.");
                 return;
             }
 
@@ -134,18 +139,15 @@ public class ClusterSupport implements VaadinServiceInitListener {
         // cookie and invalidate the session
         removeStickyClusterCookie();
         WrappedSession session = VaadinRequest.getCurrent().getWrappedSession();
-        getLogger().debug("Invalidating session {}", session.getId());
+        LOGGER.debug("Invalidating session {}", session.getId());
         session.invalidate();
     }
 
     private void removeStickyClusterCookie() {
-        getLogger().debug("Removing cookie '{}'.", STICKY_CLUSTER_COOKIE);
+        LOGGER.debug("Removing cookie '{}'.", STICKY_CLUSTER_COOKIE);
         Cookie cookie = new Cookie(STICKY_CLUSTER_COOKIE, "");
         cookie.setMaxAge(0);
         VaadinResponse.getCurrent().addCookie(cookie);
     }
 
-    private static Logger getLogger() {
-        return LoggerFactory.getLogger(ClusterSupport.class);
-    }
 }
