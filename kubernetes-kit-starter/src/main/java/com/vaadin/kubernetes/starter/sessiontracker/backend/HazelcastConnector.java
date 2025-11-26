@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
+import com.hazelcast.spi.properties.ClusterProperty;
+import com.hazelcast.spi.properties.HazelcastProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +30,22 @@ public class HazelcastConnector implements BackendConnector {
     private final IMap<String, byte[]> sessions;
 
     public HazelcastConnector(HazelcastInstance hazelcastInstance) {
+        shutdownHookWarning(hazelcastInstance);
         sessions = hazelcastInstance.getMap("vaadin:sessions");
+    }
+
+    private static void shutdownHookWarning(
+            HazelcastInstance hazelcastInstance) {
+        HazelcastProperties properties = new HazelcastProperties(
+                hazelcastInstance.getConfig().getProperties());
+        if (properties.getBoolean(ClusterProperty.SHUTDOWNHOOK_ENABLED)) {
+            getLogger()
+                    .warn("""
+                            Hazelcast shutdown hook is enabled. This is not recommended for production use because Hazelcast instance \
+                            might be stopped before KubernetesKit can propagate the latest session state to the cluster. \
+                            Please disable the shutdown hook by setting the `hazelcast.shutdownhook.enabled` property to `false`.
+                            """);
+        }
     }
 
     @Override
