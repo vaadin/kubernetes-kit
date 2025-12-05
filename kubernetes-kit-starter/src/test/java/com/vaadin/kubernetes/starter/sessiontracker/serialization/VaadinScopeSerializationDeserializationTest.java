@@ -1,5 +1,6 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization;
 
+import com.vaadin.testbench.unit.internal.UIFactory;
 import jakarta.servlet.ServletException;
 
 import java.io.ByteArrayInputStream;
@@ -65,7 +66,7 @@ class VaadinScopeSerializationDeserializationTest {
     private void setupVaadin() {
         Routes routes = new Routes()
                 .autoDiscoverViews(TestView.class.getPackageName());
-        SerializableUIFactory uiFactory = MockedUI::new;
+        UIFactory uiFactory = MockedUI::new;
         MockSpringServlet servlet = new MockSpringServlet(routes, appCtx,
                 uiFactory) {
             @Override
