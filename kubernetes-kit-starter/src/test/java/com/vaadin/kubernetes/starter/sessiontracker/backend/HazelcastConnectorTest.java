@@ -5,11 +5,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.spi.properties.ClusterProperty;
-import com.hazelcast.spi.properties.HazelcastProperty;
 import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,8 +20,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,9 +39,11 @@ public class HazelcastConnectorTest {
 
         sessionMap = mock(IMap.class);
 
-        // disable shutdown hook to prevent logs from being flooded with warning messages
+        // disable shutdown hook to prevent logs from being flooded with warning
+        // messages
         Config hazelcastConfig = new Config();
-        hazelcastConfig.getProperties().setProperty(ClusterProperty.SHUTDOWNHOOK_ENABLED.getName(), "false");
+        hazelcastConfig.getProperties().setProperty(
+                ClusterProperty.SHUTDOWNHOOK_ENABLED.getName(), "false");
 
         hazelcastInstance = mock(HazelcastInstance.class);
         when(hazelcastInstance.getConfig()).thenReturn(hazelcastConfig);
@@ -51,7 +55,16 @@ public class HazelcastConnectorTest {
 
     @Test
     void constructor_hazelcastClient_shutdownHookWarningDoesNotThrow() {
-        new HazelcastConnector(HazelcastClient.newHazelcastClient());
+        ClientConfig config = new ClientConfig();
+        config.getConnectionStrategyConfig().setAsyncStart(true);
+        HazelcastInstance instance = spy(
+                HazelcastClient.newHazelcastClient(config));
+        doAnswer(i -> mock(IMap.class)).when(instance).getMap(anyString());
+        try {
+            new HazelcastConnector(instance);
+        } finally {
+            instance.shutdown();
+        }
     }
 
     @Test
