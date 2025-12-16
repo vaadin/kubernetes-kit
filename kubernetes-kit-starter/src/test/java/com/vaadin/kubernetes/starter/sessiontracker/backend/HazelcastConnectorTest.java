@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
@@ -46,6 +47,11 @@ public class HazelcastConnectorTest {
                 .thenReturn(sessionMap);
 
         connector = new HazelcastConnector(hazelcastInstance);
+    }
+
+    @Test
+    void constructor_hazelcastClient_shutdownHookWarningDoesNotThrow() {
+        new HazelcastConnector(HazelcastClient.newHazelcastClient());
     }
 
     @Test
