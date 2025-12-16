@@ -12,6 +12,8 @@ package com.vaadin.kubernetes.starter.sessiontracker.backend;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+import com.hazelcast.client.impl.clientside.ClientDynamicClusterConfig;
+import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.map.IMap;
 import com.hazelcast.spi.properties.ClusterProperty;
@@ -36,15 +38,18 @@ public class HazelcastConnector implements BackendConnector {
 
     private static void shutdownHookWarning(
             HazelcastInstance hazelcastInstance) {
-        HazelcastProperties properties = new HazelcastProperties(
-                hazelcastInstance.getConfig().getProperties());
-        if (properties.getBoolean(ClusterProperty.SHUTDOWNHOOK_ENABLED)) {
-            getLogger()
-                    .warn("""
-                            Hazelcast shutdown hook is enabled. This is not recommended for production use because Hazelcast instance \
-                            might be stopped before KubernetesKit can propagate the latest session state to the cluster. \
-                            Please disable the shutdown hook by setting the `hazelcast.shutdownhook.enabled` property to `false`.
-                            """);
+        Config config = hazelcastInstance.getConfig();
+        if (!(config instanceof ClientDynamicClusterConfig)) {
+            HazelcastProperties properties = new HazelcastProperties(
+                    config.getProperties());
+            if (properties.getBoolean(ClusterProperty.SHUTDOWNHOOK_ENABLED)) {
+                getLogger()
+                        .warn("""
+                                Hazelcast shutdown hook is enabled. This is not recommended for production use because Hazelcast instance \
+                                might be stopped before KubernetesKit can propagate the latest session state to the cluster. \
+                                Please disable the shutdown hook by setting the `hazelcast.shutdownhook.enabled` property to `false`.
+                                """);
+            }
         }
     }
 
