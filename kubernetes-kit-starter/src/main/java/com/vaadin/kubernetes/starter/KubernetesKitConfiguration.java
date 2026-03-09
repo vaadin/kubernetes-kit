@@ -74,8 +74,8 @@ public class KubernetesKitConfiguration {
     @Bean
     @ConditionalOnMissingBean
     ClusterSupport clusterSupport(KubernetesKitProperties properties) {
-        return new ClusterSupport(
-                properties.getStickySessionCookieName());
+        return new ClusterSupport(properties.getStickySessionCookieName(),
+                properties.getUpdateVersionHeaderName());
     }
 
     @AutoConfiguration
@@ -311,8 +311,10 @@ public class KubernetesKitConfiguration {
             final var config = new Config();
 
             configure(config);
-            // Make sure Hazelcast shutdown hook is disabled so that the instance
-            // will be stopped after SessionSerializer saved the latest pending state
+            // Make sure Hazelcast shutdown hook is disabled so that the
+            // instance
+            // will be stopped after SessionSerializer saved the latest pending
+            // state
             config.setProperty("hazelcast.shutdownhook.enabled", "false");
             configureKubernetes(config);
 

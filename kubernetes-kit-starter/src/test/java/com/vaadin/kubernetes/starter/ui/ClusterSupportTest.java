@@ -73,7 +73,7 @@ public class ClusterSupportTest {
 
     @BeforeEach
     void setUp() {
-        clusterSupport = new ClusterSupport("INGRESSCOOKIE");
+        clusterSupport = new ClusterSupport("INGRESSCOOKIE", "X-AppUpdate");
         currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
@@ -236,10 +236,36 @@ public class ClusterSupportTest {
     }
 
     @Test
+    void handleRequest_usesConfiguredHeaderName() throws IOException {
+        String customHeader = "X-AppVersion";
+        ClusterSupport customClusterSupport = new ClusterSupport(
+                "INGRESSCOOKIE", customHeader);
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+
+        when(vaadinRequest.getHeader(customHeader)).thenReturn("2.0.0");
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.empty());
+
+        customClusterSupport.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        verify(vaadinSession).access(commandArgCaptor.capture());
+        commandArgCaptor.getValue().execute();
+        verify(ui).add((Component) any());
+    }
+
+    @Test
     void onComponentEvent_usesConfiguredCookieName() throws IOException {
         String customCookieName = "my-gateway-cookie";
         ClusterSupport customClusterSupport = new ClusterSupport(
-                customCookieName);
+                customCookieName, "X-AppUpdate");
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
         VersionNotifier.SwitchVersionEvent switchVersionEvent = mock(

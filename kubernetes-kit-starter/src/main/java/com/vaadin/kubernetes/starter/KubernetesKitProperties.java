@@ -52,6 +52,27 @@ public class KubernetesKitProperties {
     private SameSite clusterKeyCookieSameSite = SameSite.STRICT;
 
     /**
+     * The name of the HTTP request header used to detect a new application
+     * version during rolling updates.
+     * <p>
+     * When the ingress controller or gateway sets this header on requests to
+     * the current (old) version, and its value differs from the application's
+     * own version (set via the {@code APP_VERSION} environment variable),
+     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}
+     * shows a notification prompting the user to switch to the new version.
+     * <p>
+     * With the Kubernetes Ingress API and NGINX Ingress, this header was
+     * typically set via the {@code configuration-snippet} annotation
+     * ({@code proxy_set_header}), which is deprecated since NGINX Ingress
+     * 1.9.0.
+     * <p>
+     * With the Kubernetes Gateway API, use a {@code RequestHeaderModifier}
+     * filter in the {@code HTTPRoute} resource to add this header with the new
+     * version as its value.
+     */
+    private String updateVersionHeaderName = "X-AppUpdate";
+
+    /**
      * The name of the cookie used by the ingress controller or gateway
      * implementation for sticky sessions (session affinity).
      * <p>
@@ -158,6 +179,29 @@ public class KubernetesKitProperties {
      */
     public void setClusterKeyCookieSameSite(SameSite sameSite) {
         this.clusterKeyCookieSameSite = sameSite;
+    }
+
+    /**
+     * Gets the name of the HTTP request header used to detect a new application
+     * version during rolling updates.
+     *
+     * @return the update version header name
+     * @see #updateVersionHeaderName
+     */
+    public String getUpdateVersionHeaderName() {
+        return updateVersionHeaderName;
+    }
+
+    /**
+     * Sets the name of the HTTP request header used to detect a new application
+     * version during rolling updates.
+     *
+     * @param updateVersionHeaderName
+     *            the update version header name
+     * @see #updateVersionHeaderName
+     */
+    public void setUpdateVersionHeaderName(String updateVersionHeaderName) {
+        this.updateVersionHeaderName = updateVersionHeaderName;
     }
 
     /**

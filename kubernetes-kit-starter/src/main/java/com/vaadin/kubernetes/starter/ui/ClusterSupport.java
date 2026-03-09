@@ -33,7 +33,8 @@ import com.vaadin.flow.server.WrappedSession;
  */
 public class ClusterSupport implements VaadinServiceInitListener {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ClusterSupport.class);
+    private static final Logger LOGGER = LoggerFactory
+            .getLogger(ClusterSupport.class);
 
     /**
      * Version environment variable name.
@@ -42,17 +43,25 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     /**
      * Update version header name.
+     *
+     * @deprecated Use
+     *             {@link KubernetesKitProperties#getUpdateVersionHeaderName()}
+     *             to configure the update version header name instead.
      */
+    @Deprecated(forRemoval = true)
     public static final String UPDATE_VERSION_HEADER = "X-AppUpdate";
 
     /**
      * Sticky cluster cookie name.
      *
-     * @deprecated Use {@link KubernetesKitProperties#getStickySessionCookieName()}
+     * @deprecated Use
+     *             {@link KubernetesKitProperties#getStickySessionCookieName()}
      *             to configure the sticky session cookie name instead.
      */
     @Deprecated(forRemoval = true)
     public static final String STICKY_CLUSTER_COOKIE = "INGRESSCOOKIE";
+
+    private final String updateVersionHeaderName;
 
     private final String stickySessionCookieName;
 
@@ -61,20 +70,27 @@ public class ClusterSupport implements VaadinServiceInitListener {
     private String appVersion;
 
     /**
-     * Creates a new {@code ClusterSupport} instance with the given sticky
-     * session cookie name.
+     * Creates a new {@code ClusterSupport} instance.
      *
      * @param stickySessionCookieName
      *            the name of the cookie used by the ingress controller or
      *            gateway implementation for sticky sessions. This must match
      *            the cookie name configured in the infrastructure routing
      *            traffic to the application. When the user accepts a version
-     *            switch, this cookie is removed so that the next request is
-     *            no longer pinned to the old pod.
+     *            switch, this cookie is removed so that the next request is no
+     *            longer pinned to the old pod.
+     * @param updateVersionHeaderName
+     *            the name of the HTTP request header used to detect a new
+     *            application version during rolling updates. The ingress
+     *            controller or gateway sets this header on requests to the
+     *            current version with the new version as its value.
      * @see KubernetesKitProperties#getStickySessionCookieName()
+     * @see KubernetesKitProperties#getUpdateVersionHeaderName()
      */
-    public ClusterSupport(String stickySessionCookieName) {
+    public ClusterSupport(String stickySessionCookieName,
+            String updateVersionHeaderName) {
         this.stickySessionCookieName = stickySessionCookieName;
+        this.updateVersionHeaderName = updateVersionHeaderName;
     }
 
     /**
@@ -107,7 +123,7 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     private boolean handleRequest(VaadinSession vaadinSession,
             VaadinRequest vaadinRequest, VaadinResponse vaadinResponse) {
-        String versionHeader = vaadinRequest.getHeader(UPDATE_VERSION_HEADER);
+        String versionHeader = vaadinRequest.getHeader(updateVersionHeaderName);
 
         vaadinSession.access(() -> {
 
@@ -134,7 +150,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
                             versionHeader);
                     notifier.addSwitchVersionEventListener(
                             this::onComponentEvent);
-                    LOGGER.info("Notifying version update: updateVersion={}, appVersion={}, session={}",
+                    LOGGER.info(
+                            "Notifying version update: updateVersion={}, appVersion={}, session={}",
                             versionHeader, appVersion, session.getId());
                     ui.add(notifier);
                 }
@@ -150,7 +167,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
             // Do nothing if switch version listener prevents switching
             if (!switchVersionListener.nodeSwitch(VaadinRequest.getCurrent(),
                     VaadinResponse.getCurrent())) {
-                LOGGER.debug("Application version switch prevented by switch listener.");
+                LOGGER.debug(
+                        "Application version switch prevented by switch listener.");
                 return;
             }
 
