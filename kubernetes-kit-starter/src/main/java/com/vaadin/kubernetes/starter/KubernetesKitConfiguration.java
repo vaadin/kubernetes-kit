@@ -312,9 +312,8 @@ public class KubernetesKitConfiguration {
 
             configure(config);
             // Make sure Hazelcast shutdown hook is disabled so that the
-            // instance
-            // will be stopped after SessionSerializer saved the latest pending
-            // state
+            // instance will be stopped after SessionSerializer saved the
+            // latest pending state
             config.setProperty("hazelcast.shutdownhook.enabled", "false");
             configureKubernetes(config);
 
