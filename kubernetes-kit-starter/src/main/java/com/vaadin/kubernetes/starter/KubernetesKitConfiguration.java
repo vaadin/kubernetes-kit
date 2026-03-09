@@ -58,6 +58,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
+import com.vaadin.kubernetes.starter.ui.ClusterSupport;
 
 /**
  * This configuration bean is provided to autoconfigure Vaadin apps to run in a
@@ -69,6 +70,13 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Serializ
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean
+    ClusterSupport clusterSupport(KubernetesKitProperties properties) {
+        return new ClusterSupport(
+                properties.getStickySessionCookieName());
+    }
 
     @AutoConfiguration
     @ConditionalOnBean(BackendConnector.class)

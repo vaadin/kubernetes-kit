@@ -52,6 +52,30 @@ public class KubernetesKitProperties {
     private SameSite clusterKeyCookieSameSite = SameSite.STRICT;
 
     /**
+     * The name of the cookie used by the ingress controller or gateway
+     * implementation for sticky sessions (session affinity).
+     * <p>
+     * This must match the cookie name used by the infrastructure routing
+     * traffic to the application. The cookie is removed by
+     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}
+     * when the user accepts a version switch, so that the next request is no
+     * longer pinned to the old pod.
+     * <p>
+     * For the Kubernetes Ingress API with NGINX Ingress, the default cookie
+     * name {@code INGRESSCOOKIE} is used when session affinity is enabled via
+     * annotations.
+     * <p>
+     * For the Kubernetes Gateway API, the cookie name depends on the gateway
+     * implementation and on the {@code sessionName} field in the
+     * {@code sessionPersistence} configuration of the {@code HTTPRoute}
+     * resource. If {@code sessionName} is set, use the same value here. If
+     * {@code sessionName} is omitted, the gateway implementation generates an
+     * implementation-specific cookie name that must be determined from the
+     * implementation's documentation or by inspecting HTTP responses.
+     */
+    private String stickySessionCookieName = "INGRESSCOOKIE";
+
+    /**
      * Hazelcast configuration properties.
      */
     private HazelcastProperties hazelcast = new HazelcastProperties();
@@ -134,6 +158,29 @@ public class KubernetesKitProperties {
      */
     public void setClusterKeyCookieSameSite(SameSite sameSite) {
         this.clusterKeyCookieSameSite = sameSite;
+    }
+
+    /**
+     * Gets the name of the cookie used by the ingress controller or gateway
+     * implementation for sticky sessions.
+     *
+     * @return the sticky session cookie name
+     * @see #stickySessionCookieName
+     */
+    public String getStickySessionCookieName() {
+        return stickySessionCookieName;
+    }
+
+    /**
+     * Sets the name of the cookie used by the ingress controller or gateway
+     * implementation for sticky sessions.
+     *
+     * @param stickySessionCookieName
+     *            the sticky session cookie name
+     * @see #stickySessionCookieName
+     */
+    public void setStickySessionCookieName(String stickySessionCookieName) {
+        this.stickySessionCookieName = stickySessionCookieName;
     }
 
     /**

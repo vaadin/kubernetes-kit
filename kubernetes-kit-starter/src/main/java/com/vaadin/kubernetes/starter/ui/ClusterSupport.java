@@ -17,6 +17,8 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.vaadin.kubernetes.starter.KubernetesKitProperties;
+
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinRequest;
@@ -45,12 +47,35 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     /**
      * Sticky cluster cookie name.
+     *
+     * @deprecated Use {@link KubernetesKitProperties#getStickySessionCookieName()}
+     *             to configure the sticky session cookie name instead.
      */
+    @Deprecated(forRemoval = true)
     public static final String STICKY_CLUSTER_COOKIE = "INGRESSCOOKIE";
+
+    private final String stickySessionCookieName;
 
     private SwitchVersionListener switchVersionListener;
 
     private String appVersion;
+
+    /**
+     * Creates a new {@code ClusterSupport} instance with the given sticky
+     * session cookie name.
+     *
+     * @param stickySessionCookieName
+     *            the name of the cookie used by the ingress controller or
+     *            gateway implementation for sticky sessions. This must match
+     *            the cookie name configured in the infrastructure routing
+     *            traffic to the application. When the user accepts a version
+     *            switch, this cookie is removed so that the next request is
+     *            no longer pinned to the old pod.
+     * @see KubernetesKitProperties#getStickySessionCookieName()
+     */
+    public ClusterSupport(String stickySessionCookieName) {
+        this.stickySessionCookieName = stickySessionCookieName;
+    }
 
     /**
      * Register the global version switch listener. If set to <code>null</code>
@@ -142,8 +167,8 @@ public class ClusterSupport implements VaadinServiceInitListener {
     }
 
     private void removeStickyClusterCookie() {
-        LOGGER.debug("Removing cookie '{}'.", STICKY_CLUSTER_COOKIE);
-        Cookie cookie = new Cookie(STICKY_CLUSTER_COOKIE, "");
+        LOGGER.debug("Removing cookie '{}'.", stickySessionCookieName);
+        Cookie cookie = new Cookie(stickySessionCookieName, "");
         cookie.setMaxAge(0);
         VaadinResponse.getCurrent().addCookie(cookie);
     }

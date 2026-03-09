@@ -32,6 +32,9 @@ import com.vaadin.flow.server.VaadinResponse;
 import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.WrappedSession;
 
+import jakarta.servlet.http.Cookie;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -70,7 +73,7 @@ public class ClusterSupportTest {
 
     @BeforeEach
     void setUp() {
-        clusterSupport = new ClusterSupport();
+        clusterSupport = new ClusterSupport("INGRESSCOOKIE");
         currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
@@ -230,6 +233,53 @@ public class ClusterSupportTest {
         verify(vaadinSession).access(commandArgCaptor.capture());
         commandArgCaptor.getValue().execute();
         verify(ui).add((Component) any());
+    }
+
+    @Test
+    void onComponentEvent_usesConfiguredCookieName() throws IOException {
+        String customCookieName = "my-gateway-cookie";
+        ClusterSupport customClusterSupport = new ClusterSupport(
+                customCookieName);
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+        VersionNotifier.SwitchVersionEvent switchVersionEvent = mock(
+                VersionNotifier.SwitchVersionEvent.class);
+        SwitchVersionListener switchVersionListener = mock(
+                SwitchVersionListener.class);
+        ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor
+                .forClass(Cookie.class);
+
+        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
+                .thenReturn("2.0.0");
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
+                .thenReturn(vaadinResponse);
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.empty());
+        when(switchVersionListener.nodeSwitch(any(), any())).thenReturn(true);
+
+        customClusterSupport.setSwitchVersionListener(switchVersionListener);
+        customClusterSupport.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        try (MockedConstruction<VersionNotifier> mockedVersionNotifier = mockConstruction(
+                VersionNotifier.class)) {
+            verify(vaadinSession).access(commandArgCaptor.capture());
+            commandArgCaptor.getValue().execute();
+            verify(mockedVersionNotifier.constructed().get(0))
+                    .addSwitchVersionEventListener(
+                            componentEventListenerArgCaptor.capture());
+            componentEventListenerArgCaptor.getValue()
+                    .onComponentEvent(switchVersionEvent);
+        }
+        verify(vaadinResponse).addCookie(cookieCaptor.capture());
+        assertEquals(customCookieName, cookieCaptor.getValue().getName());
     }
 
     @ParameterizedTest(name = "{index} And_IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
