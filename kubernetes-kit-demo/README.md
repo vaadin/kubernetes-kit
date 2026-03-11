@@ -28,7 +28,7 @@ kubectl apply -f deployment/gateway.yaml
 Build the production JAR and create a container image using the Spring Boot Maven plugin:
 
 ```
-mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis
+mvn clean spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis
 ```
 
 To publish the image to a local registry (e.g., for kind or minikube):
@@ -100,7 +100,7 @@ Try incrementing the counter again. The request will be redirected to another po
 ### 1. Build and deploy the new version
 
 ```
-mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis -Dapp.version=2.0.0
+mvn clean spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis -Dapp.version=2.0.0
 kubectl apply -f deployment/app-v2.yaml
 ```
 
