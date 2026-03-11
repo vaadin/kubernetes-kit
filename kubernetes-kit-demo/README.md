@@ -34,7 +34,7 @@ mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-
 To publish the image to a local registry (e.g., for kind or minikube):
 
 ```
-docker tag kubernetes-kit-demo:3.0-SNAPSHOT localhost:5001/kubernetes-kit-demo:1.0.0
+docker tag kubernetes-kit-demo:1.0.0 localhost:5001/kubernetes-kit-demo:1.0.0
 docker push localhost:5001/kubernetes-kit-demo:1.0.0
 ```
 
@@ -100,7 +100,7 @@ Try incrementing the counter again. The request will be redirected to another po
 ### 1. Build and deploy the new version
 
 ```
-mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis
+mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis -Dapp.version=2.0.0
 kubectl apply -f deployment/app-v2.yaml
 ```
 
