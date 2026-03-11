@@ -52,6 +52,14 @@ public class KubernetesKitProperties {
     private SameSite clusterKeyCookieSameSite = SameSite.STRICT;
 
     /**
+     * Enables or disables
+     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport},
+     * which handles version update notifications and sticky session cookie
+     * removal during rolling updates.
+     */
+    private boolean clusterSupport = true;
+
+    /**
      * The name of the HTTP request header used to detect a new application
      * version during rolling updates.
      * <p>
@@ -179,6 +187,28 @@ public class KubernetesKitProperties {
      */
     public void setClusterKeyCookieSameSite(SameSite sameSite) {
         this.clusterKeyCookieSameSite = sameSite;
+    }
+
+    /**
+     * Checks if
+     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}
+     * is enabled.
+     *
+     * @return {@code true} if cluster support is enabled
+     */
+    public boolean isClusterSupport() {
+        return clusterSupport;
+    }
+
+    /**
+     * Enables or disables
+     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}.
+     *
+     * @param clusterSupport
+     *            {@code true} to enable, {@code false} to disable
+     */
+    public void setClusterSupport(boolean clusterSupport) {
+        this.clusterSupport = clusterSupport;
     }
 
     /**

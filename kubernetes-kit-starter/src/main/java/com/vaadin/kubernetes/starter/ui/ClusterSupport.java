@@ -70,6 +70,18 @@ public class ClusterSupport implements VaadinServiceInitListener {
     private String appVersion;
 
     /**
+     * Creates a new {@code ClusterSupport} instance with default values.
+     *
+     * @deprecated Use {@link #ClusterSupport(String, String)} to provide
+     *             configurable cookie and header names.
+     */
+    @Deprecated(forRemoval = true)
+    @SuppressWarnings("deprecation")
+    public ClusterSupport() {
+        this(STICKY_CLUSTER_COOKIE, UPDATE_VERSION_HEADER);
+    }
+
+    /**
      * Creates a new {@code ClusterSupport} instance.
      *
      * @param stickySessionCookieName
