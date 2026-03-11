@@ -12,7 +12,6 @@
     <name>Kubernetes Kit Demo</name>
 
     <properties>
-        <app.version>1.0.0</app.version>
         <maven.source.skip>true</maven.source.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
     </properties>
@@ -74,11 +73,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
-                <configuration>
-                    <image>
-                        <name>kubernetes-kit-demo:${app.version}</name>
-                    </image>
-                </configuration>
                 <executions>
                     <execution>
                         <goals>
