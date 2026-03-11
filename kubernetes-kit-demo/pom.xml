@@ -73,6 +73,11 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
+                <configuration>
+                    <image>
+                        <name>kubernetes-kit-demo:${project.version}</name>
+                    </image>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

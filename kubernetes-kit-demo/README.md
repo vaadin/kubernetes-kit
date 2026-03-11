@@ -1,113 +1,135 @@
 # Kubernetes Kit Demo
 
+A demo application for [Vaadin Kubernetes Kit](https://vaadin.com/docs/latest/tools/kubernetes).
+
+## Prerequisites
+
+- A local Kubernetes cluster (e.g., [minikube](https://minikube.sigs.k8s.io/docs/start/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/), or [Docker Desktop](https://docs.docker.com/desktop/kubernetes/))
+- [Helm](https://helm.sh/docs/intro/install/) for installing Envoy Gateway
+
 ## Run the demo
 
-To run the demo you first need to have a local Kubernetes cluster up and running.
-You can find recommended tools here: https://kubernetes.io/docs/tasks/tools/
+### 1. Install Envoy Gateway
 
-You also need to setup the ingress-ngnix before:
-```
-# kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.4.0/deploy/static/provider/cloud/deploy.yaml
-```
+Install [Envoy Gateway](https://gateway.envoyproxy.io/) as the Gateway API implementation:
 
-To deploy the demo application into your cluster, follow these steps:
-1. Build the application JAR:
 ```
-# mvn clean package -Pproduction,redis
-```
-2. Create or update the Docker image with version tag:
-```
-# docker build -t kubernetes-kit-demo:1.0.0 .
-```
-Optionally, if you run a local docker registry, add the *localhost:5001* registry address prefix as well and push it to registry. Refer to the image in the config files with *the localhost:5001/kubernetes-kit-demo:1.0.0* name:
-```
-# docker build -t localhost:5001/kubernetes-kit-demo:1.0.0 .
-# docker push localhost:5001/kubernetes-kit-demo:1.0.0
-```
-3. Deploy the image, redis service and ingress controller into the cluster:
-```
-# kubectl apply -f deployment/redis.yaml -f deployment/app-v1.yaml -f deployment/ingress-v1.yaml
-```
-4. Open port forward for ingress controller (in other window, and keep it open):
-```
-# kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
+helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.6.0 -n envoy-gateway-system --create-namespace
 ```
 
-You should now see 4 pods running, e.g.
+Then deploy the gateway configuration:
+
 ```
-# kubectl get pods
-NAME                                      READY   STATUS    RESTARTS      AGE
-kubernetes-kit-demo-f87bfcbb4-5qjml       1/1     Running   0             22s
-kubernetes-kit-demo-f87bfcbb4-czkzr       1/1     Running   0             22s
-kubernetes-kit-demo-f87bfcbb4-gjqw6       1/1     Running   0             22s
-kubernetes-kit-demo-f87bfcbb4-rxvjb       1/1     Running   0             22s
-kubernetes-kit-redis-788d56c66-8b259      1/1     Running   0             22s
+kubectl apply -f deployment/gateway.yaml
 ```
 
-At this point the demo should be reachable at http://localhost:8080/
+### 2. Build the application image
 
-*NOTE:* You can run the demo with Hazelcast instead of Redis by replacing `redis` with `hazelcast` in steps 2 and 4.
+Build the production JAR and create a container image using the Spring Boot Maven plugin:
+
+```
+mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis
+```
+
+To publish the image to a local registry (e.g., for kind or minikube):
+
+```
+docker tag kubernetes-kit-demo:3.0-SNAPSHOT localhost:5001/kubernetes-kit-demo:1.0.0
+docker push localhost:5001/kubernetes-kit-demo:1.0.0
+```
+
+### 3. Deploy to the cluster
+
+Deploy Redis, the application, and the HTTP route:
+
+```
+kubectl apply -f deployment/redis.yaml -f deployment/app-v1.yaml -f deployment/route-v1.yaml
+```
+
+### 4. Access the application
+
+Find the Envoy proxy service and forward a local port:
+
+```
+export ENVOY_SERVICE=$(kubectl get svc -l gateway.envoyproxy.io/owning-gateway-name=public-gateway -o jsonpath='{.items[0].metadata.name}')
+kubectl port-forward service/${ENVOY_SERVICE} 8080:80
+```
+
+The demo should be reachable at http://localhost:8080/
+
+You should see 4 application pods and 1 Redis pod running:
+
+```
+kubectl get pods
+NAME                                        READY   STATUS    RESTARTS      AGE
+kubernetes-kit-demo-v1-f87bfcbb4-5qjml      1/1     Running   0             22s
+kubernetes-kit-demo-v1-f87bfcbb4-czkzr      1/1     Running   0             22s
+kubernetes-kit-demo-v1-f87bfcbb4-gjqw6      1/1     Running   0             22s
+kubernetes-kit-demo-v1-f87bfcbb4-rxvjb      1/1     Running   0             22s
+kubernetes-kit-redis-788d56c66-8b259        1/1     Running   0             22s
+```
+
+**Note:** You can use Hazelcast instead of Redis by replacing `redis` with `hazelcast` in the Maven profiles and deploying `deployment/hazelcast.yaml` instead of `deployment/redis.yaml`.
 
 ## Scale the deployment
 
-At http://localhost:8080/counter you find a counter which value is held in the UI.
-Pushing the "Increment" button increments the counter and keeps a log of the operation, tracking the hostname and address of the node currently serving the request.
+At http://localhost:8080/counter you find a counter whose value is held in the UI. Pushing the "Increment" button increments the counter and keeps a log of the operation, tracking the hostname and address of the node currently serving the request.
 
-Now let's simulate the unavailability of the pod handling the requests (assume it's the `kubernetes-kit-demo-f87bfcbb4-5qjml` pod):
-
-```
-# kubectl delete pod kubernetes-kit-demo-f87bfcbb4-5qjml
-```
-
-And wait until the pod is terminated and there's a new one running:
+Simulate the unavailability of a pod (e.g., `kubernetes-kit-demo-v1-f87bfcbb4-5qjml`):
 
 ```
-# kubectl get pods
-NAME                                      READY   STATUS    RESTARTS      AGE
-kubernetes-kit-demo-f87bfcbb4-jj5c4       1/1     Running   0             12s
-kubernetes-kit-demo-f87bfcbb4-czkzr       1/1     Running   0             51s
-kubernetes-kit-demo-f87bfcbb4-gjqw6       1/1     Running   0             51s
-kubernetes-kit-demo-f87bfcbb4-rxvjb       1/1     Running   0             51s
-kubernetes-kit-redis-788d56c66-8b259      1/1     Running   0             51s
+kubectl delete pod kubernetes-kit-demo-v1-f87bfcbb4-5qjml
 ```
 
-If you try to increment the counter again, your request will be redirected to another pod but the session should be restored and the counter will keep incrementing.
+Wait until the pod is terminated and a new one is running:
+
+```
+kubectl get pods
+NAME                                        READY   STATUS    RESTARTS      AGE
+kubernetes-kit-demo-v1-f87bfcbb4-jj5c4      1/1     Running   0             12s
+kubernetes-kit-demo-v1-f87bfcbb4-czkzr      1/1     Running   0             51s
+kubernetes-kit-demo-v1-f87bfcbb4-gjqw6      1/1     Running   0             51s
+kubernetes-kit-demo-v1-f87bfcbb4-rxvjb      1/1     Running   0             51s
+kubernetes-kit-redis-788d56c66-8b259        1/1     Running   0             51s
+```
+
+Try incrementing the counter again. The request will be redirected to another pod but the session should be restored and the counter will keep incrementing.
 
 ## Update the application to a new version
 
-1. Build a new application version:
+### 1. Build and deploy the new version
+
 ```
-# docker build -t kubernetes-kit-demo:2.0.0 .
-```
-Optionally, if you run a local docker registry, add the *localhost:5001* registry address prefix as well and push it to registry. Refer to the image in the config files with *the localhost:5001/kubernetes-kit-demo:1.0.0* name:
-```
-# docker build -t localhost:5001/kubernetes-kit-demo:2.0.0 .
-# docker push localhost:5001/kubernetes-kit-demo:2.0.0
-```
-2. Deploy the new version:
-```
-# kubectl apply -f deployment/app-v2.yaml
-```
-3. Deploy the canary ingress config for it:
-```
-# kubectl apply -f deployment/ingress-v2-use-canary.yaml
-```
-4. Set the X-AppUpdate header for the old version to show the version update notification:
-```
-# kubectl apply -f deployment/ingress-v1-add-header.yaml
+mvn clean package -pl :kubernetes-kit-demo -Pproduction,redis spring-boot:build-image -pl :kubernetes-kit-demo -Pproduction,redis
+kubectl apply -f deployment/app-v2.yaml
 ```
 
-Test and verify if the new version is working properly.
+### 2. Route new sessions to the new version
 
-5. Make the new version as a default:
+This routes new sessions to v2 while keeping existing sessions on v1 through cookie-based session persistence:
+
 ```
-# kubectl apply -f deployment/ingress-v2.yaml
+kubectl apply -f deployment/route-v1-v2.yaml
 ```
-6. Delete the old version:
+
+### 3. Notify existing users
+
+Inject the `X-AppUpdate` header to trigger the version update notification for users on v1:
+
 ```
-# kubectl delete -f deployment/app-v1.yaml
+kubectl apply -f deployment/route-v1-v2-notify.yaml
 ```
-7. Delete the canary ingress config:
+
+### 4. Switch to the new version
+
+Once the new version is verified, route all traffic to v2:
+
 ```
-# kubectl delete -f deployment/ingress-v2-use-canary.yaml
+kubectl apply -f deployment/route-v2.yaml
+```
+
+Then remove the old version:
+
+```
+kubectl delete -f deployment/app-v1.yaml
 ```
