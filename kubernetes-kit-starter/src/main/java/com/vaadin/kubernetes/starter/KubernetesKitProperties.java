@@ -52,12 +52,12 @@ public class KubernetesKitProperties {
     private SameSite clusterKeyCookieSameSite = SameSite.STRICT;
 
     /**
-     * Enables or disables
-     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport},
-     * which handles version update notifications and sticky session cookie
-     * removal during rolling updates.
+     * Enables or disables rolling update support, which handles version update
+     * notifications and sticky session cookie removal during rolling updates.
+     *
+     * @see com.vaadin.kubernetes.starter.ui.ClusterSupport
      */
-    private boolean clusterSupport = true;
+    private boolean rollingUpdates = true;
 
     /**
      * The name of the HTTP request header used to detect a new application
@@ -190,25 +190,24 @@ public class KubernetesKitProperties {
     }
 
     /**
-     * Checks if
-     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}
-     * is enabled.
+     * Checks if rolling update support is enabled.
      *
-     * @return {@code true} if cluster support is enabled
+     * @return {@code true} if rolling update support is enabled
+     * @see com.vaadin.kubernetes.starter.ui.ClusterSupport
      */
-    public boolean isClusterSupport() {
-        return clusterSupport;
+    public boolean isRollingUpdates() {
+        return rollingUpdates;
     }
 
     /**
-     * Enables or disables
-     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}.
+     * Enables or disables rolling update support.
      *
-     * @param clusterSupport
+     * @param rollingUpdates
      *            {@code true} to enable, {@code false} to disable
+     * @see com.vaadin.kubernetes.starter.ui.ClusterSupport
      */
-    public void setClusterSupport(boolean clusterSupport) {
-        this.clusterSupport = clusterSupport;
+    public void setRollingUpdates(boolean rollingUpdates) {
+        this.rollingUpdates = rollingUpdates;
     }
 
     /**
