@@ -38,7 +38,11 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     /**
      * Version environment variable name.
+     *
+     * @deprecated Use {@link KubernetesKitProperties#getAppVersion()} to
+     *             configure the application version instead.
      */
+    @Deprecated(forRemoval = true)
     public static final String ENV_APP_VERSION = "APP_VERSION";
 
     /**
@@ -61,24 +65,26 @@ public class ClusterSupport implements VaadinServiceInitListener {
     @Deprecated(forRemoval = true)
     public static final String STICKY_CLUSTER_COOKIE = "INGRESSCOOKIE";
 
+    private final String appVersion;
+
     private final String updateVersionHeaderName;
 
     private final String stickySessionCookieName;
 
     private SwitchVersionListener switchVersionListener;
 
-    private String appVersion;
-
     /**
      * Creates a new {@code ClusterSupport} instance with default values.
      *
-     * @deprecated Use {@link #ClusterSupport(String, String)} to provide
-     *             configurable cookie and header names.
+     * @deprecated Use
+     *             {@link #ClusterSupport(String, String, String)} to provide
+     *             configurable application version, cookie and header names.
      */
     @Deprecated(forRemoval = true)
     @SuppressWarnings("deprecation")
     public ClusterSupport() {
-        this(STICKY_CLUSTER_COOKIE, UPDATE_VERSION_HEADER);
+        this(System.getenv(ENV_APP_VERSION), STICKY_CLUSTER_COOKIE,
+                UPDATE_VERSION_HEADER);
     }
 
     /**
@@ -96,11 +102,47 @@ public class ClusterSupport implements VaadinServiceInitListener {
      *            application version during rolling updates. The ingress
      *            controller or gateway sets this header on requests to the
      *            current version with the new version as its value.
+     * @deprecated Use
+     *             {@link #ClusterSupport(String, String, String)} to provide
+     *             the application version.
      * @see KubernetesKitProperties#getStickySessionCookieName()
      * @see KubernetesKitProperties#getUpdateVersionHeaderName()
      */
+    @Deprecated(forRemoval = true)
+    @SuppressWarnings("deprecation")
     public ClusterSupport(String stickySessionCookieName,
             String updateVersionHeaderName) {
+        this(System.getenv(ENV_APP_VERSION), stickySessionCookieName,
+                updateVersionHeaderName);
+    }
+
+    /**
+     * Creates a new {@code ClusterSupport} instance.
+     *
+     * @param appVersion
+     *            the application version. When the update version header value
+     *            differs from this version, a notification is shown prompting
+     *            the user to switch to the new version. If {@code null},
+     *            rolling update version detection is disabled.
+     * @param stickySessionCookieName
+     *            the name of the cookie used by the ingress controller or
+     *            gateway implementation for sticky sessions. This must match
+     *            the cookie name configured in the infrastructure routing
+     *            traffic to the application. When the user accepts a version
+     *            switch, this cookie is removed so that the next request is no
+     *            longer pinned to the old pod.
+     * @param updateVersionHeaderName
+     *            the name of the HTTP request header used to detect a new
+     *            application version during rolling updates. The ingress
+     *            controller or gateway sets this header on requests to the
+     *            current version with the new version as its value.
+     * @see KubernetesKitProperties#getAppVersion()
+     * @see KubernetesKitProperties#getStickySessionCookieName()
+     * @see KubernetesKitProperties#getUpdateVersionHeaderName()
+     */
+    public ClusterSupport(String appVersion, String stickySessionCookieName,
+            String updateVersionHeaderName) {
+        this.appVersion = appVersion;
         this.stickySessionCookieName = stickySessionCookieName;
         this.updateVersionHeaderName = updateVersionHeaderName;
     }
@@ -119,10 +161,9 @@ public class ClusterSupport implements VaadinServiceInitListener {
 
     @Override
     public void serviceInit(ServiceInitEvent serviceInitEvent) {
-        appVersion = System.getenv(ENV_APP_VERSION);
         if (appVersion == null) {
             LOGGER.debug(
-                    "Missing environment variable 'APP_VERSION'. ClusterSupport service not initialized.");
+                    "Application version not configured. ClusterSupport service not initialized.");
             return;
         }
         LOGGER.info(

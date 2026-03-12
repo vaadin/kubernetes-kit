@@ -75,7 +75,8 @@ public class KubernetesKitConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "rolling-updates", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
     ClusterSupport clusterSupport(KubernetesKitProperties properties) {
-        return new ClusterSupport(properties.getStickySessionCookieName(),
+        return new ClusterSupport(properties.getAppVersion(),
+                properties.getStickySessionCookieName(),
                 properties.getUpdateVersionHeaderName());
     }
 

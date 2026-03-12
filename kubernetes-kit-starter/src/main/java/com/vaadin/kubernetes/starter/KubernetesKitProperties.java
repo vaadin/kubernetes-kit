@@ -81,6 +81,20 @@ public class KubernetesKitProperties {
     private String updateVersionHeaderName = "X-AppUpdate";
 
     /**
+     * The application version used during rolling updates.
+     * <p>
+     * When the ingress controller or gateway sets the
+     * {@link #updateVersionHeaderName update version header} on requests to the
+     * current (old) version, its value is compared against this property to
+     * determine whether a version update notification should be shown.
+     * <p>
+     * Defaults to the value of the {@code APP_VERSION} environment variable. If
+     * this property is not set and the environment variable is not defined,
+     * rolling update version detection is disabled.
+     */
+    private String appVersion = System.getenv("APP_VERSION");
+
+    /**
      * The name of the cookie used by the ingress controller or gateway
      * implementation for sticky sessions (session affinity).
      * <p>
@@ -231,6 +245,27 @@ public class KubernetesKitProperties {
      */
     public void setUpdateVersionHeaderName(String updateVersionHeaderName) {
         this.updateVersionHeaderName = updateVersionHeaderName;
+    }
+
+    /**
+     * Gets the application version used during rolling updates.
+     *
+     * @return the application version, or {@code null} if not set
+     * @see #appVersion
+     */
+    public String getAppVersion() {
+        return appVersion;
+    }
+
+    /**
+     * Sets the application version used during rolling updates.
+     *
+     * @param appVersion
+     *            the application version
+     * @see #appVersion
+     */
+    public void setAppVersion(String appVersion) {
+        this.appVersion = appVersion;
     }
 
     /**

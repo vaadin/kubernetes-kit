@@ -16,9 +16,6 @@ import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
-import uk.org.webcompere.systemstubs.environment.EnvironmentVariables;
-import uk.org.webcompere.systemstubs.jupiter.SystemStub;
-import uk.org.webcompere.systemstubs.jupiter.SystemStubsExtension;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentEventListener;
@@ -44,7 +41,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith({ MockitoExtension.class, SystemStubsExtension.class })
+@ExtendWith(MockitoExtension.class)
 public class ClusterSupportTest {
 
     private ClusterSupport clusterSupport;
@@ -68,16 +65,13 @@ public class ClusterSupportTest {
     @Captor
     private ArgumentCaptor<ComponentEventListener<VersionNotifier.SwitchVersionEvent>> componentEventListenerArgCaptor;
 
-    @SystemStub
-    private EnvironmentVariables environmentVariables;
-
     @BeforeEach
     void setUp() {
-        clusterSupport = new ClusterSupport("INGRESSCOOKIE", "X-AppUpdate");
+        clusterSupport = new ClusterSupport("1.0.0", "INGRESSCOOKIE",
+                "X-AppUpdate");
         currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, "1.0.0");
     }
 
     @AfterEach
@@ -98,10 +92,11 @@ public class ClusterSupportTest {
 
     @Test
     void serviceInit_withNoAppVersion_requestHandlerIsNotAdded() {
-        environmentVariables.set(ClusterSupport.ENV_APP_VERSION, null);
+        ClusterSupport noVersionSupport = new ClusterSupport(null,
+                "INGRESSCOOKIE", "X-AppUpdate");
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        noVersionSupport.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent, never()).addRequestHandler(any());
     }
@@ -238,7 +233,7 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_usesConfiguredHeaderName() throws IOException {
         String customHeader = "X-AppVersion";
-        ClusterSupport customClusterSupport = new ClusterSupport(
+        ClusterSupport customClusterSupport = new ClusterSupport("1.0.0",
                 "INGRESSCOOKIE", customHeader);
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
@@ -264,7 +259,7 @@ public class ClusterSupportTest {
     @Test
     void onComponentEvent_usesConfiguredCookieName() throws IOException {
         String customCookieName = "my-gateway-cookie";
-        ClusterSupport customClusterSupport = new ClusterSupport(
+        ClusterSupport customClusterSupport = new ClusterSupport("1.0.0",
                 customCookieName, "X-AppUpdate");
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
