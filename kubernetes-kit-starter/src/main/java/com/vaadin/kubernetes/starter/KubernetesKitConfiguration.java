@@ -19,6 +19,7 @@ import java.util.function.Predicate;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,8 +38,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.type.AnnotatedTypeMetadata;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.util.StringUtils;
 
@@ -269,9 +270,17 @@ public class KubernetesKitConfiguration {
                 @Override
                 public boolean matches(ConditionContext context,
                         AnnotatedTypeMetadata metadata) {
-                    return DebugMode
-                            .isTrackingAvailable(LoggerFactory.getLogger(
-                                    VaadinReplicatedSessionDevModeConfiguration.class));
+                    var env = context.getEnvironment();
+                    boolean devMode = !env.getProperty(
+                            "vaadin.productionMode", Boolean.class, false);
+                    boolean serializationEnabled = env.getProperty(
+                            "vaadin.devmode.sessionSerialization.enabled",
+                            Boolean.class, false);
+                    Logger logger = devMode && serializationEnabled
+                            ? LoggerFactory.getLogger(
+                                    VaadinReplicatedSessionDevModeConfiguration.class)
+                            : null;
+                    return DebugMode.isTrackingAvailable(logger);
                 }
             }
 

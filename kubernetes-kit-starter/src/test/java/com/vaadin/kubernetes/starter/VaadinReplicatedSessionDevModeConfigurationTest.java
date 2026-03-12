@@ -159,7 +159,7 @@ class VaadinReplicatedSessionDevModeConfigurationTest {
     }
 
     @Test
-    void sessionSerializationDebugTool_reflectionOnJavaIOAllowedAndExtendedDebugInfoSystemPropertyNotActive_installed() {
+    void sessionSerializationDebugTool_reflectionOnJavaIOAllowedAndExtendedDebugInfoSystemPropertyNotActive_notInstalled() {
         new ApplicationContextRunner()
                 .withSystemProperties(
                         "sun.io.serialization.extendedDebugInfo=false")
