@@ -55,7 +55,7 @@ public class KubernetesKitProperties {
      * Enables or disables rolling update support, which handles version update
      * notifications and sticky session cookie removal during rolling updates.
      *
-     * @see com.vaadin.kubernetes.starter.ui.ClusterSupport
+     * @see com.vaadin.kubernetes.starter.ui.RollingUpdateHandler
      */
     private boolean rollingUpdates = true;
 
@@ -66,7 +66,7 @@ public class KubernetesKitProperties {
      * When the ingress controller or gateway sets this header on requests to
      * the current (old) version, and its value differs from the application's
      * own version (set via the {@code APP_VERSION} environment variable),
-     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}
+     * {@link com.vaadin.kubernetes.starter.ui.RollingUpdateHandler RollingUpdateHandler}
      * shows a notification prompting the user to switch to the new version.
      * <p>
      * With the Kubernetes Ingress API and NGINX Ingress, this header was
@@ -100,7 +100,7 @@ public class KubernetesKitProperties {
      * <p>
      * This must match the cookie name used by the infrastructure routing
      * traffic to the application. The cookie is removed by
-     * {@link com.vaadin.kubernetes.starter.ui.ClusterSupport ClusterSupport}
+     * {@link com.vaadin.kubernetes.starter.ui.RollingUpdateHandler RollingUpdateHandler}
      * when the user accepts a version switch, so that the next request is no
      * longer pinned to the old pod.
      * <p>
@@ -207,7 +207,7 @@ public class KubernetesKitProperties {
      * Checks if rolling update support is enabled.
      *
      * @return {@code true} if rolling update support is enabled
-     * @see com.vaadin.kubernetes.starter.ui.ClusterSupport
+     * @see com.vaadin.kubernetes.starter.ui.RollingUpdateHandler
      */
     public boolean isRollingUpdates() {
         return rollingUpdates;
@@ -218,7 +218,7 @@ public class KubernetesKitProperties {
      *
      * @param rollingUpdates
      *            {@code true} to enable, {@code false} to disable
-     * @see com.vaadin.kubernetes.starter.ui.ClusterSupport
+     * @see com.vaadin.kubernetes.starter.ui.RollingUpdateHandler
      */
     public void setRollingUpdates(boolean rollingUpdates) {
         this.rollingUpdates = rollingUpdates;

@@ -58,7 +58,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
-import com.vaadin.kubernetes.starter.ui.ClusterSupport;
+import com.vaadin.kubernetes.starter.ui.RollingUpdateHandler;
 
 /**
  * This configuration bean is provided to autoconfigure Vaadin apps to run in a
@@ -74,8 +74,9 @@ public class KubernetesKitConfiguration {
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "rolling-updates", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
-    ClusterSupport clusterSupport(KubernetesKitProperties properties) {
-        return new ClusterSupport(properties.getAppVersion(),
+    RollingUpdateHandler rollingUpdateHandler(
+            KubernetesKitProperties properties) {
+        return new RollingUpdateHandler(properties.getAppVersion(),
                 properties.getStickySessionCookieName(),
                 properties.getUpdateVersionHeaderName());
     }

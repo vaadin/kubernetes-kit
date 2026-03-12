@@ -42,9 +42,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class ClusterSupportTest {
+public class RollingUpdateHandlerTest {
 
-    private ClusterSupport clusterSupport;
+    private RollingUpdateHandler handler;
     private MockedStatic<CurrentInstance> currentInstanceMockedStatic;
     private MockedStatic<VaadinRequest> vaadinRequestMockedStatic;
     private MockedStatic<VaadinResponse> vaadinResponseMockedStatic;
@@ -67,7 +67,7 @@ public class ClusterSupportTest {
 
     @BeforeEach
     void setUp() {
-        clusterSupport = new ClusterSupport("1.0.0", "INGRESSCOOKIE",
+        handler = new RollingUpdateHandler("1.0.0", "INGRESSCOOKIE",
                 "X-AppUpdate");
         currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
@@ -85,18 +85,18 @@ public class ClusterSupportTest {
     void serviceInit_requestHandlerIsAdded() {
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent).addRequestHandler(any());
     }
 
     @Test
     void serviceInit_withNoAppVersion_requestHandlerIsNotAdded() {
-        ClusterSupport noVersionSupport = new ClusterSupport(null,
+        RollingUpdateHandler noVersionHandler = new RollingUpdateHandler(null,
                 "INGRESSCOOKIE", "X-AppUpdate");
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
-        noVersionSupport.serviceInit(serviceInitEvent);
+        noVersionHandler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent, never()).addRequestHandler(any());
     }
@@ -108,15 +108,14 @@ public class ClusterSupportTest {
         UI ui = mock(UI.class);
         VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn(null);
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn(null);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(vaadinSession.getSession()).thenReturn(wrappedSession);
         when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -134,15 +133,14 @@ public class ClusterSupportTest {
         UI ui = mock(UI.class);
         VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn("");
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("");
         when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -160,15 +158,14 @@ public class ClusterSupportTest {
         UI ui = mock(UI.class);
         VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn("1.0.0");
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("1.0.0");
         when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -186,15 +183,14 @@ public class ClusterSupportTest {
         UI ui = mock(UI.class);
         VersionNotifier versionNotifier = mock(VersionNotifier.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn("2.0.0");
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("2.0.0");
         when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.of(versionNotifier));
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -211,15 +207,14 @@ public class ClusterSupportTest {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn("2.0.0");
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("2.0.0");
         when(vaadinSession.getSession()).thenReturn(wrappedSession);
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.empty());
 
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -233,7 +228,7 @@ public class ClusterSupportTest {
     @Test
     void handleRequest_usesConfiguredHeaderName() throws IOException {
         String customHeader = "X-AppVersion";
-        ClusterSupport customClusterSupport = new ClusterSupport("1.0.0",
+        RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
                 "INGRESSCOOKIE", customHeader);
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
@@ -245,7 +240,7 @@ public class ClusterSupportTest {
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.empty());
 
-        customClusterSupport.serviceInit(serviceInitEvent);
+        customHandler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -259,7 +254,7 @@ public class ClusterSupportTest {
     @Test
     void onComponentEvent_usesConfiguredCookieName() throws IOException {
         String customCookieName = "my-gateway-cookie";
-        ClusterSupport customClusterSupport = new ClusterSupport("1.0.0",
+        RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
                 customCookieName, "X-AppUpdate");
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
@@ -270,8 +265,7 @@ public class ClusterSupportTest {
         ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor
                 .forClass(Cookie.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn("2.0.0");
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("2.0.0");
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
@@ -282,8 +276,8 @@ public class ClusterSupportTest {
         when(ui.getChildren()).thenReturn(Stream.empty());
         when(switchVersionListener.nodeSwitch(any(), any())).thenReturn(true);
 
-        customClusterSupport.setSwitchVersionListener(switchVersionListener);
-        customClusterSupport.serviceInit(serviceInitEvent);
+        customHandler.setSwitchVersionListener(switchVersionListener);
+        customHandler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -316,8 +310,7 @@ public class ClusterSupportTest {
         SwitchVersionListener switchVersionListener = mock(
                 SwitchVersionListener.class);
 
-        when(vaadinRequest.getHeader(ClusterSupport.UPDATE_VERSION_HEADER))
-                .thenReturn("2.0.0");
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("2.0.0");
         vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
                 .thenReturn(vaadinRequest);
         vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
@@ -329,8 +322,8 @@ public class ClusterSupportTest {
         when(switchVersionListener.nodeSwitch(any(), any()))
                 .thenReturn(nodeSwitch);
 
-        clusterSupport.setSwitchVersionListener(switchVersionListener);
-        clusterSupport.serviceInit(serviceInitEvent);
+        handler.setSwitchVersionListener(switchVersionListener);
+        handler.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
