@@ -50,9 +50,9 @@ class KubernetesKitConfigurationTest {
 
     @Test
     public void hazelcastInstance_serviceNameSet_kubernetesConfigured() {
-        var prop = new KubernetesKitProperties();
-        prop.getHazelcast().setNamespace("foo-namespace");
-        prop.getHazelcast().setServiceName("foo-service");
+        var prop = new HazelcastProperties();
+        prop.setNamespace("foo-namespace");
+        prop.setServiceName("foo-service");
 
         var configuration = new MockHazelcastConfiguration(prop);
 
@@ -72,9 +72,9 @@ class KubernetesKitConfigurationTest {
     }
 
     private final class MockHazelcastConfiguration
-            extends KubernetesKitConfiguration.HazelcastConfiguration {
+            extends HazelcastConfiguration {
 
-        public MockHazelcastConfiguration(KubernetesKitProperties properties) {
+        public MockHazelcastConfiguration(HazelcastProperties properties) {
             super(properties);
         }
 
