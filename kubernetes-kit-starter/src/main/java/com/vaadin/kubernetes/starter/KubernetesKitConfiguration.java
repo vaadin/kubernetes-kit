@@ -16,9 +16,6 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.function.Predicate;
 
-import com.hazelcast.config.Config;
-import com.hazelcast.core.Hazelcast;
-import com.hazelcast.core.HazelcastInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,11 +24,9 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.AllNestedConditions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -40,17 +35,12 @@ import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.core.annotation.Order;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.util.StringUtils;
-
 import com.vaadin.flow.spring.SpringBootAutoConfiguration;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionListener;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializationCallback;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.sessiontracker.SessionTrackerFilter;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.BackendConnector;
-import com.vaadin.kubernetes.starter.sessiontracker.backend.HazelcastConnector;
-import com.vaadin.kubernetes.starter.sessiontracker.backend.RedisConnector;
 import com.vaadin.kubernetes.starter.sessiontracker.backend.SessionExpirationPolicy;
 import com.vaadin.kubernetes.starter.sessiontracker.push.PushSessionTracker;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.SerializationStreamFactory;
@@ -67,7 +57,8 @@ import com.vaadin.kubernetes.starter.ui.RollingUpdateHandler;
  */
 @AutoConfiguration
 @ConditionalOnProperty(name = "auto-configure", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
-@AutoConfigureAfter(SpringBootAutoConfiguration.class)
+@AutoConfigureAfter({ SpringBootAutoConfiguration.class,
+        RedisConfiguration.class, HazelcastConfiguration.class })
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
@@ -288,77 +279,4 @@ public class KubernetesKitConfiguration {
 
     }
 
-    @AutoConfiguration(after = DataRedisAutoConfiguration.class)
-    @ConditionalOnClass(DataRedisAutoConfiguration.class)
-    public static class RedisConfiguration {
-
-        @Bean
-        @ConditionalOnBean(RedisConnectionFactory.class)
-        @ConditionalOnMissingBean
-        RedisConnector redisConnector(RedisConnectionFactory factory) {
-            return new RedisConnector(factory);
-        }
-    }
-
-    @AutoConfiguration
-    @ConditionalOnClass(HazelcastInstance.class)
-    public static class HazelcastConfiguration {
-
-        final KubernetesKitProperties properties;
-
-        public HazelcastConfiguration(KubernetesKitProperties properties) {
-            this.properties = properties;
-        }
-
-        @Bean
-        @ConditionalOnMissingBean
-        HazelcastConnector hazelcastConnector(
-                HazelcastInstance hazelcastInstance) {
-            return new HazelcastConnector(hazelcastInstance);
-        }
-
-        @Bean
-        @ConditionalOnMissingBean
-        public HazelcastInstance hazelcastInstance() {
-            final var config = new Config();
-
-            configure(config);
-            // Make sure Hazelcast shutdown hook is disabled so that the
-            // instance will be stopped after SessionSerializer saved the
-            // latest pending state
-            config.setProperty("hazelcast.shutdownhook.enabled", "false");
-            configureKubernetes(config);
-
-            return createHazelcastInstance(config);
-        }
-
-        HazelcastInstance createHazelcastInstance(Config config) {
-            return Hazelcast.newHazelcastInstance(config);
-        }
-
-        protected void configure(Config config) {
-            // Do nothing
-        }
-
-        private void configureKubernetes(Config config) {
-            final var k8sProperties = properties.getHazelcast();
-            final var k8sServiceName = k8sProperties.getServiceName();
-
-            if (StringUtils.hasText(k8sServiceName)) {
-                final var networkConfig = config.getNetworkConfig().getJoin();
-                networkConfig.getTcpIpConfig().setEnabled(false);
-                networkConfig.getMulticastConfig().setEnabled(false);
-
-                final var k8sConfig = networkConfig.getKubernetesConfig();
-                k8sConfig.setEnabled(true);
-
-                final var k8sNamespace = k8sProperties.getNamespace();
-                k8sConfig.setProperty("namespace", k8sNamespace);
-                k8sConfig.setProperty("service-name", k8sServiceName);
-                k8sConfig.setProperty("service-port",
-                        Integer.toString(k8sProperties.getServicePort()));
-            }
-        }
-
-    }
 }
