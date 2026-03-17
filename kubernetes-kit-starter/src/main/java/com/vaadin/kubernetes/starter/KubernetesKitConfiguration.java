@@ -19,6 +19,7 @@ import java.util.function.Predicate;
 import com.hazelcast.config.Config;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,8 +38,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
 import org.springframework.context.annotation.Conditional;
-import org.springframework.core.annotation.Order;
 import org.springframework.core.type.AnnotatedTypeMetadata;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.util.StringUtils;
 
@@ -58,6 +59,7 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientHandl
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.TransientInjectableObjectStreamFactory;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.DebugMode;
 import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.SerializationDebugRequestHandler;
+import com.vaadin.kubernetes.starter.ui.RollingUpdateHandler;
 
 /**
  * This configuration bean is provided to autoconfigure Vaadin apps to run in a
@@ -69,6 +71,16 @@ import com.vaadin.kubernetes.starter.sessiontracker.serialization.debug.Serializ
 @EnableConfigurationProperties({ KubernetesKitProperties.class,
         SerializationProperties.class })
 public class KubernetesKitConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "rolling-updates", prefix = KubernetesKitProperties.PREFIX, matchIfMissing = true)
+    RollingUpdateHandler rollingUpdateHandler(
+            KubernetesKitProperties properties) {
+        return new RollingUpdateHandler(properties.getAppVersion(),
+                properties.getStickySessionCookieName(),
+                properties.getUpdateVersionHeaderName());
+    }
 
     @AutoConfiguration
     @ConditionalOnBean(BackendConnector.class)
@@ -258,9 +270,17 @@ public class KubernetesKitConfiguration {
                 @Override
                 public boolean matches(ConditionContext context,
                         AnnotatedTypeMetadata metadata) {
-                    return DebugMode
-                            .isTrackingAvailable(LoggerFactory.getLogger(
-                                    VaadinReplicatedSessionDevModeConfiguration.class));
+                    var env = context.getEnvironment();
+                    boolean devMode = !env.getProperty(
+                            "vaadin.productionMode", Boolean.class, false);
+                    boolean serializationEnabled = env.getProperty(
+                            "vaadin.devmode.sessionSerialization.enabled",
+                            Boolean.class, false);
+                    Logger logger = devMode && serializationEnabled
+                            ? LoggerFactory.getLogger(
+                                    VaadinReplicatedSessionDevModeConfiguration.class)
+                            : null;
+                    return DebugMode.isTrackingAvailable(logger);
                 }
             }
 
@@ -303,8 +323,9 @@ public class KubernetesKitConfiguration {
             final var config = new Config();
 
             configure(config);
-            // Make sure Hazelcast shutdown hook is disabled so that the instance
-            // will be stopped after SessionSerializer saved the latest pending state
+            // Make sure Hazelcast shutdown hook is disabled so that the
+            // instance will be stopped after SessionSerializer saved the
+            // latest pending state
             config.setProperty("hazelcast.shutdownhook.enabled", "false");
             configureKubernetes(config);
 

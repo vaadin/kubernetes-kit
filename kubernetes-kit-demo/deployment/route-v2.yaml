@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kubernetes-kit-demo
+spec:
+  parentRefs:
+    - name: public-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: kubernetes-kit-demo-v2
+          port: 80
+      sessionPersistence:
+        sessionName: vaadin-session
+        type: Cookie
