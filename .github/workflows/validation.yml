@@ -21,9 +21,9 @@ env:
   _PR_NUMBER: ${{ github.event.number }}
   JAVA_VERSION: '21'
 jobs:
-  build:
+  tests:
     environment: ${{ github.event.pull_request.head.repo.fork && 'pr-tests' || '' }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     steps:
       - run: echo "Concurrency Group = ${_HEAD_REF:-$_REF_NAME}"
@@ -54,55 +54,7 @@ jobs:
           TB_LICENSE=${{secrets.VAADIN_PRO_KEY}}
           mkdir -p ~/.vaadin/
           echo '{"username":"'$(echo $TB_LICENSE | cut -d / -f1)'","proKey":"'$(echo $TB_LICENSE | cut -d / -f2)'"}' > ~/.vaadin/proKey
-      - name: Build
-        run: mvn clean install -B -ntp -DskipTests
-      - name: Save workspace
-        run: |
-          tar cf workspace.tar $(find . -type d -name target)
-      - uses: actions/upload-artifact@v5
-        with:
-          name: saved-workspace
-          path: workspace.tar
-  tests:
-    needs: build
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{env._HEAD_SHA || github.sha}}
-      - name: Set up JDK
-        uses: actions/setup-java@v5
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: 'temurin'
-      - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
-        with:
-          maven-version: 3.8.7
-      - uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
-      - uses: actions/download-artifact@v5
-        if: ${{ github.run_attempt == 1 }}
-        with:
-          name: saved-workspace
-      - name: Restore Workspace
-        if: ${{ github.run_attempt == 1 }}
-        run: |
-          set -x
-          tar xf workspace.tar
-      - name: Build (on retry)
-        if: ${{ github.run_attempt > 1 }}
-        run: mvn install -B -ntp -DskipTests
-      - name: Set TB License
-        run: |
-          TB_LICENSE=${{secrets.VAADIN_PRO_KEY}}
-          mkdir -p ~/.vaadin/
-          echo '{"username":"'$(echo $TB_LICENSE | cut -d / -f1)'","proKey":"'$(echo $TB_LICENSE | cut -d / -f2)'"}' > ~/.vaadin/proKey
-      - name: Run Tests
+      - name: Build and Test
         run: |
           set -x -e -o pipefail
           mvn verify -B -e -V -ntp | tee mvn-tests.out
@@ -137,9 +89,6 @@ jobs:
         with:
           junit_files: '**/target/*-reports/TEST*.xml'
           check_run_annotations: all tests, skipped tests
-      - uses: geekyeggo/delete-artifact@v5
-        with:
-          name: saved-workspace
       - name: Set Failure Status
         if: ${{ always() && needs.tests.result != 'success' }}
         run: |
