@@ -355,6 +355,7 @@ public class SerializationDebugRequestHandler
         public SerializationProperties serializationProperties;
 
         public InitListener() {
+            this(new SerializationProperties());
         }
 
         public InitListener(SerializationProperties serializationProperties) {
