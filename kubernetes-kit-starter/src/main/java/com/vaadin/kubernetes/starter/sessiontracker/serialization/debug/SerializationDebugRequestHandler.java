@@ -380,9 +380,10 @@ public class SerializationDebugRequestHandler
             } else {
                 logger.info(
                         "Installing SerializationDebugRequestHandler for session serialization debug");
-                serviceInitEvent
-                        .addRequestHandler(new SerializationDebugRequestHandler(
-                                serializationProperties));
+                SerializationDebugRequestHandler handler = new SerializationDebugRequestHandler(
+                        serializationProperties);
+                handler.sessionSerializer.serviceInit(serviceInitEvent);
+                serviceInitEvent.addRequestHandler(handler);
             }
         }
     }

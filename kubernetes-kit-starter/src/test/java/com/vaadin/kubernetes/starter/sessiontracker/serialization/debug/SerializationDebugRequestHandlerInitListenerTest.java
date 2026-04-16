@@ -1,5 +1,6 @@
 package com.vaadin.kubernetes.starter.sessiontracker.serialization.debug;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -11,6 +12,7 @@ import com.vaadin.flow.server.ServiceInitEvent;
 import com.vaadin.flow.server.VaadinContext;
 import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.startup.ApplicationConfiguration;
+import com.vaadin.kubernetes.starter.sessiontracker.SessionSerializer;
 import com.vaadin.kubernetes.starter.test.EnableOnJavaIOReflection;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +38,29 @@ class SerializationDebugRequestHandlerInitListenerTest {
         assertThat(handlers).hasSize(1);
         assertThat(handlers.get(0))
                 .isExactlyInstanceOf(SerializationDebugRequestHandler.class);
+    }
+
+    @Test
+    void developmentModeAndSerializationDebugEnabled_sessionSerializerReceivesVaadinService()
+            throws Exception {
+        ServiceInitEvent event = createEvent(false, true);
+        listener.serviceInit(event);
+
+        SerializationDebugRequestHandler handler = (SerializationDebugRequestHandler) event
+                .getAddedRequestHandlers().findFirst().orElseThrow();
+
+        Field serializerField = SerializationDebugRequestHandler.class
+                .getDeclaredField("sessionSerializer");
+        serializerField.setAccessible(true);
+        SessionSerializer serializer = (SessionSerializer) serializerField
+                .get(handler);
+
+        Field serviceField = SessionSerializer.class
+                .getDeclaredField("vaadinService");
+        serviceField.setAccessible(true);
+        VaadinService service = (VaadinService) serviceField.get(serializer);
+
+        assertThat(service).isSameAs(event.getSource());
     }
 
     @Test
