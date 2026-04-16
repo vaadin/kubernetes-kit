@@ -28,8 +28,10 @@ jobs:
     steps:
       - run: echo "Concurrency Group = ${_HEAD_REF:-$_REF_NAME}"
       - name: Check secrets
+        env:
+          VAADIN_PRO_KEY: ${{secrets.VAADIN_PRO_KEY}}
         run: |
-          [ -z "${{secrets.VAADIN_PRO_KEY}}" ] \
+          [ -z "$VAADIN_PRO_KEY" ] \
             && echo "🚫 **VAADIN_PRO_KEY** is not defined, check that **${{github.repository}}** repo has a valid secret" \
             | tee -a $GITHUB_STEP_SUMMARY && exit 1 || exit 0
       - uses: actions/checkout@v5
@@ -50,10 +52,11 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
       - name: Set TB License
+        env:
+          VAADIN_PRO_KEY: ${{secrets.VAADIN_PRO_KEY}}
         run: |
-          TB_LICENSE=${{secrets.VAADIN_PRO_KEY}}
           mkdir -p ~/.vaadin/
-          echo '{"username":"'$(echo $TB_LICENSE | cut -d / -f1)'","proKey":"'$(echo $TB_LICENSE | cut -d / -f2)'"}' > ~/.vaadin/proKey
+          echo '{"username":"'$(echo $VAADIN_PRO_KEY | cut -d / -f1)'","proKey":"'$(echo $VAADIN_PRO_KEY | cut -d / -f2)'"}' > ~/.vaadin/proKey
       - name: Build and Test
         run: |
           set -x -e -o pipefail
