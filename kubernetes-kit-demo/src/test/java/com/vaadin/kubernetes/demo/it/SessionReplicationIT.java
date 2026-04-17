@@ -27,9 +27,9 @@ class SessionReplicationIT {
         Locator incrementBtn = page.getByRole(AriaRole.BUTTON,
                 new Page.GetByRoleOptions().setName("Increment"));
 
-        // Wait for the page to fully load (constructor calls count(),
+        // Wait for Vaadin to fully bootstrap (constructor calls count(),
         // setting counter to 1)
-        assertThat(counter).not().hasText("");
+        assertThat(counter).hasText("1");
 
         // Click increment a few times to trigger UIDL requests and
         // serialization

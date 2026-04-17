@@ -50,18 +50,16 @@ jobs:
             -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}
 
       - name: Create kind cluster
-        run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
-          kind create cluster --name kit-test --wait 60s
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kit-test
 
       - name: Load image into kind
         run: kind load docker-image ${{ env.IMAGE_NAME }} --name kit-test
 
       - name: Install Envoy Gateway
         run: |
-          kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.3.0/install.yaml
+          kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.7.2/install.yaml
           kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
 
       - name: Deploy application stack
@@ -74,24 +72,25 @@ jobs:
         run: |
           kubectl wait --timeout=5m deployment/kubernetes-kit-redis --for=condition=Available
           kubectl wait --timeout=5m deployment/kubernetes-kit-demo --for=condition=Available
-          kubectl wait --timeout=5m -n envoy-gateway-system \
+          # Envoy proxy is created in the Gateway's namespace (default)
+          kubectl wait --timeout=5m \
             -l gateway.envoyproxy.io/owning-gateway-name=public-gateway \
             deployment --for=condition=Available
 
       - name: Port-forward Envoy Gateway
         run: |
-          ENVOY_SVC=$(kubectl get svc -n envoy-gateway-system \
+          ENVOY_SVC=$(kubectl get svc \
             -l gateway.envoyproxy.io/owning-gateway-name=public-gateway \
             -o jsonpath='{.items[0].metadata.name}')
-          kubectl -n envoy-gateway-system port-forward "svc/${ENVOY_SVC}" 8080:80 &
+          kubectl port-forward "svc/${ENVOY_SVC}" 8080:80 &
           echo "ENVOY_PORT_FORWARD_PID=$!" >> $GITHUB_ENV
           # Wait for port-forward to be ready
           for i in $(seq 1 30); do
-            curl -s -o /dev/null http://localhost:8080 && break || sleep 2
+            curl -sf -o /dev/null http://localhost:8080 && break || sleep 2
           done
 
       - name: Install Playwright browsers
-        run: mvn exec:java -pl :kubernetes-kit-demo -Pintegration-test -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium --with-deps"
+        run: mvn exec:java -pl :kubernetes-kit-demo -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium --with-deps"
 
       - name: Run integration tests
         run: |
@@ -110,6 +109,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: |
-          kill $ENVOY_PORT_FORWARD_PID 2>/dev/null || true
-          kind delete cluster --name kit-test
+        run: kill $ENVOY_PORT_FORWARD_PID 2>/dev/null || true
