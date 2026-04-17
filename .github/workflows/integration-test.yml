@@ -1,0 +1,133 @@
+name: Integration Test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  merge_group:
+permissions:
+  contents: read
+concurrency:
+  group: it-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  _HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  JAVA_VERSION: '21'
+  IMAGE_NAME: kubernetes-kit-demo:test
+jobs:
+  integration-test:
+    environment: ${{ github.event.pull_request.head.repo.fork && 'pr-tests' || '' }}
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check secrets
+        env:
+          VAADIN_PRO_KEY: ${{ secrets.VAADIN_PRO_KEY }}
+        run: |
+          [ -z "$VAADIN_PRO_KEY" ] \
+            && echo "VAADIN_PRO_KEY is not defined" | tee -a $GITHUB_STEP_SUMMARY && exit 1 || exit 0
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env._HEAD_SHA || github.sha }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: 3.8.7
+
+      - uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-it-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Set TB License
+        env:
+          VAADIN_PRO_KEY: ${{ secrets.VAADIN_PRO_KEY }}
+        run: |
+          mkdir -p ~/.vaadin/
+          echo '{"username":"'$(echo $VAADIN_PRO_KEY | cut -d / -f1)'","proKey":"'$(echo $VAADIN_PRO_KEY | cut -d / -f2)'"}' > ~/.vaadin/proKey
+
+      - name: Build demo image with Buildpacks
+        run: |
+          set -x -e -o pipefail
+          mvn spring-boot:build-image -B -e -ntp \
+            -pl :kubernetes-kit-demo -am \
+            -Pproduction,redis \
+            -DskipTests \
+            -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}
+
+      - name: Create kind cluster
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind create cluster --name kit-test --wait 60s
+
+      - name: Load image into kind
+        run: kind load docker-image ${{ env.IMAGE_NAME }} --name kit-test
+
+      - name: Install Envoy Gateway
+        run: |
+          kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.3.0/install.yaml
+          kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
+
+      - name: Deploy application stack
+        run: |
+          kubectl apply -f kubernetes-kit-demo/deployment/gateway.yaml
+          kubectl apply -f kubernetes-kit-demo/deployment/redis.yaml
+          kubectl apply -f kubernetes-kit-demo/src/test/resources/k8s/
+
+      - name: Wait for deployments to be ready
+        run: |
+          kubectl wait --timeout=5m deployment/kubernetes-kit-redis --for=condition=Available
+          kubectl wait --timeout=5m deployment/kubernetes-kit-demo --for=condition=Available
+          kubectl wait --timeout=5m -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name=public-gateway \
+            deployment --for=condition=Available
+
+      - name: Port-forward Envoy Gateway
+        run: |
+          ENVOY_SVC=$(kubectl get svc -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name=public-gateway \
+            -o jsonpath='{.items[0].metadata.name}')
+          kubectl -n envoy-gateway-system port-forward "svc/${ENVOY_SVC}" 8080:80 &
+          echo "ENVOY_PORT_FORWARD_PID=$!" >> $GITHUB_ENV
+          # Wait for port-forward to be ready
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null http://localhost:8080 && break || sleep 2
+          done
+
+      - name: Install Playwright browsers
+        run: mvn exec:java -pl :kubernetes-kit-demo -Pintegration-test -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium --with-deps"
+
+      - name: Run integration tests
+        run: |
+          mvn verify -B -e -ntp \
+            -pl :kubernetes-kit-demo \
+            -Pintegration-test \
+            -Dapp.url=http://localhost:8080
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== Pod status ===" && kubectl get pods -o wide
+          echo "=== App logs ===" && kubectl logs -l app=kubernetes-kit-demo --all-containers --tail=200
+          echo "=== Redis logs ===" && kubectl logs -l app=kubernetes-kit-redis --tail=50
+          echo "=== Events ===" && kubectl get events --sort-by='.lastTimestamp'
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $ENVOY_PORT_FORWARD_PID 2>/dev/null || true
+          kind delete cluster --name kit-test
