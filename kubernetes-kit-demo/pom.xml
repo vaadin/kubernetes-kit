@@ -64,6 +64,17 @@
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.52.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -120,19 +131,6 @@
 
         <profile>
             <id>integration-test</id>
-            <dependencies>
-                <dependency>
-                    <groupId>com.microsoft.playwright</groupId>
-                    <artifactId>playwright</artifactId>
-                    <version>1.52.0</version>
-                    <scope>test</scope>
-                </dependency>
-                <dependency>
-                    <groupId>org.junit.jupiter</groupId>
-                    <artifactId>junit-jupiter</artifactId>
-                    <scope>test</scope>
-                </dependency>
-            </dependencies>
             <build>
                 <plugins>
                     <plugin>
