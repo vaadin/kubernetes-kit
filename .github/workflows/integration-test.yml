@@ -37,11 +37,14 @@ jobs:
           mkdir -p ~/.vaadin/
           echo '{"username":"'$(echo $VAADIN_PRO_KEY | cut -d / -f1)'","proKey":"'$(echo $VAADIN_PRO_KEY | cut -d / -f2)'"}' > ~/.vaadin/proKey
 
+      - name: Build starter
+        run: mvn install -B -e -ntp -pl :kubernetes-kit-starter -am -DskipTests
+
       - name: Build demo image with Buildpacks
         run: |
           set -x -e -o pipefail
           mvn spring-boot:build-image -B -e -ntp \
-            -pl :kubernetes-kit-demo -am \
+            -pl :kubernetes-kit-demo \
             -Pproduction,redis \
             -DskipTests \
             -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}
