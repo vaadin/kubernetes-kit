@@ -1,7 +1,7 @@
 name: Integration Test
 on:
   push:
-    branches: [main, feat/integration-test-session-replication]
+    branches: [main]
   workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened]
