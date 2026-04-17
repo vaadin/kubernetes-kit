@@ -7,6 +7,7 @@ import java.io.IOException;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.assertions.LocatorAssertions;
 import com.microsoft.playwright.junit.UsePlaywright;
 import com.microsoft.playwright.options.AriaRole;
 
@@ -28,8 +29,9 @@ class SessionReplicationIT {
                 new Page.GetByRoleOptions().setName("Increment"));
 
         // Wait for Vaadin to fully bootstrap (constructor calls count(),
-        // setting counter to 1)
-        assertThat(counter).hasText("1");
+        // setting counter to 1). Production mode may take a while.
+        assertThat(counter).hasText("1",
+                new LocatorAssertions.HasTextOptions().setTimeout(30_000));
 
         // Click increment a few times to trigger UIDL requests and
         // serialization
