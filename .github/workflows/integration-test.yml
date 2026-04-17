@@ -23,13 +23,6 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     steps:
-      - name: Check secrets
-        env:
-          VAADIN_PRO_KEY: ${{ secrets.VAADIN_PRO_KEY }}
-        run: |
-          [ -z "$VAADIN_PRO_KEY" ] \
-            && echo "VAADIN_PRO_KEY is not defined" | tee -a $GITHUB_STEP_SUMMARY && exit 1 || exit 0
-
       - uses: actions/checkout@v5
         with:
           ref: ${{ env._HEAD_SHA || github.sha }}
@@ -39,17 +32,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-
-      - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
-        with:
-          maven-version: 3.8.7
-
-      - uses: actions/cache@v5
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-it-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
+          cache: 'maven'
 
       - name: Set TB License
         env:
