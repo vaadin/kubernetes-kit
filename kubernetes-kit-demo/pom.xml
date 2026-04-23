@@ -14,6 +14,7 @@
     <properties>
         <maven.source.skip>true</maven.source.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
+        <failsafe.excludedGroups>kubernetes</failsafe.excludedGroups>
     </properties>
 
     <dependencies>
@@ -63,6 +64,17 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>1.52.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -116,6 +128,33 @@
                     <artifactId>hazelcast</artifactId>
                 </dependency>
             </dependencies>
+        </profile>
+
+        <profile>
+            <id>integration-test</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>${maven.surefire.version}</version>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <excludedGroups>${failsafe.excludedGroups}</excludedGroups>
+                            <systemPropertyVariables>
+                                <app.url>${app.url}</app.url>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
 
     </profiles>

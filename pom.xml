@@ -43,9 +43,9 @@
         <maven.compiler.target>${maven.compiler.release}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <flow.version>25.0-SNAPSHOT</flow.version>
+        <flow.version>25.1-SNAPSHOT</flow.version>
         <testbench.version>10.0.0</testbench.version>
-        <spring.boot.version>4.0.0</spring.boot.version>
+        <spring.boot.version>4.0.4</spring.boot.version>
         <maven.jar.version>3.3.0</maven.jar.version>
         <maven.source.version>3.2.1</maven.source.version>
         <maven.javadoc.version>3.4.1</maven.javadoc.version>

@@ -9,4 +9,5 @@ target/
 
 *.iml
 .DS_Store
+.secrets
 

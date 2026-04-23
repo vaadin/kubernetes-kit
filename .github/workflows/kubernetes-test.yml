@@ -1,0 +1,109 @@
+name: Kubernetes Test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+  merge_group:
+permissions:
+  contents: read
+concurrency:
+  group: k8s-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  _HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  JAVA_VERSION: '21'
+  IMAGE_NAME: kubernetes-kit-demo:test
+jobs:
+  kubernetes-test:
+    environment: ${{ github.event.pull_request.head.repo.fork && 'pr-tests' || '' }}
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env._HEAD_SHA || github.sha }}
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Set TB License
+        env:
+          VAADIN_PRO_KEY: ${{ secrets.VAADIN_PRO_KEY }}
+        run: |
+          mkdir -p ~/.vaadin/
+          echo '{"username":"'$(echo $VAADIN_PRO_KEY | cut -d / -f1)'","proKey":"'$(echo $VAADIN_PRO_KEY | cut -d / -f2)'"}' > ~/.vaadin/proKey
+      - name: Build starter
+        run: mvn install -B -e -ntp -pl :kubernetes-kit-starter -am -DskipTests
+      - name: Build demo image with Buildpacks
+        run: |
+          mvn spring-boot:build-image -B -e -ntp \
+            -pl :kubernetes-kit-demo \
+            -Predis \
+            -DskipTests \
+            -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kit-test
+      - name: Load image into kind
+        run: kind load docker-image ${{ env.IMAGE_NAME }} --name kit-test
+      - name: Install Envoy Gateway
+        run: |
+          kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.7.2/install.yaml
+          kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
+      - name: Deploy application stack
+        run: |
+          kubectl apply -f kubernetes-kit-demo/deployment/gateway.yaml
+          kubectl apply -f kubernetes-kit-demo/deployment/redis.yaml
+          kubectl apply -f kubernetes-kit-demo/src/test/resources/k8s/
+      - name: Wait for deployments to be ready
+        run: |
+          kubectl wait --timeout=5m deployment/kubernetes-kit-redis --for=condition=Available
+          kubectl wait --timeout=5m deployment/kubernetes-kit-demo --for=condition=Available
+          kubectl wait --timeout=5m -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name=public-gateway \
+            deployment --for=condition=Available
+      - name: Verify application is running
+        run: |
+          ENVOY_SVC=$(kubectl get svc -n envoy-gateway-system \
+            -l gateway.envoyproxy.io/owning-gateway-name=public-gateway \
+            -o jsonpath='{.items[0].metadata.name}')
+          kubectl -n envoy-gateway-system port-forward "svc/${ENVOY_SVC}" 8080:80 &
+          echo "ENVOY_PORT_FORWARD_PID=$!" >> $GITHUB_ENV
+          timeout 60 bash -c 'until curl -sf http://localhost:8080 >/dev/null; do sleep 2; done' \
+            || (echo "Port-forward never became ready" && exit 1)
+          curl -sf http://localhost:8080/ | grep -q 'Vaadin' \
+            || (echo "App not responding correctly" && exit 1)
+          kubectl logs -l app=kubernetes-kit-demo --tail=50 | grep -c ERROR | xargs -I{} test {} -eq 0
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+      - name: Run Kubernetes integration tests
+        run: |
+          mvn verify -B -e -ntp \
+            -pl :kubernetes-kit-demo \
+            -Pintegration-test \
+            -Dfailsafe.excludedGroups= \
+            -Dapp.url=http://localhost:8080
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p k8s-logs
+          kubectl get pods -o wide > k8s-logs/pod-status.txt
+          kubectl logs -l app=kubernetes-kit-demo --all-containers --prefix --tail=-1 > k8s-logs/app.log
+          kubectl logs -l app=kubernetes-kit-redis --tail=-1 > k8s-logs/redis.log
+          kubectl logs -n envoy-gateway-system -l gateway.envoyproxy.io/owning-gateway-name=public-gateway --tail=-1 > k8s-logs/envoy.log || true
+          kubectl get events --sort-by='.lastTimestamp' > k8s-logs/events.txt
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: k8s-logs
+          path: k8s-logs/
+      - name: Cleanup
+        if: always()
+        run: kill $ENVOY_PORT_FORWARD_PID 2>/dev/null || true
