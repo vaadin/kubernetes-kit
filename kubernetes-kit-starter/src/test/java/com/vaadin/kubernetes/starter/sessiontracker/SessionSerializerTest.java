@@ -514,21 +514,39 @@ class SessionSerializerTest {
         doAnswer(i -> completed.add(i.getArgument(0))).when(connector)
                 .markSerializationComplete(anyString());
 
+        // Block session1's serialization on a latch so the concurrency
+        // ordering is deterministic: session2 is allowed to complete first,
+        // then session1 is released. This avoids flakes caused by
+        // Thread.sleep timing drift on loaded runners.
+        CountDownLatch session1Release = new CountDownLatch(1);
         String sid1 = UUID.randomUUID().toString();
         HttpSession session1 = newHttpSession(sid1);
-        session1.setAttribute("DELAY", new SerializationDelay(300));
+        session1.setAttribute("BLOCK", new BlockingSerialization(session1Release));
         vaadinService.newMockSession(session1);
 
         String sid2 = UUID.randomUUID().toString();
         HttpSession session2 = newHttpSession(sid2);
-        session2.setAttribute("DELAY", new SerializationDelay(100));
         vaadinService.newMockSession(session2);
 
-        serializer.serialize(session1);
-        Thread.sleep(100);
-        serializer.serialize(session2);
+        try {
+            serializer.serialize(session1);
+            // Wait for session1 to actually start serializing before
+            // scheduling session2, so 'started' order is deterministic.
+            await().atMost(1000, MILLISECONDS).until(() -> started.size() == 1);
+            serializer.serialize(session2);
 
-        await().atMost(1000, MILLISECONDS).until(() -> completed.size() == 2);
+            // session2 has no delay; it must complete while session1 is
+            // still blocked on the latch. This proves concurrent processing.
+            await().atMost(1000, MILLISECONDS).until(() -> completed.size() == 1);
+            Assertions.assertEquals(sid2, completed.get(0),
+                    "session2 should complete first (session1 is blocked)");
+
+            // Now release session1 and wait for both to be complete.
+            session1Release.countDown();
+            await().atMost(1000, MILLISECONDS).until(() -> completed.size() == 2);
+        } finally {
+            session1Release.countDown();
+        }
 
         Assertions.assertIterableEquals(List.of(sid1, sid2), started,
                 "Started serializations");
@@ -536,9 +554,9 @@ class SessionSerializerTest {
                 .assertIterableEquals(List.of(sid2, sid1),
                         infoList.stream().map(SessionInfo::getClusterKey)
                                 .collect(Collectors.toList()),
-                        "Started completed");
+                        "Sent sessions");
         Assertions.assertIterableEquals(List.of(sid2, sid1), completed,
-                "Started completed");
+                "Completed serializations");
 
         verify(connector, times(2)).markSerializationStarted(anyString(),
                 any());
@@ -964,6 +982,29 @@ class SessionSerializerTest {
                 lock.unlock();
             }
             return session;
+        }
+    }
+
+    // A serializable class that blocks serialization until an externally
+    // controlled latch is released. Used to make concurrency ordering
+    // deterministic in tests without relying on Thread.sleep timing.
+    private static class BlockingSerialization implements Serializable {
+        private final transient CountDownLatch release;
+
+        BlockingSerialization(CountDownLatch release) {
+            this.release = release;
+        }
+
+        @Serial
+        private void writeObject(java.io.ObjectOutputStream stream)
+                throws IOException {
+            stream.defaultWriteObject();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
+            }
         }
     }
 
