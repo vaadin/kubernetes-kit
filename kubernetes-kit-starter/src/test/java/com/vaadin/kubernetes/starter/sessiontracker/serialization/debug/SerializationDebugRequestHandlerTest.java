@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -305,14 +306,26 @@ class SerializationDebugRequestHandlerTest {
         properties.setTimeout(100);
         handler = new SerializationDebugRequestHandler(properties);
 
-        httpSession.setAttribute("OBJ1", new SlowSerialization());
+        // Block the serializer on a latch so that the 100ms timeout always
+        // fires before the serialization finishes, regardless of scheduling
+        // delays (e.g. GC pauses, slow CI runners). Without this, a long
+        // enough pause on the main thread between trySerialize() and
+        // waitForCompletion() can let the background serialization complete
+        // first, hiding the timeout outcome.
+        CountDownLatch releaseSerializer = new CountDownLatch(1);
+        SlowSerialization.releaseLatch = releaseSerializer;
+        try {
+            httpSession.setAttribute("OBJ1", new SlowSerialization());
 
-        runDebugTool();
-        Result result = resultHolder.get();
-        assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
-        assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
-                Outcome.NOT_SERIALIZABLE_CLASSES,
-                Outcome.SERIALIZATION_TIMEOUT);
+            runDebugTool();
+            Result result = resultHolder.get();
+            assertThat(result.getSessionId()).isEqualTo(httpSession.getId());
+            assertThat(result.getOutcomes()).containsExactlyInAnyOrder(
+                    Outcome.NOT_SERIALIZABLE_CLASSES,
+                    Outcome.SERIALIZATION_TIMEOUT);
+        } finally {
+            releaseSerializer.countDown();
+        }
     }
 
     @Test
@@ -382,10 +395,13 @@ class SerializationDebugRequestHandlerTest {
     }
 
     private static class SlowSerialization extends DeepNested {
+        static CountDownLatch releaseLatch;
+
         private void writeObject(ObjectOutputStream out) throws IOException {
             try {
-                Thread.sleep(2000);
+                releaseLatch.await();
             } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             }
             out.defaultWriteObject();
