@@ -44,7 +44,7 @@ jobs:
         run: |
           mvn spring-boot:build-image -B -e -ntp \
             -pl :kubernetes-kit-demo \
-            -Pproduction,redis \
+            -Predis \
             -DskipTests \
             -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}
       - name: Create kind cluster
