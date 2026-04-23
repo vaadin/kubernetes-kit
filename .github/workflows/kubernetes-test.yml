@@ -1,4 +1,4 @@
-name: Integration Test
+name: Kubernetes Test
 on:
   push:
     branches: [main]
@@ -10,19 +10,22 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: it-${{ github.head_ref || github.ref_name }}
+  group: k8s-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  _HEAD_SHA: ${{ github.event.pull_request.head.sha }}
   JAVA_VERSION: '21'
   IMAGE_NAME: kubernetes-kit-demo:test
 jobs:
-  integration-test:
+  kubernetes-test:
     environment: ${{ github.event.pull_request.head.repo.fork && 'pr-tests' || '' }}
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env._HEAD_SHA || github.sha }}
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -73,27 +76,34 @@ jobs:
             -o jsonpath='{.items[0].metadata.name}')
           kubectl -n envoy-gateway-system port-forward "svc/${ENVOY_SVC}" 8080:80 &
           echo "ENVOY_PORT_FORWARD_PID=$!" >> $GITHUB_ENV
-          for i in $(seq 1 30); do
-            curl -sf -o /dev/null http://localhost:8080 && break || sleep 2
-          done
-          curl -sf http://localhost:8080/ | grep -q 'Vaadin' || (echo "App not responding correctly" && exit 1)
-          echo "No errors in app logs:"
+          timeout 60 bash -c 'until curl -sf http://localhost:8080 >/dev/null; do sleep 2; done' \
+            || (echo "Port-forward never became ready" && exit 1)
+          curl -sf http://localhost:8080/ | grep -q 'Vaadin' \
+            || (echo "App not responding correctly" && exit 1)
           kubectl logs -l app=kubernetes-kit-demo --tail=50 | grep -c ERROR | xargs -I{} test {} -eq 0
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
-      - name: Run integration tests
+      - name: Run Kubernetes integration tests
         run: |
           mvn verify -B -e -ntp \
             -pl :kubernetes-kit-demo \
             -Pintegration-test \
+            -Dfailsafe.excludedGroups= \
             -Dapp.url=http://localhost:8080
       - name: Collect logs on failure
         if: failure()
         run: |
-          echo "=== Pod status ===" && kubectl get pods -o wide
-          echo "=== App logs ===" && kubectl logs -l app=kubernetes-kit-demo --all-containers --tail=200
-          echo "=== Redis logs ===" && kubectl logs -l app=kubernetes-kit-redis --tail=50
-          echo "=== Events ===" && kubectl get events --sort-by='.lastTimestamp'
+          mkdir -p k8s-logs
+          kubectl get pods -o wide > k8s-logs/pod-status.txt
+          kubectl logs -l app=kubernetes-kit-demo --all-containers --prefix --tail=-1 > k8s-logs/app.log
+          kubectl logs -l app=kubernetes-kit-redis --tail=-1 > k8s-logs/redis.log
+          kubectl logs -n envoy-gateway-system -l gateway.envoyproxy.io/owning-gateway-name=public-gateway --tail=-1 > k8s-logs/envoy.log || true
+          kubectl get events --sort-by='.lastTimestamp' > k8s-logs/events.txt
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: k8s-logs
+          path: k8s-logs/
       - name: Cleanup
         if: always()
         run: kill $ENVOY_PORT_FORWARD_PID 2>/dev/null || true
