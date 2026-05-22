@@ -11,6 +11,7 @@ package com.vaadin.kubernetes.starter.ui;
 
 import jakarta.servlet.http.Cookie;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -50,7 +51,7 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
 
     private final String updateVersionHeaderName;
 
-    private final String stickySessionCookieName;
+    private final List<String> stickySessionCookieNames;
 
     private SwitchVersionListener switchVersionListener;
 
@@ -62,13 +63,13 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
      *            differs from this version, a notification is shown prompting
      *            the user to switch to the new version. If {@code null},
      *            rolling update version detection is disabled.
-     * @param stickySessionCookieName
-     *            the name of the cookie used by the ingress controller or
-     *            gateway implementation for sticky sessions. This must match
-     *            the cookie name configured in the infrastructure routing
-     *            traffic to the application. When the user accepts a version
-     *            switch, this cookie is removed so that the next request is no
-     *            longer pinned to the old pod.
+     * @param stickySessionCookieNames
+     *            the names of the cookies used by the ingress controller or
+     *            gateway implementation for sticky sessions. All cookies in the
+     *            list are removed when the user accepts a version switch, so
+     *            that the next request is no longer pinned to the old pod.
+     *            Multiple names are needed when the gateway sets more than one
+     *            affinity cookie (e.g. Azure Application Gateway with AGIC).
      * @param updateVersionHeaderName
      *            the name of the HTTP request header used to detect a new
      *            application version during rolling updates. The ingress
@@ -79,9 +80,10 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
      * @see KubernetesKitProperties#getUpdateVersionHeaderName()
      */
     public RollingUpdateHandler(String appVersion,
-            String stickySessionCookieName, String updateVersionHeaderName) {
+            List<String> stickySessionCookieNames,
+            String updateVersionHeaderName) {
         this.appVersion = appVersion;
-        this.stickySessionCookieName = stickySessionCookieName;
+        this.stickySessionCookieNames = stickySessionCookieNames;
         this.updateVersionHeaderName = updateVersionHeaderName;
     }
 
@@ -176,10 +178,13 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
     }
 
     private void removeStickyClusterCookie() {
-        LOGGER.debug("Removing cookie '{}'.", stickySessionCookieName);
-        Cookie cookie = new Cookie(stickySessionCookieName, "");
-        cookie.setMaxAge(0);
-        VaadinResponse.getCurrent().addCookie(cookie);
+        VaadinResponse response = VaadinResponse.getCurrent();
+        for (String name : stickySessionCookieNames) {
+            LOGGER.debug("Removing cookie '{}'.", name);
+            Cookie cookie = new Cookie(name, "");
+            cookie.setMaxAge(0);
+            response.addCookie(cookie);
+        }
     }
 
 }

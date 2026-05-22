@@ -9,6 +9,8 @@
  */
 package com.vaadin.kubernetes.starter.ui;
 
+import java.util.List;
+
 import com.vaadin.kubernetes.starter.KubernetesKitProperties;
 
 /**
@@ -56,7 +58,7 @@ public class ClusterSupport extends RollingUpdateHandler {
     @Deprecated(forRemoval = true)
     @SuppressWarnings("deprecation")
     public ClusterSupport() {
-        super(System.getenv(ENV_APP_VERSION), STICKY_CLUSTER_COOKIE,
+        super(System.getenv(ENV_APP_VERSION), List.of(STICKY_CLUSTER_COOKIE),
                 UPDATE_VERSION_HEADER);
     }
 
@@ -73,7 +75,7 @@ public class ClusterSupport extends RollingUpdateHandler {
     @SuppressWarnings("deprecation")
     public ClusterSupport(String stickySessionCookieName,
             String updateVersionHeaderName) {
-        super(System.getenv(ENV_APP_VERSION), stickySessionCookieName,
+        super(System.getenv(ENV_APP_VERSION), List.of(stickySessionCookieName),
                 updateVersionHeaderName);
     }
 
@@ -91,7 +93,8 @@ public class ClusterSupport extends RollingUpdateHandler {
     @Deprecated(forRemoval = true)
     public ClusterSupport(String appVersion, String stickySessionCookieName,
             String updateVersionHeaderName) {
-        super(appVersion, stickySessionCookieName, updateVersionHeaderName);
+        super(appVersion, List.of(stickySessionCookieName),
+                updateVersionHeaderName);
     }
 
 }

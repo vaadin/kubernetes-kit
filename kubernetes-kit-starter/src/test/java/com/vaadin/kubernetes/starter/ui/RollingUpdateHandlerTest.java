@@ -2,6 +2,7 @@ package com.vaadin.kubernetes.starter.ui;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -67,8 +68,8 @@ public class RollingUpdateHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new RollingUpdateHandler("1.0.0", "INGRESSCOOKIE",
-                "X-AppUpdate");
+        handler = new RollingUpdateHandler("1.0.0",
+                List.of("INGRESSCOOKIE"), "X-AppUpdate");
         currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
@@ -93,7 +94,7 @@ public class RollingUpdateHandlerTest {
     @Test
     void serviceInit_withNoAppVersion_requestHandlerIsNotAdded() {
         RollingUpdateHandler noVersionHandler = new RollingUpdateHandler(null,
-                "INGRESSCOOKIE", "X-AppUpdate");
+                List.of("INGRESSCOOKIE"), "X-AppUpdate");
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
         noVersionHandler.serviceInit(serviceInitEvent);
@@ -229,7 +230,7 @@ public class RollingUpdateHandlerTest {
     void handleRequest_usesConfiguredHeaderName() throws IOException {
         String customHeader = "X-AppVersion";
         RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
-                "INGRESSCOOKIE", customHeader);
+                List.of("INGRESSCOOKIE"), customHeader);
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
 
@@ -255,7 +256,7 @@ public class RollingUpdateHandlerTest {
     void onComponentEvent_usesConfiguredCookieName() throws IOException {
         String customCookieName = "my-gateway-cookie";
         RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
-                customCookieName, "X-AppUpdate");
+                List.of(customCookieName), "X-AppUpdate");
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
         VersionNotifier.SwitchVersionEvent switchVersionEvent = mock(
@@ -295,6 +296,53 @@ public class RollingUpdateHandlerTest {
         }
         verify(vaadinResponse).addCookie(cookieCaptor.capture());
         assertEquals(customCookieName, cookieCaptor.getValue().getName());
+    }
+
+    @Test
+    void onComponentEvent_expiresAllConfiguredCookieNames() throws IOException {
+        String cookieName1 = "ApplicationGatewayAffinity";
+        String cookieName2 = "ApplicationGatewayAffinityCORS";
+        RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
+                List.of(cookieName1, cookieName2), "X-AppUpdate");
+        WrappedSession wrappedSession = mock(WrappedSession.class);
+        UI ui = mock(UI.class);
+        VersionNotifier.SwitchVersionEvent switchVersionEvent = mock(
+                VersionNotifier.SwitchVersionEvent.class);
+        ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor
+                .forClass(Cookie.class);
+
+        when(vaadinRequest.getHeader("X-AppUpdate")).thenReturn("2.0.0");
+        vaadinRequestMockedStatic.when(VaadinRequest::getCurrent)
+                .thenReturn(vaadinRequest);
+        vaadinResponseMockedStatic.when(VaadinResponse::getCurrent)
+                .thenReturn(vaadinResponse);
+        when(vaadinRequest.getWrappedSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getSession()).thenReturn(wrappedSession);
+        when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
+        when(ui.getChildren()).thenReturn(Stream.empty());
+
+        customHandler.serviceInit(serviceInitEvent);
+
+        verify(serviceInitEvent)
+                .addRequestHandler(requestHandlerArgCaptor.capture());
+        requestHandlerArgCaptor.getValue().handleRequest(vaadinSession,
+                vaadinRequest, vaadinResponse);
+        try (MockedConstruction<VersionNotifier> mockedVersionNotifier = mockConstruction(
+                VersionNotifier.class)) {
+            verify(vaadinSession).access(commandArgCaptor.capture());
+            commandArgCaptor.getValue().execute();
+            verify(mockedVersionNotifier.constructed().get(0))
+                    .addSwitchVersionEventListener(
+                            componentEventListenerArgCaptor.capture());
+            componentEventListenerArgCaptor.getValue()
+                    .onComponentEvent(switchVersionEvent);
+        }
+        verify(vaadinResponse, times(2)).addCookie(cookieCaptor.capture());
+        List<String> expiredNames = cookieCaptor.getAllValues().stream()
+                .map(Cookie::getName).toList();
+        assertEquals(List.of(cookieName1, cookieName2), expiredNames);
+        cookieCaptor.getAllValues()
+                .forEach(c -> assertEquals(0, c.getMaxAge()));
     }
 
     @ParameterizedTest(name = "{index} And_IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")
