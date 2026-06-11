@@ -69,7 +69,7 @@ public class KubernetesKitConfiguration {
     RollingUpdateHandler rollingUpdateHandler(
             KubernetesKitProperties properties) {
         return new RollingUpdateHandler(properties.getAppVersion(),
-                properties.getStickySessionCookieName(),
+                properties.getStickySessionCookieNames(),
                 properties.getUpdateVersionHeaderName());
     }
 

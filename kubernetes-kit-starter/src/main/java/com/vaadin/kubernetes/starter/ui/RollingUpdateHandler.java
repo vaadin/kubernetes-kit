@@ -76,15 +76,48 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
      *            controller or gateway sets this header on requests to the
      *            current version with the new version as its value.
      * @see KubernetesKitProperties#getAppVersion()
-     * @see KubernetesKitProperties#getStickySessionCookieName()
+     * @see KubernetesKitProperties#getStickySessionCookieNames()
      * @see KubernetesKitProperties#getUpdateVersionHeaderName()
      */
     public RollingUpdateHandler(String appVersion,
             List<String> stickySessionCookieNames,
             String updateVersionHeaderName) {
         this.appVersion = appVersion;
-        this.stickySessionCookieNames = stickySessionCookieNames;
+        this.stickySessionCookieNames = stickySessionCookieNames != null
+                ? stickySessionCookieNames
+                : List.of();
         this.updateVersionHeaderName = updateVersionHeaderName;
+    }
+
+    /**
+     * Creates a new {@code RollingUpdateHandler} instance with a single sticky
+     * session cookie name.
+     *
+     * @param appVersion
+     *            the application version. When the update version header value
+     *            differs from this version, a notification is shown prompting
+     *            the user to switch to the new version. If {@code null},
+     *            rolling update version detection is disabled.
+     * @param stickySessionCookieName
+     *            the name of the cookie used by the ingress controller or
+     *            gateway implementation for sticky sessions.
+     * @param updateVersionHeaderName
+     *            the name of the HTTP request header used to detect a new
+     *            application version during rolling updates.
+     * @see KubernetesKitProperties#getAppVersion()
+     * @see KubernetesKitProperties#getStickySessionCookieNames()
+     * @see KubernetesKitProperties#getUpdateVersionHeaderName()
+     * @deprecated Use {@link #RollingUpdateHandler(String, List, String)}
+     *             instead to support multiple sticky session cookie names.
+     */
+    @Deprecated(forRemoval = true)
+    public RollingUpdateHandler(String appVersion,
+            String stickySessionCookieName, String updateVersionHeaderName) {
+        this(appVersion,
+                stickySessionCookieName != null
+                        ? List.of(stickySessionCookieName)
+                        : List.of(),
+                updateVersionHeaderName);
     }
 
     /**
@@ -179,8 +212,8 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
 
     private void removeStickyClusterCookie() {
         VaadinResponse response = VaadinResponse.getCurrent();
+        LOGGER.debug("Removing cookies: {}.", stickySessionCookieNames);
         for (String name : stickySessionCookieNames) {
-            LOGGER.debug("Removing cookie '{}'.", name);
             Cookie cookie = new Cookie(name, "");
             cookie.setMaxAge(0);
             response.addCookie(cookie);

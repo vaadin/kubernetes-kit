@@ -125,7 +125,7 @@ public class KubernetesKitProperties {
      * implementation-specific cookie name that must be determined from the
      * implementation's documentation or by inspecting HTTP responses.
      */
-    private List<String> stickySessionCookieName = new ArrayList<>(
+    private List<String> stickySessionCookieNames = new ArrayList<>(
             List.of("INGRESSCOOKIE"));
 
     /**
@@ -278,10 +278,26 @@ public class KubernetesKitProperties {
      * implementation for sticky sessions.
      *
      * @return the sticky session cookie names
-     * @see #stickySessionCookieName
+     * @see #stickySessionCookieNames
      */
-    public List<String> getStickySessionCookieName() {
-        return stickySessionCookieName;
+    public List<String> getStickySessionCookieNames() {
+        return stickySessionCookieNames;
+    }
+
+    /**
+     * Gets the name of the cookie used by the ingress controller or gateway
+     * implementation for sticky sessions.
+     *
+     * @return the first sticky session cookie name, or {@code null} if none
+     *         configured
+     * @see #stickySessionCookieNames
+     * @deprecated Use {@link #getStickySessionCookieNames()} instead to get
+     *             all configured cookie names.
+     */
+    @Deprecated(forRemoval = true)
+    public String getStickySessionCookieName() {
+        return stickySessionCookieNames.isEmpty() ? null
+                : stickySessionCookieNames.get(0);
     }
 
     /**
@@ -290,11 +306,28 @@ public class KubernetesKitProperties {
      *
      * @param stickySessionCookieName
      *            the sticky session cookie names
-     * @see #stickySessionCookieName
+     * @see #stickySessionCookieNames
      */
     public void setStickySessionCookieName(
             List<String> stickySessionCookieName) {
-        this.stickySessionCookieName = stickySessionCookieName;
+        this.stickySessionCookieNames = stickySessionCookieName;
+    }
+
+    /**
+     * Sets the name of the cookie used by the ingress controller or gateway
+     * implementation for sticky sessions.
+     *
+     * @param stickySessionCookieName
+     *            the sticky session cookie name
+     * @see #stickySessionCookieNames
+     * @deprecated Use {@link #setStickySessionCookieName(List)} instead to
+     *             support multiple cookie names.
+     */
+    @Deprecated(forRemoval = true)
+    public void setStickySessionCookieName(String stickySessionCookieName) {
+        this.stickySessionCookieNames = stickySessionCookieName != null
+                ? new ArrayList<>(List.of(stickySessionCookieName))
+                : new ArrayList<>();
     }
 
 }
