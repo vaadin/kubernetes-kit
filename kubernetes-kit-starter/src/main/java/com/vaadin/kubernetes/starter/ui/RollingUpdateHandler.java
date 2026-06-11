@@ -211,6 +211,9 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
     }
 
     private void removeStickyClusterCookie() {
+        if (stickySessionCookieNames == null || stickySessionCookieNames.isEmpty()) {
+            return;
+        }
         VaadinResponse response = VaadinResponse.getCurrent();
         LOGGER.debug("Removing cookies: {}.", stickySessionCookieNames);
         for (String name : stickySessionCookieNames) {

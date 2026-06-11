@@ -255,32 +255,24 @@ public class RollingUpdateHandlerTest {
 
     @Test
     void onComponentEvent_usesConfiguredCookieName() throws IOException {
-        String customCookieName = "my-gateway-cookie";
-        RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
-                List.of(customCookieName), "X-AppUpdate");
-        SwitchVersionListener switchVersionListener = mock(
-                SwitchVersionListener.class);
-        when(switchVersionListener.nodeSwitch(any(), any())).thenReturn(true);
-        customHandler.setSwitchVersionListener(switchVersionListener);
-
-        List<Cookie> cookies = triggerSwitchVersionEvent(customHandler);
-
-        assertEquals(1, cookies.size());
-        assertEquals(customCookieName, cookies.get(0).getName());
+        assertConfiguredCookiesExpired("my-gateway-cookie");
     }
 
     @Test
     void onComponentEvent_expiresAllConfiguredCookieNames() throws IOException {
-        String cookieName1 = "ApplicationGatewayAffinity";
-        String cookieName2 = "ApplicationGatewayAffinityCORS";
+        assertConfiguredCookiesExpired("ApplicationGatewayAffinity", "ApplicationGatewayAffinityCORS");
+    }
+
+    private void assertConfiguredCookiesExpired(String... cookieNames) throws IOException {
+        List<String> cookieNamesList = List.of(cookieNames);
         RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
-                List.of(cookieName1, cookieName2), "X-AppUpdate");
+                cookieNamesList, "X-AppUpdate");
 
         List<Cookie> cookies = triggerSwitchVersionEvent(customHandler);
 
         List<String> expiredNames = cookies.stream().map(Cookie::getName)
                 .toList();
-        assertEquals(List.of(cookieName1, cookieName2), expiredNames);
+        assertEquals(cookieNamesList, expiredNames);
         cookies.forEach(c -> assertEquals(0, c.getMaxAge()));
     }
 
