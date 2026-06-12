@@ -17,6 +17,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SameSite;
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 
 /**
  * Definition of configuration properties for the Kubernetes Kit starter.
@@ -294,10 +295,14 @@ public class KubernetesKitProperties {
      * @deprecated Use {@link #getStickySessionCookieNames()} instead to get
      *             all configured cookie names.
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(since = "3.1", forRemoval = true)
+    @DeprecatedConfigurationProperty(
+        since = "3.1", replacement = "vaadin.kubernetes.sticky-session-cookie-names",
+        reason = "Replaced by vaadin.kubernetes.sticky-session-cookie-names which accepts a list of cookie names."
+    )
     public String getStickySessionCookieName() {
-        return stickySessionCookieNames.isEmpty() ? null
-                : stickySessionCookieNames.get(0);
+        return stickySessionCookieNames == null || stickySessionCookieNames.isEmpty() ? null
+                : stickySessionCookieNames.getFirst();
     }
 
     /**
@@ -308,7 +313,7 @@ public class KubernetesKitProperties {
      *            the sticky session cookie names
      * @see #stickySessionCookieNames
      */
-    public void setStickySessionCookieName(
+    public void setStickySessionCookieNames(
             List<String> stickySessionCookieName) {
         this.stickySessionCookieNames = stickySessionCookieName;
     }
@@ -320,10 +325,10 @@ public class KubernetesKitProperties {
      * @param stickySessionCookieName
      *            the sticky session cookie name
      * @see #stickySessionCookieNames
-     * @deprecated Use {@link #setStickySessionCookieName(List)} instead to
+     * @deprecated Use {@link #setStickySessionCookieNames(List)} instead to
      *             support multiple cookie names.
      */
-    @Deprecated(forRemoval = true)
+    @Deprecated(since = "3.1", forRemoval = true)
     public void setStickySessionCookieName(String stickySessionCookieName) {
         this.stickySessionCookieNames = stickySessionCookieName != null
                 ? new ArrayList<>(List.of(stickySessionCookieName))
