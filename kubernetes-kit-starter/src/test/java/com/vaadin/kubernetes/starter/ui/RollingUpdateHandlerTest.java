@@ -2,6 +2,7 @@ package com.vaadin.kubernetes.starter.ui;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +34,7 @@ import jakarta.servlet.http.Cookie;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
@@ -67,8 +69,8 @@ public class RollingUpdateHandlerTest {
 
     @BeforeEach
     void setUp() {
-        handler = new RollingUpdateHandler("1.0.0", "INGRESSCOOKIE",
-                "X-AppUpdate");
+        handler = new RollingUpdateHandler("1.0.0",
+                List.of("INGRESSCOOKIE"), "X-AppUpdate");
         currentInstanceMockedStatic = mockStatic(CurrentInstance.class);
         vaadinRequestMockedStatic = mockStatic(VaadinRequest.class);
         vaadinResponseMockedStatic = mockStatic(VaadinResponse.class);
@@ -93,7 +95,7 @@ public class RollingUpdateHandlerTest {
     @Test
     void serviceInit_withNoAppVersion_requestHandlerIsNotAdded() {
         RollingUpdateHandler noVersionHandler = new RollingUpdateHandler(null,
-                "INGRESSCOOKIE", "X-AppUpdate");
+                List.of("INGRESSCOOKIE"), "X-AppUpdate");
         ServiceInitEvent serviceInitEvent = mock(ServiceInitEvent.class);
 
         noVersionHandler.serviceInit(serviceInitEvent);
@@ -229,7 +231,7 @@ public class RollingUpdateHandlerTest {
     void handleRequest_usesConfiguredHeaderName() throws IOException {
         String customHeader = "X-AppVersion";
         RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
-                "INGRESSCOOKIE", customHeader);
+                List.of("INGRESSCOOKIE"), customHeader);
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
 
@@ -253,15 +255,33 @@ public class RollingUpdateHandlerTest {
 
     @Test
     void onComponentEvent_usesConfiguredCookieName() throws IOException {
-        String customCookieName = "my-gateway-cookie";
+        assertConfiguredCookiesExpired("my-gateway-cookie");
+    }
+
+    @Test
+    void onComponentEvent_expiresAllConfiguredCookieNames() throws IOException {
+        assertConfiguredCookiesExpired("ApplicationGatewayAffinity", "ApplicationGatewayAffinityCORS");
+    }
+
+    private void assertConfiguredCookiesExpired(String... cookieNames) throws IOException {
+        List<String> cookieNamesList = List.of(cookieNames);
         RollingUpdateHandler customHandler = new RollingUpdateHandler("1.0.0",
-                customCookieName, "X-AppUpdate");
+                cookieNamesList, "X-AppUpdate");
+
+        List<Cookie> cookies = triggerSwitchVersionEvent(customHandler);
+
+        List<String> expiredNames = cookies.stream().map(Cookie::getName)
+                .toList();
+        assertEquals(cookieNamesList, expiredNames);
+        cookies.forEach(c -> assertEquals(0, c.getMaxAge()));
+    }
+
+    private List<Cookie> triggerSwitchVersionEvent(
+            RollingUpdateHandler handlerToTest) throws IOException {
         WrappedSession wrappedSession = mock(WrappedSession.class);
         UI ui = mock(UI.class);
         VersionNotifier.SwitchVersionEvent switchVersionEvent = mock(
                 VersionNotifier.SwitchVersionEvent.class);
-        SwitchVersionListener switchVersionListener = mock(
-                SwitchVersionListener.class);
         ArgumentCaptor<Cookie> cookieCaptor = ArgumentCaptor
                 .forClass(Cookie.class);
 
@@ -274,10 +294,8 @@ public class RollingUpdateHandlerTest {
         when(vaadinSession.getSession()).thenReturn(wrappedSession);
         when(vaadinSession.getUIs()).thenReturn(Collections.singletonList(ui));
         when(ui.getChildren()).thenReturn(Stream.empty());
-        when(switchVersionListener.nodeSwitch(any(), any())).thenReturn(true);
 
-        customHandler.setSwitchVersionListener(switchVersionListener);
-        customHandler.serviceInit(serviceInitEvent);
+        handlerToTest.serviceInit(serviceInitEvent);
 
         verify(serviceInitEvent)
                 .addRequestHandler(requestHandlerArgCaptor.capture());
@@ -293,8 +311,8 @@ public class RollingUpdateHandlerTest {
             componentEventListenerArgCaptor.getValue()
                     .onComponentEvent(switchVersionEvent);
         }
-        verify(vaadinResponse).addCookie(cookieCaptor.capture());
-        assertEquals(customCookieName, cookieCaptor.getValue().getName());
+        verify(vaadinResponse, atLeastOnce()).addCookie(cookieCaptor.capture());
+        return cookieCaptor.getAllValues();
     }
 
     @ParameterizedTest(name = "{index} And_IfNodeSwitchIs_{0}_doAppCleanupIsCalled_{1}_times")

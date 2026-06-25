@@ -10,11 +10,14 @@
 package com.vaadin.kubernetes.starter;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import com.vaadin.kubernetes.starter.sessiontracker.CurrentKey;
 import com.vaadin.kubernetes.starter.sessiontracker.SameSite;
+import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 
 /**
  * Definition of configuration properties for the Kubernetes Kit starter.
@@ -95,14 +98,21 @@ public class KubernetesKitProperties {
     private String appVersion = System.getenv("APP_VERSION");
 
     /**
-     * The name of the cookie used by the ingress controller or gateway
+     * The names of the cookies used by the ingress controller or gateway
      * implementation for sticky sessions (session affinity).
      * <p>
-     * This must match the cookie name used by the infrastructure routing
-     * traffic to the application. The cookie is removed by
-     * {@link com.vaadin.kubernetes.starter.ui.RollingUpdateHandler RollingUpdateHandler}
-     * when the user accepts a version switch, so that the next request is no
-     * longer pinned to the old pod.
+     * All cookies in the list are removed by
+     * {@link com.vaadin.kubernetes.starter.ui.RollingUpdateHandler
+     * RollingUpdateHandler} when the user accepts a version switch, so that the
+     * next request is no longer pinned to the old pod.
+     * <p>
+     * Multiple cookie names can be specified as a comma-separated list in the
+     * {@code VAADIN_KUBERNETES_STICKY_SESSION_COOKIE_NAME} environment variable
+     * or the {@code vaadin.kubernetes.sticky-session-cookie-name} property.
+     * This is useful when the gateway sets more than one affinity cookie — for
+     * example, Azure Application Gateway with AGIC sets both
+     * {@code ApplicationGatewayAffinity} and {@code ApplicationGatewayAffinityCORS}
+     * when cookie-based affinity is enabled.
      * <p>
      * For the Kubernetes Ingress API with NGINX Ingress, the default cookie
      * name {@code INGRESSCOOKIE} is used when session affinity is enabled via
@@ -116,7 +126,8 @@ public class KubernetesKitProperties {
      * implementation-specific cookie name that must be determined from the
      * implementation's documentation or by inspecting HTTP responses.
      */
-    private String stickySessionCookieName = "INGRESSCOOKIE";
+    private List<String> stickySessionCookieNames = new ArrayList<>(
+            List.of("INGRESSCOOKIE"));
 
     /**
      * Checks if auto-configuration of Kubernetes Kit is
@@ -264,14 +275,47 @@ public class KubernetesKitProperties {
     }
 
     /**
+     * Gets the names of the cookies used by the ingress controller or gateway
+     * implementation for sticky sessions.
+     *
+     * @return the sticky session cookie names
+     * @see #stickySessionCookieNames
+     */
+    public List<String> getStickySessionCookieNames() {
+        return stickySessionCookieNames;
+    }
+
+    /**
      * Gets the name of the cookie used by the ingress controller or gateway
      * implementation for sticky sessions.
      *
-     * @return the sticky session cookie name
-     * @see #stickySessionCookieName
+     * @return the first sticky session cookie name, or {@code null} if none
+     *         configured
+     * @see #stickySessionCookieNames
+     * @deprecated Use {@link #getStickySessionCookieNames()} instead to get
+     *             all configured cookie names.
      */
+    @Deprecated(since = "3.1", forRemoval = true)
+    @DeprecatedConfigurationProperty(
+        since = "3.1", replacement = "vaadin.kubernetes.sticky-session-cookie-names",
+        reason = "Replaced by vaadin.kubernetes.sticky-session-cookie-names which accepts a list of cookie names."
+    )
     public String getStickySessionCookieName() {
-        return stickySessionCookieName;
+        return stickySessionCookieNames == null || stickySessionCookieNames.isEmpty() ? null
+                : stickySessionCookieNames.getFirst();
+    }
+
+    /**
+     * Sets the names of the cookies used by the ingress controller or gateway
+     * implementation for sticky sessions.
+     *
+     * @param stickySessionCookieName
+     *            the sticky session cookie names
+     * @see #stickySessionCookieNames
+     */
+    public void setStickySessionCookieNames(
+            List<String> stickySessionCookieName) {
+        this.stickySessionCookieNames = stickySessionCookieName;
     }
 
     /**
@@ -280,10 +324,15 @@ public class KubernetesKitProperties {
      *
      * @param stickySessionCookieName
      *            the sticky session cookie name
-     * @see #stickySessionCookieName
+     * @see #stickySessionCookieNames
+     * @deprecated Use {@link #setStickySessionCookieNames(List)} instead to
+     *             support multiple cookie names.
      */
+    @Deprecated(since = "3.1", forRemoval = true)
     public void setStickySessionCookieName(String stickySessionCookieName) {
-        this.stickySessionCookieName = stickySessionCookieName;
+        this.stickySessionCookieNames = stickySessionCookieName != null
+                ? new ArrayList<>(List.of(stickySessionCookieName))
+                : new ArrayList<>();
     }
 
 }

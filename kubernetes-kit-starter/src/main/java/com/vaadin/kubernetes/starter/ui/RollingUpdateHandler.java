@@ -11,6 +11,7 @@ package com.vaadin.kubernetes.starter.ui;
 
 import jakarta.servlet.http.Cookie;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -50,7 +51,7 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
 
     private final String updateVersionHeaderName;
 
-    private final String stickySessionCookieName;
+    private final List<String> stickySessionCookieNames;
 
     private SwitchVersionListener switchVersionListener;
 
@@ -62,27 +63,61 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
      *            differs from this version, a notification is shown prompting
      *            the user to switch to the new version. If {@code null},
      *            rolling update version detection is disabled.
-     * @param stickySessionCookieName
-     *            the name of the cookie used by the ingress controller or
-     *            gateway implementation for sticky sessions. This must match
-     *            the cookie name configured in the infrastructure routing
-     *            traffic to the application. When the user accepts a version
-     *            switch, this cookie is removed so that the next request is no
-     *            longer pinned to the old pod.
+     * @param stickySessionCookieNames
+     *            the names of the cookies used by the ingress controller or
+     *            gateway implementation for sticky sessions. All cookies in the
+     *            list are removed when the user accepts a version switch, so
+     *            that the next request is no longer pinned to the old pod.
+     *            Multiple names are needed when the gateway sets more than one
+     *            affinity cookie (e.g. Azure Application Gateway with AGIC).
      * @param updateVersionHeaderName
      *            the name of the HTTP request header used to detect a new
      *            application version during rolling updates. The ingress
      *            controller or gateway sets this header on requests to the
      *            current version with the new version as its value.
      * @see KubernetesKitProperties#getAppVersion()
-     * @see KubernetesKitProperties#getStickySessionCookieName()
+     * @see KubernetesKitProperties#getStickySessionCookieNames()
      * @see KubernetesKitProperties#getUpdateVersionHeaderName()
      */
     public RollingUpdateHandler(String appVersion,
-            String stickySessionCookieName, String updateVersionHeaderName) {
+            List<String> stickySessionCookieNames,
+            String updateVersionHeaderName) {
         this.appVersion = appVersion;
-        this.stickySessionCookieName = stickySessionCookieName;
+        this.stickySessionCookieNames = stickySessionCookieNames != null
+                ? stickySessionCookieNames
+                : List.of();
         this.updateVersionHeaderName = updateVersionHeaderName;
+    }
+
+    /**
+     * Creates a new {@code RollingUpdateHandler} instance with a single sticky
+     * session cookie name.
+     *
+     * @param appVersion
+     *            the application version. When the update version header value
+     *            differs from this version, a notification is shown prompting
+     *            the user to switch to the new version. If {@code null},
+     *            rolling update version detection is disabled.
+     * @param stickySessionCookieName
+     *            the name of the cookie used by the ingress controller or
+     *            gateway implementation for sticky sessions.
+     * @param updateVersionHeaderName
+     *            the name of the HTTP request header used to detect a new
+     *            application version during rolling updates.
+     * @see KubernetesKitProperties#getAppVersion()
+     * @see KubernetesKitProperties#getStickySessionCookieNames()
+     * @see KubernetesKitProperties#getUpdateVersionHeaderName()
+     * @deprecated Use {@link #RollingUpdateHandler(String, List, String)}
+     *             instead to support multiple sticky session cookie names.
+     */
+    @Deprecated(forRemoval = true)
+    public RollingUpdateHandler(String appVersion,
+            String stickySessionCookieName, String updateVersionHeaderName) {
+        this(appVersion,
+                stickySessionCookieName != null
+                        ? List.of(stickySessionCookieName)
+                        : List.of(),
+                updateVersionHeaderName);
     }
 
     /**
@@ -176,10 +211,16 @@ public class RollingUpdateHandler implements VaadinServiceInitListener {
     }
 
     private void removeStickyClusterCookie() {
-        LOGGER.debug("Removing cookie '{}'.", stickySessionCookieName);
-        Cookie cookie = new Cookie(stickySessionCookieName, "");
-        cookie.setMaxAge(0);
-        VaadinResponse.getCurrent().addCookie(cookie);
+        if (stickySessionCookieNames == null || stickySessionCookieNames.isEmpty()) {
+            return;
+        }
+        VaadinResponse response = VaadinResponse.getCurrent();
+        LOGGER.debug("Removing cookies: {}.", stickySessionCookieNames);
+        for (String name : stickySessionCookieNames) {
+            Cookie cookie = new Cookie(name, "");
+            cookie.setMaxAge(0);
+            response.addCookie(cookie);
+        }
     }
 
 }
