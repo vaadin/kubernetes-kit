@@ -470,34 +470,67 @@ class SessionSerializerTest {
     void serialize_applicationStopped_serializationRequestWhilePendingSerialization_ignoreAndWaitForCompletion() {
         AtomicBoolean serializationStarted = new AtomicBoolean();
         AtomicBoolean serializationCompleted = new AtomicBoolean();
-        AtomicBoolean serializationInProgress = new AtomicBoolean();
+        // Block the first serialization inside onSerializationSuccess on a
+        // test-controlled latch instead of Thread.sleep. The previous timing
+        // pattern relied on the sleep outlasting the await() polling for
+        // !isRunning(); on slow runners the sleep could finish first, letting
+        // stop() shut down the executor before the second serialize() ran,
+        // which then hit RejectedExecutionException instead of taking the
+        // expected "wait for pending" branch.
+        CountDownLatch firstSerializationRelease = new CountDownLatch(1);
         doAnswer(i -> serializationStarted.getAndSet(true)).when(connector)
                 .markSerializationStarted(clusterSID, timeToLive);
         doAnswer(i -> serializationCompleted.getAndSet(true)).when(connector)
                 .markSerializationComplete(clusterSID);
         doAnswer(i -> {
-            serializationInProgress.set(true);
-            // Slow down serialization simulation to simplify assertions
-            Thread.sleep(300);
+            firstSerializationRelease.await();
             return null;
         }).when(serializationCallback).onSerializationSuccess();
 
-        serializer.serialize(httpSession);
-        await().during(100, MILLISECONDS).untilTrue(serializationStarted);
-        verify(connector).markSerializationStarted(clusterSID, timeToLive);
+        try {
+            serializer.serialize(httpSession);
+            await().atMost(1000, MILLISECONDS).untilTrue(serializationStarted);
+            verify(connector).markSerializationStarted(clusterSID, timeToLive);
 
-        // Simulate stop asynchronously to prevent blocking the current thread
-        AtomicBoolean stopCompleted = new AtomicBoolean();
-        CompletableFuture
-                .runAsync(() -> serializer.stop())
-                .whenComplete((r, e) -> stopCompleted.set(e == null));
+            // Simulate stop asynchronously to prevent blocking the current
+            // thread. stop() flips isRunning()->false immediately, then
+            // blocks in waitForSerialization() until 'pending' is empty.
+            AtomicBoolean stopCompleted = new AtomicBoolean();
+            CompletableFuture.runAsync(() -> serializer.stop())
+                    .whenComplete((r, e) -> stopCompleted.set(e == null));
 
-        await().until(() -> !serializer.isRunning());
-        // Enqueue another request, should wait until serialization completion.
-        serializer.serialize(httpSession);
-        Assertions.assertTrue(serializationCompleted.get(),
-                "Serialization completed");
-        Assertions.assertTrue(stopCompleted.get(), "Stop completed");
+            await().until(() -> !serializer.isRunning());
+
+            // Issue the second serialize() on a separate thread while the
+            // first serialization is still pending (latch held). It must
+            // take the "wait for pending" branch instead of submitting to
+            // the executor that stop() is about to shut down.
+            AtomicBoolean secondSerializeCompleted = new AtomicBoolean();
+            CompletableFuture<Void> secondSerialize = CompletableFuture
+                    .runAsync(() -> serializer.serialize(httpSession))
+                    .whenComplete((r, e) -> secondSerializeCompleted
+                            .set(e == null));
+
+            // Give the second serialize() time to enter waitForSerialization()
+            // before releasing the latch; assert it is genuinely blocked
+            // (i.e. did not throw RejectedExecutionException synchronously).
+            await().during(100, MILLISECONDS)
+                    .until(() -> !secondSerialize.isDone());
+
+            // Release the first serialization; both stop() and the second
+            // serialize() should now complete cleanly.
+            firstSerializationRelease.countDown();
+
+            await().alias("Second serialize completed without exception")
+                    .atMost(1000, MILLISECONDS)
+                    .untilTrue(secondSerializeCompleted);
+            await().alias("Serialization completed").atMost(1000, MILLISECONDS)
+                    .untilTrue(serializationCompleted);
+            await().alias("Stop completed").atMost(1000, MILLISECONDS)
+                    .untilTrue(stopCompleted);
+        } finally {
+            firstSerializationRelease.countDown();
+        }
     }
 
     @Test
