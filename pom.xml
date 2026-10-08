@@ -94,8 +94,10 @@
             </dependency>
             <dependency>
                 <groupId>com.vaadin</groupId>
-                <artifactId>vaadin-spring</artifactId>
+                <artifactId>flow-bom</artifactId>
                 <version>${flow.version}</version>
+                <scope>import</scope>
+                <type>pom</type>
             </dependency>
             <dependency>
                 <groupId>com.vaadin</groupId>

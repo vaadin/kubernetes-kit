@@ -1,0 +1,60 @@
+name: Update Flow Version
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+env:
+  REPO_URL: https://maven.vaadin.com/vaadin-prereleases/com/vaadin
+  # Properties whose value is taken from Flow's own pom
+  ALIGNED_PROPERTIES: spring.boot.version testbench.version
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: Find latest Flow snapshot
+        id: flow
+        run: |
+          set -e -o pipefail
+          VERSION=$(curl -sf "$REPO_URL/vaadin-spring/maven-metadata.xml" \
+            | grep -oE '<version>[0-9]+\.[0-9]+-SNAPSHOT</version>' \
+            | sed -E 's|</?version>||g' | sort -V | tail -1)
+          CURRENT=$(grep -oP '(?<=<flow.version>)[^<]+' pom.xml)
+          echo "Latest Flow snapshot: $VERSION (current: $CURRENT)" | tee -a $GITHUB_STEP_SUMMARY
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Update pom.xml
+        env:
+          VERSION: ${{ steps.flow.outputs.version }}
+        run: |
+          set -e -o pipefail
+          TIMESTAMPED=$(curl -sf "$REPO_URL/flow-project/$VERSION/maven-metadata.xml" \
+            | grep -oP '(?<=<value>)[^<]+' | head -1)
+          curl -sf -o "$RUNNER_TEMP/flow-project.pom" \
+            "$REPO_URL/flow-project/$VERSION/flow-project-$TIMESTAMPED.pom"
+          sed -i "s|<flow.version>[^<]*</flow.version>|<flow.version>$VERSION</flow.version>|" pom.xml
+          for PROPERTY in $ALIGNED_PROPERTIES; do
+            VALUE=$(grep -oP "(?<=<$PROPERTY>)[^<]+" "$RUNNER_TEMP/flow-project.pom" | head -1)
+            if [ -z "$VALUE" ]; then
+              echo "::warning::$PROPERTY not found in Flow $VERSION pom"
+              continue
+            fi
+            echo "$PROPERTY: $VALUE" | tee -a $GITHUB_STEP_SUMMARY
+            sed -i "s|<$PROPERTY>[^<]*</$PROPERTY>|<$PROPERTY>$VALUE</$PROPERTY>|" pom.xml
+          done
+          git diff
+      - uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        with:
+          # A PAT or app token is required for the PR to trigger the validation workflows
+          token: ${{ secrets.VAADIN_BOT_TOKEN || github.token }}
+          branch: chore/update-flow
+          commit-message: 'chore: update to Flow ${{ steps.flow.outputs.version }}'
+          title: 'chore: update to Flow ${{ steps.flow.outputs.version }}'
+          body: |
+            Updates `flow.version` to the latest Flow snapshot and aligns
+            `${{ env.ALIGNED_PROPERTIES }}` with the values in Flow's pom.
+          delete-branch: true
