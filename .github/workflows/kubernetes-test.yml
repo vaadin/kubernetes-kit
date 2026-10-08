@@ -21,7 +21,7 @@ jobs:
   kubernetes-test:
     environment: ${{ github.event.pull_request.head.repo.fork && 'pr-tests' || '' }}
     timeout-minutes: 45
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v5
         with:
@@ -82,7 +82,7 @@ jobs:
             || (echo "App not responding correctly" && exit 1)
           kubectl logs -l app=kubernetes-kit-demo --tail=50 | grep -c ERROR | xargs -I{} test {} -eq 0
       - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
+        run: npx --yes playwright@1.63.0 install chromium --with-deps
       - name: Run Kubernetes integration tests
         run: |
           mvn verify -B -e -ntp \
